@@ -58,6 +58,14 @@
     h1{ font-size:18px; }
     #filter{ min-width:110px; }
   }
+  .tag.loan{ background:var(--accent-soft); color:var(--accent); margin-left:0; margin-right:6px; }
+  .steps{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .step{ display:flex; align-items:center; gap:6px; padding:6px 11px; border-radius:99px; border:1px solid var(--line); font-size:13.5px; color:var(--muted); background:#fff; }
+  .step .dot{ font-size:12px; }
+  .step.ok{ background:var(--green-soft); color:var(--green); border-color:transparent; }
+  .step.cur{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent); font-weight:700; }
+  .step small{ font-size:11px; opacity:.8; }
+  .stepbtns{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
   #login,#app{ display:none; }
   .center{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px; }
   .center .card{ width:100%; max-width:340px; text-align:center; }
@@ -83,7 +91,10 @@
 
   <div class="card">
     <h2>새 업무지시 등록</h2>
-    <label>업무 내용</label><input id="fTitle" placeholder="예: 3분기 연체 현황 보고서 작성" />
+    <label>업무 구분</label>
+    <select id="fType"><option value="general">일반업무 (단건 지시)</option><option value="loan">대출진행 (단계별)</option></select>
+    <div id="loanOpt" style="display:none"><label>현재 진행 단계 (이전 단계는 완료 처리됩니다)</label><select id="fStage"></select></div>
+    <label id="fTitleLabel">업무 내용</label><input id="fTitle" placeholder="예: 3분기 연체 현황 보고서 작성" />
     <label>상세 (선택)</label><textarea id="fDetail" rows="2"></textarea>
     <div class="row">
       <div><label>지시자</label><input id="fBy" placeholder="예: 김상무" /></div>
@@ -112,7 +123,10 @@
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // 업무 유형별 단계 (나중에 채권관리 등 유형을 추가할 때 여기에 추가)
+  const LOAN_STEPS = ['대출상담', '대출신청', '감정평가', '내부결재', '대출실행'];
   let me = '', members = [], nameOf = (e) => e;
+  const fmtD = (iso) => { const d = new Date(iso); return `${d.getMonth()+1}/${d.getDate()}`; };
 
   async function doLogin(){
     const email = $('emailInput').value.trim(), password = $('pwInput').value;
@@ -153,40 +167,68 @@
     };
   }
 
+  $('fStage').innerHTML = LOAN_STEPS.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+  $('fType').onchange = () => {
+    const loan = $('fType').value === 'loan';
+    $('loanOpt').style.display = loan ? 'block' : 'none';
+    $('fTitleLabel').textContent = loan ? '고객명 / 대출 건명' : '업무 내용';
+    $('fTitle').placeholder = loan ? '예: 홍길동 담보대출 1억' : '예: 3분기 연체 현황 보고서 작성';
+  };
+
   $('addBtn').onclick = async () => {
     const title = $('fTitle').value.trim();
     const emails = [...document.querySelectorAll('#fAsg input:checked')].map(i => i.value);
     if (!title || !emails.length) return alert('업무 내용과 담당자를 입력해주세요.');
     $('addBtn').disabled = true;
     const { data: t, error } = await sb.from('work_tasks').insert({
-      title, detail: $('fDetail').value.trim() || null, directed_by: $('fBy').value.trim() || null, due_date: $('fDue').value || null
+      title, detail: $('fDetail').value.trim() || null, directed_by: $('fBy').value.trim() || null, due_date: $('fDue').value || null,
+      task_type: $('fType').value
     }).select('id').single();
     if (error){ $('addBtn').disabled = false; return alert(error.message); }
     await sb.from('work_task_assignees').insert(emails.map(email => ({ task_id: t.id, email })));
+    if ($('fType').value === 'loan'){
+      const startIdx = +$('fStage').value, now = new Date().toISOString();
+      const { error: e2 } = await sb.from('work_task_steps').insert(LOAN_STEPS.map((name, i) => ({ task_id: t.id, seq: i + 1, name, done_at: i < startIdx ? now : null })));
+      if (e2){ $('addBtn').disabled = false; return alert(e2.message); }
+    }
     await sb.functions.invoke('task-notify', { body: { event: 'created', task_id: t.id } });
     ['fTitle','fDetail','fDue'].forEach(id => $(id).value = '');
     $('addBtn').disabled = false; loadTasks();
   };
 
   $('filter').onchange = loadTasks;
+  function loanBlock(t){
+    const steps = [...t.work_task_steps].sort((a, b) => a.seq - b.seq);
+    const cur = steps.find(s => !s.done_at);
+    const canAct = t.created_by === me || t.work_task_assignees.some(a => a.email === me);
+    const lastDone = [...steps].reverse().find(s => s.done_at);
+    const canUndo = canAct && lastDone && (t.created_by === me || lastDone.done_by === me);
+    const chips = steps.map(s => `<div class="step ${s.done_at ? 'ok' : (cur && cur.seq === s.seq ? 'cur' : '')}">
+      <span class="dot">${s.done_at ? '✓' : s.seq}</span><span>${esc(s.name)}</span>${s.done_at && s.done_by ? `<small>${esc(nameOf(s.done_by))} ${fmtD(s.done_at)}</small>` : ''}</div>`).join('');
+    const btns = canAct ? `<div class="stepbtns">
+      ${cur ? `<button class="btn small primary" data-step="${t.id}:${cur.seq}">✔ ${esc(cur.name)} 완료</button>` : ''}
+      ${canUndo ? `<button class="btn small" data-undo="${t.id}:${lastDone.seq}">↩ ${esc(lastDone.name)} 되돌리기</button>` : ''}</div>` : '';
+    return `<div class="meta">담당: ${esc(t.work_task_assignees.map(a => nameOf(a.email)).join(', '))}</div><div class="steps">${chips}</div>${btns}`;
+  }
+
   async function loadTasks(){
     const { data, error } = await sb.from('work_tasks')
-      .select('*, work_task_assignees(email, done_at)').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false });
+      .select('*, work_task_assignees(email, done_at), work_task_steps(seq, name, done_at, done_by)').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false });
     if (error) { $('list').textContent = error.message; return; }
     const today = new Date(Date.now() + 9*3600e3).toISOString().slice(0,10);
     const f = $('filter').value;
-    const rows = (data || []).filter(t => {
-      const done = t.work_task_assignees.every(a => a.done_at);
-      return f === 'all' || (f === 'done' ? done : !done);
-    });
+    const isDone = (t) => t.task_type === 'loan'
+      ? t.work_task_steps.length > 0 && t.work_task_steps.every(s => s.done_at)
+      : t.work_task_assignees.every(a => a.done_at);
+    const rows = (data || []).filter(t => f === 'all' || (f === 'done' ? isDone(t) : !isDone(t)));
     $('list').innerHTML = rows.map(t => {
-      const done = t.work_task_assignees.every(a => a.done_at);
+      const done = isDone(t);
       const tag = done || !t.due_date ? '' : t.due_date < today ? '<span class="tag over">기한초과</span>' : t.due_date === today ? '<span class="tag today">오늘마감</span>' : '';
       const meta = [t.directed_by && `지시: ${t.directed_by}`, t.due_date && `기한: ${t.due_date}`].filter(Boolean).join(' · ');
       return `<div class="task ${done?'done':''}">
-        <div class="t">${esc(t.title)}${tag}</div>
+        <div class="t">${t.task_type === 'loan' ? '<span class="tag loan">대출</span>' : ''}${esc(t.title)}${tag}</div>
         <div class="meta">${esc(meta)}${t.detail ? '\n' + esc(t.detail) : ''}</div>
-        ${t.work_task_assignees.map(a => `<div class="asg ${a.done_at?'ok':''}">
+        ${t.task_type === 'loan' ? loanBlock(t) : t.work_task_assignees.map(a => `<div class="asg ${a.done_at?'ok':''}">
           <input type="checkbox" ${a.done_at?'checked':''} ${a.email===me?'':'disabled'} data-t="${t.id}" data-e="${esc(a.email)}" />
           ${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}
         ${t.created_by === me ? `<button class="btn small" data-del="${t.id}" style="margin-top:10px">삭제</button>` : ''}
@@ -197,6 +239,21 @@
         .update({ done_at: cb.checked ? new Date().toISOString() : null }).eq('task_id', cb.dataset.t).eq('email', cb.dataset.e);
       if (error) return alert(error.message);
       if (cb.checked) await sb.functions.invoke('task-notify', { body: { event: 'done', task_id: +cb.dataset.t } });
+      loadTasks();
+    });
+    $('list').querySelectorAll('[data-step]').forEach(b => b.onclick = async () => {
+      const [tid, seq] = b.dataset.step.split(':').map(Number);
+      b.disabled = true;
+      const { error } = await sb.from('work_task_steps').update({ done_at: new Date().toISOString() }).eq('task_id', tid).eq('seq', seq);
+      if (error){ alert(error.message); return loadTasks(); }
+      await sb.functions.invoke('task-notify', { body: { event: 'step_done', task_id: tid, seq } });
+      loadTasks();
+    });
+    $('list').querySelectorAll('[data-undo]').forEach(b => b.onclick = async () => {
+      const [tid, seq] = b.dataset.undo.split(':').map(Number);
+      if (!confirm('이 단계를 되돌릴까요?')) return;
+      const { error } = await sb.from('work_task_steps').update({ done_at: null }).eq('task_id', tid).eq('seq', seq);
+      if (error) alert(error.message);
       loadTasks();
     });
     $('list').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {

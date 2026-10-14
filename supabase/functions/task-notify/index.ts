@@ -42,14 +42,25 @@ Deno.serve(async (req) => {
   // 2) 정기 독촉 (pg_cron): 미완료 건을 담당자별로 모아 1통씩 발송
   if (req.headers.get("x-cron-secret")) {
     if (req.headers.get("x-cron-secret") !== Deno.env.get("CRON_SECRET")) return new Response("forbidden", { status: 403 });
-    const { data } = await db.from("work_task_assignees")
-      .select("email, work_tasks!inner(title, due_date, directed_by)").is("done_at", null);
     const today = kstToday();
+    const dueTag = (d: string | null) => !d ? "" : d < today ? ` 🔴기한초과(${d})` : d === today ? " 🟠오늘마감" : ` (~${d})`;
     const byUser = new Map<string, string[]>();
+    const add = (email: string, line: string) => byUser.set(email, [...(byUser.get(email) ?? []), line]);
+    // 일반업무: 담당자별 미완료
+    const { data } = await db.from("work_task_assignees")
+      .select("email, work_tasks!inner(title, due_date, task_type)").is("done_at", null).eq("work_tasks.task_type", "general");
     for (const r of data ?? []) {
       const t = (r as any).work_tasks;
-      const tag = !t.due_date ? "" : t.due_date < today ? ` 🔴기한초과(${t.due_date})` : t.due_date === today ? " 🟠오늘마감" : ` (~${t.due_date})`;
-      byUser.set(r.email, [...(byUser.get(r.email) ?? []), `• ${t.title}${tag}`]);
+      add(r.email, `• ${t.title}${dueTag(t.due_date)}`);
+    }
+    // 대출진행: 현재 단계 안내 (담당자 전원에게)
+    const { data: loans } = await db.from("work_tasks")
+      .select("title, due_date, work_task_assignees(email), work_task_steps(seq, name, done_at)").eq("task_type", "loan");
+    for (const t of loans ?? []) {
+      const steps = [...(t as any).work_task_steps].sort((a: any, b: any) => a.seq - b.seq);
+      const cur = steps.find((x: any) => !x.done_at);
+      if (!cur) continue;
+      for (const a of (t as any).work_task_assignees) add(a.email, `• [대출] ${t.title} — ${cur.name} 진행중 (${cur.seq}/${steps.length})${dueTag(t.due_date)}`);
     }
     for (const [email, lines] of byUser) await notify([email], `⏰ 미처리 업무 ${lines.length}건\n${lines.join("\n")}`);
     return ok({ users: byUser.size });
@@ -60,9 +71,11 @@ Deno.serve(async (req) => {
   const { data: au } = await db.auth.getUser(jwt);
   const me = au?.user?.email;
   if (!me) return new Response("unauthorized", { status: 401 });
-  const { event, task_id } = await req.json();
+  const { event, task_id, seq } = await req.json();
   const { data: task } = await db.from("work_tasks").select("*").eq("id", task_id).single();
   const { data: asg } = await db.from("work_task_assignees").select("email, done_at").eq("task_id", task_id);
+  const { data: stepRows } = await db.from("work_task_steps").select("seq, name, done_at").eq("task_id", task_id).order("seq");
+  const steps = stepRows ?? [];
   if (!task || !asg) return new Response("not found", { status: 404 });
   const names = await nameMap();
   const who = (e: string) => names.get(e) ?? e;
@@ -70,7 +83,17 @@ Deno.serve(async (req) => {
   if (event === "created" && task.created_by === me) {
     const due = task.due_date ? `\n기한: ${task.due_date}` : "";
     const by = task.directed_by ? `\n지시: ${task.directed_by}` : "";
-    await notify(asg.map((a) => a.email).filter((e) => e !== me), `📌 새 업무지시\n${task.title}${by}${due}`);
+    const cur = steps.find((x) => !x.done_at);
+    const head = task.task_type === "loan" ? `📌 새 대출 업무\n${task.title}${cur ? `\n현재 단계: ${cur.name}` : ""}` : `📌 새 업무지시\n${task.title}`;
+    await notify(asg.map((a) => a.email).filter((e) => e !== me), `${head}${by}${due}`);
+  } else if (event === "step_done" && task.task_type === "loan" && (task.created_by === me || asg.some((a) => a.email === me))) {
+    const step = steps.find((x) => x.seq === seq);
+    if (!step?.done_at) return new Response("bad request", { status: 400 });
+    const next = steps.find((x) => !x.done_at);
+    const others = [task.created_by, ...asg.map((a) => a.email)].filter((e) => e !== me);
+    await notify(others, next
+      ? `✅ [대출] ${task.title}\n${who(me)}: ${step.name} 완료 → 다음 단계: ${next.name} (${next.seq}/${steps.length})`
+      : `🎉 [대출] ${task.title}\n${step.name}까지 전 단계 완료되었습니다.`);
   } else if (event === "done" && asg.some((a) => a.email === me)) {
     const all = asg.every((a) => a.done_at);
     const others = [task.created_by, ...asg.map((a) => a.email)].filter((e) => e !== me);

@@ -102,3 +102,48 @@ grant execute on function public.is_member(), public.task_is_owner(bigint), publ
 -- Edge Function(service_role)이 테이블을 읽고 쓰기 위한 권한 (Automatically expose new tables 를 끈 경우 필요)
 grant select, insert, update, delete on public.work_tasks, public.work_task_assignees, public.telegram_links, public.team_members to service_role;
 grant usage, select on all sequences in schema public to service_role;
+
+-- ===== 업무 유형(일반/대출진행) + 단계 =====
+alter table public.work_tasks add column if not exists task_type text not null default 'general';
+
+create table if not exists public.work_task_steps (
+  task_id bigint   not null references public.work_tasks(id) on delete cascade,
+  seq     smallint not null,
+  name    text     not null,
+  done_at timestamptz,
+  done_by text,
+  primary key (task_id, seq)
+);
+alter table public.work_task_steps enable row level security;
+
+create policy steps_select on public.work_task_steps for select to authenticated
+  using (public.task_is_owner(task_id) or public.task_is_member(task_id));
+create policy steps_insert on public.work_task_steps for insert to authenticated
+  with check (public.task_is_owner(task_id));
+create policy steps_update on public.work_task_steps for update to authenticated
+  using (public.task_is_owner(task_id) or public.task_is_member(task_id));
+
+-- 단계는 순서대로만 완료/되돌리기 가능 (DB에서 강제)
+create or replace function public.work_task_steps_guard() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.done_at is not null and old.done_at is null then
+    if exists (select 1 from work_task_steps where task_id = new.task_id and seq < new.seq and done_at is null) then
+      raise exception '이전 단계를 먼저 완료해야 합니다.';
+    end if;
+    new.done_by := auth.email();
+  elsif new.done_at is null and old.done_at is not null then
+    if exists (select 1 from work_task_steps where task_id = new.task_id and seq > new.seq and done_at is not null) then
+      raise exception '다음 단계가 이미 완료되어 되돌릴 수 없습니다.';
+    end if;
+    new.done_by := null;
+  end if;
+  return new;
+end $$;
+
+create trigger work_task_steps_guard_trg before update on public.work_task_steps
+  for each row execute function public.work_task_steps_guard();
+
+grant select, insert on public.work_task_steps to authenticated;
+grant update (done_at) on public.work_task_steps to authenticated;
+grant select, insert, update, delete on public.work_task_steps to service_role;
