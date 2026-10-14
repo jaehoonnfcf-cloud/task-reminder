@@ -147,3 +147,7 @@ create trigger work_task_steps_guard_trg before update on public.work_task_steps
 grant select, insert on public.work_task_steps to authenticated;
 grant update (done_at) on public.work_task_steps to authenticated;
 grant select, insert, update, delete on public.work_task_steps to service_role;
+
+-- 등록자가 수정할 수 있는 컬럼만 허용 (task_type, created_by 변조 방지)
+revoke update on public.work_tasks from authenticated;
+grant update (title, detail, directed_by, due_date) on public.work_tasks to authenticated;

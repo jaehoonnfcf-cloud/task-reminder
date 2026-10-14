@@ -71,7 +71,8 @@ Deno.serve(async (req) => {
   const { data: au } = await db.auth.getUser(jwt);
   const me = au?.user?.email;
   if (!me) return new Response("unauthorized", { status: 401 });
-  const { event, task_id, seq } = await req.json();
+  const body = await req.json();
+  const { event, task_id, seq } = body;
   const { data: task } = await db.from("work_tasks").select("*").eq("id", task_id).single();
   const { data: asg } = await db.from("work_task_assignees").select("email, done_at").eq("task_id", task_id);
   const { data: stepRows } = await db.from("work_task_steps").select("seq, name, done_at").eq("task_id", task_id).order("seq");
@@ -80,12 +81,21 @@ Deno.serve(async (req) => {
   const names = await nameMap();
   const who = (e: string) => names.get(e) ?? e;
 
+  const due = task.due_date ? `\n기한: ${task.due_date}` : "";
+  const by = task.directed_by ? `\n지시: ${task.directed_by}` : "";
+  const cur = steps.find((x) => !x.done_at);
+  const newHead = task.task_type === "loan" ? `📌 새 대출 업무\n${task.title}${cur ? `\n현재 단계: ${cur.name}` : ""}` : `📌 새 업무지시\n${task.title}`;
+
   if (event === "created" && task.created_by === me) {
-    const due = task.due_date ? `\n기한: ${task.due_date}` : "";
-    const by = task.directed_by ? `\n지시: ${task.directed_by}` : "";
-    const cur = steps.find((x) => !x.done_at);
-    const head = task.task_type === "loan" ? `📌 새 대출 업무\n${task.title}${cur ? `\n현재 단계: ${cur.name}` : ""}` : `📌 새 업무지시\n${task.title}`;
-    await notify(asg.map((a) => a.email).filter((e) => e !== me), `${head}${by}${due}`);
+    await notify(asg.map((a) => a.email).filter((e) => e !== me), `${newHead}${by}${due}`);
+  } else if (event === "updated" && task.created_by === me) {
+    // 새로 추가된 담당자에게는 신규 안내, 기존 담당자에게는 수정 안내
+    const added: string[] = (body.added ?? []).filter((e: string) => e !== me && asg.some((a) => a.email === e));
+    if (added.length) await notify(added, `${newHead}${by}${due}`);
+    if (body.changed) {
+      const rest = asg.map((a) => a.email).filter((e) => e !== me && !added.includes(e));
+      await notify(rest, `✏️ 업무 수정\n${task.title}${by}${due}`);
+    }
   } else if (event === "step_done" && task.task_type === "loan" && (task.created_by === me || asg.some((a) => a.email === me))) {
     const step = steps.find((x) => x.seq === seq);
     if (!step?.done_at) return new Response("bad request", { status: 400 });

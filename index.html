@@ -66,6 +66,8 @@
   .step.cur{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent); font-weight:700; }
   .step small{ font-size:11px; opacity:.8; }
   .stepbtns{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  #editOv{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:10; overflow:auto; padding:max(16px, env(safe-area-inset-top)) 16px 32px; -webkit-overflow-scrolling:touch; }
+  .rowbtns{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
   #login,#app{ display:none; }
   .center{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px; }
   .center .card{ width:100%; max-width:340px; text-align:center; }
@@ -79,6 +81,18 @@
   <input id="pwInput" type="password" placeholder="비밀번호" autocomplete="current-password" style="margin-top:8px" />
   <button class="btn primary" id="sendLink" style="width:100%;margin-top:10px">로그인</button>
   <p id="loginMsg" class="muted"></p>
+</div></div>
+
+<div id="editOv"><div class="card" style="max-width:560px;margin:0 auto">
+  <h2>업무 수정</h2>
+  <label>업무 내용</label><input id="eTitle" />
+  <label>상세</label><textarea id="eDetail" rows="2"></textarea>
+  <div class="row">
+    <div><label>지시자</label><input id="eBy" /></div>
+    <div><label>기한</label><input id="eDue" type="date" /></div>
+  </div>
+  <label>담당자</label><div class="checks" id="eAsg"></div>
+  <div class="rowbtns"><button class="btn primary" id="eSave">저장</button><button class="btn" id="eCancel">취소</button></div>
 </div></div>
 
 <div id="app"><div class="wrap">
@@ -125,6 +139,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   // 업무 유형별 단계 (나중에 채권관리 등 유형을 추가할 때 여기에 추가)
   const LOAN_STEPS = ['대출상담', '대출신청', '감정평가', '내부결재', '대출실행'];
+  let tasksById = {}, editingId = null;
   let me = '', members = [], nameOf = (e) => e;
   const fmtD = (iso) => { const d = new Date(iso); return `${d.getMonth()+1}/${d.getDate()}`; };
 
@@ -197,6 +212,35 @@
   };
 
   $('filter').onchange = loadTasks;
+  function openEdit(id){
+    const t = tasksById[id]; if (!t) return;
+    editingId = id;
+    $('eTitle').value = t.title; $('eDetail').value = t.detail || ''; $('eBy').value = t.directed_by || ''; $('eDue').value = t.due_date || '';
+    const cur = new Set(t.work_task_assignees.map(a => a.email));
+    $('eAsg').innerHTML = members.map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${cur.has(m.email)?'checked':''}/> ${esc(m.name)}</label>`).join('');
+    $('editOv').style.display = 'block';
+  }
+  $('eCancel').onclick = () => { $('editOv').style.display = 'none'; editingId = null; };
+  $('eSave').onclick = async () => {
+    const t = tasksById[editingId]; if (!t) return;
+    const title = $('eTitle').value.trim();
+    const emails = [...document.querySelectorAll('#eAsg input:checked')].map(i => i.value);
+    if (!title || !emails.length) return alert('업무 내용과 담당자를 입력해주세요.');
+    $('eSave').disabled = true;
+    const patch = { title, detail: $('eDetail').value.trim() || null, directed_by: $('eBy').value.trim() || null, due_date: $('eDue').value || null };
+    const changed = ['title','detail','directed_by','due_date'].some(k => (t[k] || null) !== patch[k]);
+    const before = t.work_task_assignees.map(a => a.email);
+    const added = emails.filter(e => !before.includes(e)), removed = before.filter(e => !emails.includes(e));
+    let err = (await sb.from('work_tasks').update(patch).eq('id', t.id)).error;
+    if (!err && removed.length) err = (await sb.from('work_task_assignees').delete().eq('task_id', t.id).in('email', removed)).error;
+    if (!err && added.length) err = (await sb.from('work_task_assignees').insert(added.map(email => ({ task_id: t.id, email })))).error;
+    $('eSave').disabled = false;
+    if (err) return alert(err.message);
+    $('editOv').style.display = 'none'; editingId = null;
+    if (changed || added.length) await sb.functions.invoke('task-notify', { body: { event: 'updated', task_id: t.id, added, changed } });
+    loadTasks();
+  };
+
   function loanBlock(t){
     const steps = [...t.work_task_steps].sort((a, b) => a.seq - b.seq);
     const cur = steps.find(s => !s.done_at);
@@ -215,6 +259,7 @@
     const { data, error } = await sb.from('work_tasks')
       .select('*, work_task_assignees(email, done_at), work_task_steps(seq, name, done_at, done_by)').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false });
     if (error) { $('list').textContent = error.message; return; }
+    tasksById = Object.fromEntries((data || []).map(t => [t.id, t]));
     const today = new Date(Date.now() + 9*3600e3).toISOString().slice(0,10);
     const f = $('filter').value;
     const isDone = (t) => t.task_type === 'loan'
@@ -231,7 +276,7 @@
         ${t.task_type === 'loan' ? loanBlock(t) : t.work_task_assignees.map(a => `<div class="asg ${a.done_at?'ok':''}">
           <input type="checkbox" ${a.done_at?'checked':''} ${a.email===me?'':'disabled'} data-t="${t.id}" data-e="${esc(a.email)}" />
           ${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}
-        ${t.created_by === me ? `<button class="btn small" data-del="${t.id}" style="margin-top:10px">삭제</button>` : ''}
+        ${t.created_by === me ? `<div class="rowbtns"><button class="btn small" data-edit="${t.id}">✏ 수정</button><button class="btn small" data-del="${t.id}">삭제</button></div>` : ''}
       </div>`;
     }).join('') || '<p class="muted">업무가 없습니다.</p>';
     $('list').querySelectorAll('input[data-t]').forEach(cb => cb.onchange = async () => {
@@ -256,6 +301,7 @@
       if (error) alert(error.message);
       loadTasks();
     });
+    $('list').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEdit(+b.dataset.edit));
     $('list').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
       if (!confirm('이 업무를 삭제할까요?')) return;
       await sb.from('work_tasks').delete().eq('id', b.dataset.del); loadTasks();
