@@ -2,7 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#f7f8fa" />
 <title>업무지시 체크</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
@@ -32,6 +34,30 @@
   .tag.over{ background:#f7dedb; color:var(--danger); } .tag.today{ background:var(--warn-soft); color:var(--warn); }
   .asg{ display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13.5px; }
   .asg input{ width:auto; } .asg.ok{ color:var(--green); }
+
+  /* 아이폰/모바일 보정 */
+  html{ -webkit-text-size-adjust:100%; }
+  body{ -webkit-tap-highlight-color:transparent; }
+  .wrap{ padding-left:max(16px, env(safe-area-inset-left)); padding-right:max(16px, env(safe-area-inset-right)); padding-bottom:max(64px, calc(env(safe-area-inset-bottom) + 32px)); }
+  input,textarea,select{ font-size:16px; -webkit-appearance:none; appearance:none; border-radius:10px; min-height:44px; }
+  textarea{ min-height:76px; }
+  input[type=date]{ display:block; width:100%; min-width:0; background:#fff; }
+  select{ background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23767b85' stroke-width='2'/></svg>") no-repeat right 12px center; padding-right:32px; }
+  .btn{ min-height:44px; font-size:15px; }
+  .btn.small{ min-height:36px; padding:6px 12px; font-size:13px; }
+  .checks label{ min-height:40px; font-size:15px; }
+  .checks input{ width:22px; height:22px; min-height:0; -webkit-appearance:auto; appearance:auto; }
+  .asg{ min-height:40px; font-size:15px; }
+  .asg input{ width:22px; height:22px; min-height:0; -webkit-appearance:auto; appearance:auto; flex-shrink:0; }
+  .task .t{ word-break:break-word; line-height:1.4; }
+  .row > *{ min-width:0; }
+  @media (max-width:520px){
+    .wrap{ gap:14px; padding-top:max(16px, env(safe-area-inset-top)); }
+    .card{ padding:16px; border-radius:12px; }
+    .row > *{ flex:1 1 100%; }
+    h1{ font-size:18px; }
+    #filter{ min-width:110px; }
+  }
   #login,#app{ display:none; }
   .center{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px; }
   .center .card{ width:100%; max-width:340px; text-align:center; }
