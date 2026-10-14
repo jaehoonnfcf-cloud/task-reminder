@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>업무지시 체크</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
+<style>
+  :root{ --ink:#252a34; --paper:#f7f8fa; --panel:#fff; --line:#e7e9ec; --accent:#2e73fc; --accent-soft:#e8f2fe;
+    --danger:#a4443a; --muted:#767b85; --green:#1a7a4c; --green-soft:#e3f5ea; --warn:#b5601f; --warn-soft:#fdecd4; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif; letter-spacing:-0.01em; }
+  .wrap{ max-width:760px; margin:0 auto; padding:24px 16px 64px; display:flex; flex-direction:column; gap:18px; }
+  header{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  h1{ font-size:20px; margin:0; } h2{ font-size:16px; margin:0 0 12px; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; }
+  input,textarea,select,button{ font-family:inherit; font-size:14px; }
+  input,textarea,select{ width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  label{ display:block; font-size:12.5px; color:var(--muted); margin:10px 0 4px; }
+  .btn{ border:1px solid var(--line); background:#fff; padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.small{ padding:4px 10px; font-size:12px; }
+  .muted{ color:var(--muted); font-size:13px; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; } .row > *{ flex:1; min-width:140px; }
+  .checks{ display:flex; flex-wrap:wrap; gap:8px 16px; } .checks label{ display:flex; align-items:center; gap:6px; margin:0; color:var(--ink); font-size:14px; }
+  .checks input{ width:auto; }
+  .task{ border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px; }
+  .task.done{ opacity:.55; }
+  .task .t{ font-weight:700; } .task .meta{ font-size:12.5px; color:var(--muted); margin-top:2px; white-space:pre-wrap; }
+  .tag{ display:inline-block; font-size:11.5px; padding:2px 8px; border-radius:99px; margin-left:6px; }
+  .tag.over{ background:#f7dedb; color:var(--danger); } .tag.today{ background:var(--warn-soft); color:var(--warn); }
+  .asg{ display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13.5px; }
+  .asg input{ width:auto; } .asg.ok{ color:var(--green); }
+  #login,#app{ display:none; }
+  .center{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px; }
+  .center .card{ width:100%; max-width:340px; text-align:center; }
+</style>
+</head>
+<body>
+<div id="login" class="center"><div class="card">
+  <h1>📌 업무지시 체크</h1>
+  <p class="muted">등록된 이메일로 로그인 링크를 보내드립니다.</p>
+  <input id="emailInput" type="email" placeholder="이메일" />
+  <button class="btn primary" id="sendLink" style="width:100%;margin-top:10px">로그인 링크 받기</button>
+  <p id="loginMsg" class="muted"></p>
+</div></div>
+
+<div id="app"><div class="wrap">
+  <header><h1>📌 업무지시 체크</h1><div><span class="muted" id="who"></span> <button class="btn small" id="logout">로그아웃</button></div></header>
+
+  <div class="card" id="tgCard">
+    <h2>🔔 텔레그램 알림</h2>
+    <div id="tgStatus" class="muted"></div>
+  </div>
+
+  <div class="card">
+    <h2>새 업무지시 등록</h2>
+    <label>업무 내용</label><input id="fTitle" placeholder="예: 3분기 연체 현황 보고서 작성" />
+    <label>상세 (선택)</label><textarea id="fDetail" rows="2"></textarea>
+    <div class="row">
+      <div><label>지시자</label><input id="fBy" placeholder="예: 김상무" /></div>
+      <div><label>기한</label><input id="fDue" type="date" /></div>
+    </div>
+    <label>담당자 (체크한 사람에게 알림)</label><div class="checks" id="fAsg"></div>
+    <button class="btn primary" id="addBtn" style="margin-top:14px">등록</button>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">업무 목록</h2>
+      <select id="filter" style="width:auto"><option value="open">미완료</option><option value="all">전체</option><option value="done">완료</option></select>
+    </div>
+    <div id="list" style="margin-top:14px"></div>
+  </div>
+</div></div>
+
+<script>
+  // 새 Supabase 프로젝트의 값으로 교체하세요 (Project Settings > API)
+  const SUPABASE_URL = "https://mknsdknryqqewewxmbpf.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_7RCkTtp_pNvzXe2MuYKqpg_wtfyVPO8";
+  // 텔레그램 봇 사용자명 (@BotFather 에서 만든 봇, @ 제외)
+  const BOT_USERNAME = "todo_fairy_bot";
+
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let me = '', members = [], nameOf = (e) => e;
+
+  $('sendLink').onclick = async () => {
+    const email = $('emailInput').value.trim();
+    if (!email) return;
+    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.href.split('#')[0], shouldCreateUser: true } });
+    $('loginMsg').textContent = error ? '실패: ' + error.message : '메일을 확인해 링크를 눌러주세요.';
+  };
+  $('logout').onclick = () => sb.auth.signOut();
+  sb.auth.onAuthStateChange((_e, session) => session ? start(session) : show(false));
+  function show(on){ $('login').style.display = on ? 'none' : 'flex'; $('app').style.display = on ? 'block' : 'none'; }
+
+  async function start(session){
+    const { data: ok } = await sb.rpc('is_member');
+    if (!ok){ await sb.auth.signOut(); show(false); $('loginMsg').textContent = '등록되지 않은 이메일입니다.'; return; }
+    me = session.user.email; show(true);
+    const { data } = await sb.from('team_members').select('email,name').order('name');
+    members = data || [];
+    nameOf = (e) => (members.find(m => m.email === e) || {}).name || e;
+    $('who').textContent = nameOf(me);
+    $('fAsg').innerHTML = members.map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${m.email===me?'checked':''}/> ${esc(m.name)}</label>`).join('');
+    await loadTelegram(); await loadTasks();
+  }
+
+  async function loadTelegram(){
+    const { data } = await sb.from('telegram_links').select('chat_id').eq('email', me).maybeSingle();
+    if (data && data.chat_id){ $('tgStatus').innerHTML = '✅ 연결됨'; return; }
+    $('tgStatus').innerHTML = '연결되지 않았습니다. <button class="btn small primary" id="tgBtn">텔레그램 연결하기</button>';
+    $('tgBtn').onclick = async () => {
+      const code = crypto.randomUUID().replace(/-/g, '');
+      const { error } = await sb.from('telegram_links').upsert({ email: me, link_code: code, chat_id: null });
+      if (error) return alert(error.message);
+      window.open(`https://t.me/${BOT_USERNAME}?start=${code}`, '_blank');
+      $('tgStatus').innerHTML = '텔레그램에서 <b>시작(START)</b>을 누른 뒤 <button class="btn small" id="tgRe">연결 확인</button>';
+      $('tgRe').onclick = loadTelegram;
+    };
+  }
+
+  $('addBtn').onclick = async () => {
+    const title = $('fTitle').value.trim();
+    const emails = [...document.querySelectorAll('#fAsg input:checked')].map(i => i.value);
+    if (!title || !emails.length) return alert('업무 내용과 담당자를 입력해주세요.');
+    $('addBtn').disabled = true;
+    const { data: t, error } = await sb.from('work_tasks').insert({
+      title, detail: $('fDetail').value.trim() || null, directed_by: $('fBy').value.trim() || null, due_date: $('fDue').value || null
+    }).select('id').single();
+    if (error){ $('addBtn').disabled = false; return alert(error.message); }
+    await sb.from('work_task_assignees').insert(emails.map(email => ({ task_id: t.id, email })));
+    await sb.functions.invoke('task-notify', { body: { event: 'created', task_id: t.id } });
+    ['fTitle','fDetail','fDue'].forEach(id => $(id).value = '');
+    $('addBtn').disabled = false; loadTasks();
+  };
+
+  $('filter').onchange = loadTasks;
+  async function loadTasks(){
+    const { data, error } = await sb.from('work_tasks')
+      .select('*, work_task_assignees(email, done_at)').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false });
+    if (error) { $('list').textContent = error.message; return; }
+    const today = new Date(Date.now() + 9*3600e3).toISOString().slice(0,10);
+    const f = $('filter').value;
+    const rows = (data || []).filter(t => {
+      const done = t.work_task_assignees.every(a => a.done_at);
+      return f === 'all' || (f === 'done' ? done : !done);
+    });
+    $('list').innerHTML = rows.map(t => {
+      const done = t.work_task_assignees.every(a => a.done_at);
+      const tag = done || !t.due_date ? '' : t.due_date < today ? '<span class="tag over">기한초과</span>' : t.due_date === today ? '<span class="tag today">오늘마감</span>' : '';
+      const meta = [t.directed_by && `지시: ${t.directed_by}`, t.due_date && `기한: ${t.due_date}`].filter(Boolean).join(' · ');
+      return `<div class="task ${done?'done':''}">
+        <div class="t">${esc(t.title)}${tag}</div>
+        <div class="meta">${esc(meta)}${t.detail ? '\n' + esc(t.detail) : ''}</div>
+        ${t.work_task_assignees.map(a => `<div class="asg ${a.done_at?'ok':''}">
+          <input type="checkbox" ${a.done_at?'checked':''} ${a.email===me?'':'disabled'} data-t="${t.id}" data-e="${esc(a.email)}" />
+          ${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}
+        ${t.created_by === me ? `<button class="btn small" data-del="${t.id}" style="margin-top:10px">삭제</button>` : ''}
+      </div>`;
+    }).join('') || '<p class="muted">업무가 없습니다.</p>';
+    $('list').querySelectorAll('input[data-t]').forEach(cb => cb.onchange = async () => {
+      const { error } = await sb.from('work_task_assignees')
+        .update({ done_at: cb.checked ? new Date().toISOString() : null }).eq('task_id', cb.dataset.t).eq('email', cb.dataset.e);
+      if (error) return alert(error.message);
+      if (cb.checked) await sb.functions.invoke('task-notify', { body: { event: 'done', task_id: +cb.dataset.t } });
+      loadTasks();
+    });
+    $('list').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+      if (!confirm('이 업무를 삭제할까요?')) return;
+      await sb.from('work_tasks').delete().eq('id', b.dataset.del); loadTasks();
+    });
+  }
+</script>
+</body>
+</html>
