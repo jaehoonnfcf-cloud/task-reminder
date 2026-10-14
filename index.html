@@ -68,6 +68,29 @@
   .stepbtns{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
   #editOv{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:10; overflow:auto; padding:max(16px, env(safe-area-inset-top)) 16px 32px; -webkit-overflow-scrolling:touch; }
   .rowbtns{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  /* 레이아웃: 모바일은 세로 한 줄, PC(1024px~)는 왼쪽 입력 / 오른쪽 목록 */
+  #side,#main{ display:flex; flex-direction:column; gap:18px; min-width:0; }
+  .pc-only{ display:none; }
+  .grp-h{ display:none; }
+  .summary{ gap:12px; }
+  .tile{ flex:1; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+  .tile .n{ font-size:26px; font-weight:800; line-height:1.1; }
+  .tile .l{ font-size:12.5px; color:var(--muted); margin-top:4px; }
+  .tile.over .n{ color:var(--danger); } .tile.today .n{ color:var(--warn); } .tile.loan .n{ color:var(--accent); }
+  .toolbar{ gap:10px; margin-top:12px; }
+  .toolbar input{ flex:1; } .toolbar select{ width:auto; min-width:130px; }
+  @media (min-width:1024px){
+    .wrap{ max-width:1280px; display:grid; grid-template-columns:360px minmax(0,1fr); gap:24px; align-items:start; padding-top:28px; }
+    header{ grid-column:1 / -1; }
+    #side{ position:sticky; top:16px; max-height:calc(100vh - 32px); overflow-y:auto; padding-bottom:4px; }
+    .pc-only.summary{ display:flex; } .pc-only.toolbar{ display:flex; }
+    .grp-h{ display:block; font-size:14px; font-weight:800; margin:18px 0 8px; }
+    .grp-h:first-child{ margin-top:0; } .grp-h span{ color:var(--muted); font-weight:600; }
+    .group-items{ display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:12px; align-items:start; }
+    .group-items .task{ margin:0; }
+    .card{ padding:22px; }
+    body{ font-size:15px; }
+  }
   #login,#app{ display:none; }
   .center{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px; }
   .center .card{ width:100%; max-width:340px; text-align:center; }
@@ -98,6 +121,7 @@
 <div id="app"><div class="wrap">
   <header><h1>📌 업무지시 체크</h1><div><span class="muted" id="who"></span> <button class="btn small" id="logout">로그아웃</button></div></header>
 
+  <aside id="side">
   <div class="card" id="tgCard">
     <h2>🔔 텔레그램 알림</h2>
     <div id="tgStatus" class="muted"></div>
@@ -117,14 +141,22 @@
     <label>담당자 (체크한 사람에게 알림)</label><div class="checks" id="fAsg"></div>
     <button class="btn primary" id="addBtn" style="margin-top:14px">등록</button>
   </div>
+  </aside>
 
+  <main id="main">
+  <div class="summary pc-only" id="summary"></div>
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <h2 style="margin:0">업무 목록</h2>
       <select id="filter" style="width:auto"><option value="open">미완료</option><option value="all">전체</option><option value="done">완료</option></select>
     </div>
+    <div class="toolbar pc-only">
+      <input id="q" type="search" placeholder="🔍 업무·고객명·지시자 검색" />
+      <select id="typeFilter"><option value="all">전체 구분</option><option value="general">일반업무</option><option value="loan">대출진행</option></select>
+    </div>
     <div id="list" style="margin-top:14px"></div>
   </div>
+  </main>
 </div></div>
 
 <script>
@@ -212,6 +244,8 @@
   };
 
   $('filter').onchange = loadTasks;
+  $('typeFilter').onchange = loadTasks;
+  let qTimer; $('q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(loadTasks, 250); };
   function openEdit(id){
     const t = tasksById[id]; if (!t) return;
     editingId = id;
@@ -266,7 +300,7 @@
       ? t.work_task_steps.length > 0 && t.work_task_steps.every(s => s.done_at)
       : t.work_task_assignees.every(a => a.done_at);
     const rows = (data || []).filter(t => f === 'all' || (f === 'done' ? isDone(t) : !isDone(t)));
-    $('list').innerHTML = rows.map(t => {
+    const cardHtml = (t) => {
       const done = isDone(t);
       const tag = done || !t.due_date ? '' : t.due_date < today ? '<span class="tag over">기한초과</span>' : t.due_date === today ? '<span class="tag today">오늘마감</span>' : '';
       const meta = [t.directed_by && `지시: ${t.directed_by}`, t.due_date && `기한: ${t.due_date}`].filter(Boolean).join(' · ');
@@ -278,6 +312,27 @@
           ${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}
         ${t.created_by === me ? `<div class="rowbtns"><button class="btn small" data-edit="${t.id}">✏ 수정</button><button class="btn small" data-del="${t.id}">삭제</button></div>` : ''}
       </div>`;
+    };
+
+    // 요약 타일 (PC) — 필터와 무관하게 전체 기준
+    const all = data || [];
+    const grpOf = (t) => isDone(t) ? 'done' : (t.due_date && t.due_date < today) ? 'over' : (t.due_date === today) ? 'today' : 'prog';
+    const open = all.filter(t => !isDone(t));
+    $('summary').innerHTML = [
+      ['over', open.filter(t => grpOf(t) === 'over').length, '기한초과'],
+      ['today', open.filter(t => grpOf(t) === 'today').length, '오늘마감'],
+      ['', open.length, '미완료 전체'],
+      ['loan', open.filter(t => t.task_type === 'loan').length, '진행 중 대출'],
+    ].map(([c, n, l]) => `<div class="tile ${c}"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+
+    // 구분 필터·검색 (PC 입력칸은 모바일에서 숨겨져 기본값이라 영향 없음)
+    const tf = $('typeFilter').value, q = $('q').value.trim().toLowerCase();
+    const shown = rows.filter(t => (tf === 'all' || t.task_type === tf)
+      && (!q || [t.title, t.detail, t.directed_by].some(v => (v || '').toLowerCase().includes(q))));
+    const GROUPS = [['over', '🔴 기한초과'], ['today', '🟠 오늘마감'], ['prog', '⚪ 진행중'], ['done', '✅ 완료']];
+    $('list').innerHTML = GROUPS.map(([k, label]) => {
+      const items = shown.filter(t => grpOf(t) === k);
+      return items.length ? `<div class="grp-h">${label} <span>${items.length}</span></div><div class="group-items">${items.map(cardHtml).join('')}</div>` : '';
     }).join('') || '<p class="muted">업무가 없습니다.</p>';
     $('list').querySelectorAll('input[data-t]').forEach(cb => cb.onchange = async () => {
       const { error } = await sb.from('work_task_assignees')
