@@ -87,8 +87,8 @@ grant execute on function public.is_member() to authenticated;
 
 -- ===== 정기 독촉 알림 (Edge Function 배포 + 시크릿 설정 후 실행) =====
 -- create extension if not exists pg_cron; create extension if not exists pg_net;
--- 평일 09:00, 15:00 (KST) = UTC 00:00, 06:00
--- select cron.schedule('task-remind', '0 0,6 * * 1-5', $$
+-- 평일 09:00, 16:00 (KST) = UTC 00:00, 07:00
+-- select cron.schedule('task-remind', '0 0,7 * * 1-5', $$
 --   select net.http_post(
 --     url := 'https://neepcdiumutjjwuxzjyt.supabase.co/functions/v1/task-notify',
 --     headers := jsonb_build_object('x-cron-secret', '<CRON_SECRET>', 'Content-Type', 'application/json'),
