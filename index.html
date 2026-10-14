@@ -141,7 +141,7 @@
 </div></div>
 
 <div id="app"><div class="wrap">
-  <header><h1>🧚 할일요정</h1><div><span class="muted" id="who"></span> <button class="btn small" id="logout">로그아웃</button></div></header>
+  <header><h1>🧚 할일요정</h1><div><span class="muted" id="tgBadge" style="margin-right:10px"></span><span class="muted" id="who"></span> <button class="btn small" id="logout">로그아웃</button></div></header>
 
   <aside id="side">
   <div class="card" id="tgCard">
@@ -224,7 +224,8 @@
 
   async function loadTelegram(){
     const { data } = await sb.from('telegram_links').select('chat_id').eq('email', me).maybeSingle();
-    if (data && data.chat_id){ $('tgStatus').innerHTML = '✅ 연결됨'; return; }
+    if (data && data.chat_id){ $('tgCard').style.display = 'none'; $('tgBadge').textContent = '🔔 알림 연결됨'; return; }
+    $('tgCard').style.display = ''; $('tgBadge').textContent = '';
     $('tgStatus').innerHTML = '연결되지 않았습니다. <button class="btn small primary" id="tgBtn">텔레그램 연결하기</button>';
     $('tgBtn').onclick = async () => {
       const code = crypto.randomUUID().replace(/-/g, '');
