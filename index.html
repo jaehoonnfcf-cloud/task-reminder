@@ -40,9 +40,10 @@
 <body>
 <div id="login" class="center"><div class="card">
   <h1>📌 업무지시 체크</h1>
-  <p class="muted">등록된 이메일로 로그인 링크를 보내드립니다.</p>
-  <input id="emailInput" type="email" placeholder="이메일" />
-  <button class="btn primary" id="sendLink" style="width:100%;margin-top:10px">로그인 링크 받기</button>
+  <p class="muted">등록된 이메일과 비밀번호로 로그인합니다.</p>
+  <input id="emailInput" type="email" placeholder="이메일" autocomplete="username" />
+  <input id="pwInput" type="password" placeholder="비밀번호" autocomplete="current-password" style="margin-top:8px" />
+  <button class="btn primary" id="sendLink" style="width:100%;margin-top:10px">로그인</button>
   <p id="loginMsg" class="muted"></p>
 </div></div>
 
@@ -87,12 +88,15 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let me = '', members = [], nameOf = (e) => e;
 
-  $('sendLink').onclick = async () => {
-    const email = $('emailInput').value.trim();
-    if (!email) return;
-    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.href.split('#')[0], shouldCreateUser: true } });
-    $('loginMsg').textContent = error ? '실패: ' + error.message : '메일을 확인해 링크를 눌러주세요.';
-  };
+  async function doLogin(){
+    const email = $('emailInput').value.trim(), password = $('pwInput').value;
+    if (!email || !password) return;
+    $('loginMsg').textContent = '로그인 중...';
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    $('loginMsg').textContent = error ? '로그인 실패: 이메일 또는 비밀번호를 확인해주세요.' : '';
+  }
+  $('sendLink').onclick = doLogin;
+  $('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   $('logout').onclick = () => sb.auth.signOut();
   sb.auth.onAuthStateChange((_e, session) => session ? start(session) : show(false));
   function show(on){ $('login').style.display = on ? 'none' : 'flex'; $('app').style.display = on ? 'block' : 'none'; }
