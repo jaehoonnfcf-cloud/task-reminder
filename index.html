@@ -4,7 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="theme-color" content="#f7f8fa" />
+<meta name="theme-color" content="#2e73fc" />
+<meta name="apple-mobile-web-app-title" content="할일요정" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="manifest" href="manifest.webmanifest" />
 <title>할일요정</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
@@ -141,7 +146,7 @@
 </div></div>
 
 <div id="app"><div class="wrap">
-  <header><h1>🧚 할일요정</h1><div><span class="muted" id="tgBadge" style="margin-right:10px"></span><span class="muted" id="who"></span> <button class="btn small" id="logout">로그아웃</button></div></header>
+  <header><h1>🧚 할일요정</h1><div><span class="muted" id="tgBadge" style="margin-right:10px;cursor:pointer" title="텔레그램 다시 연결"></span><span class="muted" id="who"></span> <button class="btn small" id="logout">로그아웃</button></div></header>
 
   <aside id="side">
   <div class="card" id="tgCard">
@@ -222,18 +227,28 @@
     await loadTelegram(); await loadTasks();
   }
 
-  async function loadTelegram(){
-    const { data } = await sb.from('telegram_links').select('chat_id').eq('email', me).maybeSingle();
-    if (data && data.chat_id){ $('tgCard').style.display = 'none'; $('tgBadge').textContent = '🔔 알림 연결됨'; return; }
-    $('tgCard').style.display = ''; $('tgBadge').textContent = '';
-    $('tgStatus').innerHTML = '연결되지 않았습니다. <button class="btn small primary" id="tgBtn">텔레그램 연결하기</button>';
+  async function loadTelegram(forceCard){
+    const { data } = await sb.from('telegram_links').select('chat_id, link_code').eq('email', me).maybeSingle();
+    const linked = !!(data && data.chat_id), pending = !!(data && data.link_code);
+    if (linked && !pending && !forceCard){
+      $('tgCard').style.display = 'none';
+      $('tgBadge').textContent = '🔔 알림 연결됨 · 다시 연결';
+      $('tgBadge').onclick = () => loadTelegram(true);
+      return;
+    }
+    $('tgCard').style.display = ''; $('tgBadge').textContent = ''; $('tgBadge').onclick = null;
+    $('tgStatus').innerHTML = (linked ? '새 텔레그램으로 다시 연결합니다. ' : '연결되지 않았습니다. ')
+      + '<button class="btn small primary" id="tgBtn">텔레그램 연결하기</button>'
+      + (linked ? ' <button class="btn small" id="tgCancel">취소</button>' : '');
+    if (linked) $('tgCancel').onclick = async () => { await sb.from('telegram_links').update({ link_code: null }).eq('email', me); loadTelegram(); };
     $('tgBtn').onclick = async () => {
       const code = crypto.randomUUID().replace(/-/g, '');
-      const { error } = await sb.from('telegram_links').upsert({ email: me, link_code: code, chat_id: null });
+      // chat_id 는 건드리지 않고 코드만 갱신 (연결 완료 전까지 기존 연결 유지)
+      const { error } = await sb.from('telegram_links').upsert({ email: me, link_code: code });
       if (error) return alert(error.message);
       window.open(`https://t.me/${BOT_USERNAME}?start=${code}`, '_blank');
       $('tgStatus').innerHTML = '텔레그램에서 <b>시작(START)</b>을 누른 뒤 <button class="btn small" id="tgRe">연결 확인</button>';
-      $('tgRe').onclick = loadTelegram;
+      $('tgRe').onclick = () => loadTelegram();
     };
   }
 
