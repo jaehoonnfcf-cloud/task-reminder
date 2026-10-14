@@ -14,194 +14,200 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
 <style>
-  :root{ --ink:#252a34; --paper:#f7f8fa; --panel:#fff; --line:#e7e9ec; --accent:#2e73fc; --accent-soft:#e8f2fe;
-    --danger:#a4443a; --muted:#767b85; --green:#1a7a4c; --green-soft:#e3f5ea; --warn:#b5601f; --warn-soft:#fdecd4; }
+  :root{
+    --ink:#172b4d; --muted:#626f86; --line:#dcdfe4; --accent:#0c66e4; --accent-soft:#e9f2ff;
+    --danger:#c9372c; --danger-soft:#ffeceb; --warn:#a54800; --warn-soft:#fff1e0; --green:#1f845a; --green-soft:#dcfff1;
+    --col:#f1f2f4; --card:#fff;
+    --lbl-loan:#9f8fef; --lbl-general:#579dff; --lbl-over:#f87168; --lbl-today:#fea362; --lbl-done:#4bce97;
+  }
   *{ box-sizing:border-box; }
-  body{ margin:0; background:var(--paper); color:var(--ink); font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif; letter-spacing:-0.01em; }
-  .wrap{ max-width:760px; margin:0 auto; padding:24px 16px 64px; display:flex; flex-direction:column; gap:18px; }
-  header{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
-  h1{ font-size:20px; margin:0; } h2{ font-size:16px; margin:0 0 12px; }
-  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; }
-  input,textarea,select,button{ font-family:inherit; font-size:14px; }
-  input,textarea,select{ width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; }
-  label{ display:block; font-size:12.5px; color:var(--muted); margin:10px 0 4px; }
-  .btn{ border:1px solid var(--line); background:#fff; padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
-  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
-  .btn.small{ padding:4px 10px; font-size:12px; }
-  .muted{ color:var(--muted); font-size:13px; }
-  .row{ display:flex; gap:10px; flex-wrap:wrap; } .row > *{ flex:1; min-width:140px; }
-  .checks{ display:flex; flex-wrap:wrap; gap:8px 16px; } .checks label{ display:flex; align-items:center; gap:6px; margin:0; color:var(--ink); font-size:14px; }
-  .checks input{ width:auto; }
-  .task{ border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px; }
-  .task.done{ opacity:.55; }
-  .task .t{ font-weight:700; } .task .meta{ font-size:12.5px; color:var(--muted); margin-top:2px; white-space:pre-wrap; }
-  .tag{ display:inline-block; font-size:11.5px; padding:2px 8px; border-radius:99px; margin-left:6px; }
-  .tag.over{ background:#f7dedb; color:var(--danger); } .tag.today{ background:var(--warn-soft); color:var(--warn); }
-  .asg{ display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13.5px; }
-  .asg input{ width:auto; } .asg.ok{ color:var(--green); }
-
-  /* 아이폰/모바일 보정 */
   html{ -webkit-text-size-adjust:100%; }
-  body{ -webkit-tap-highlight-color:transparent; }
-  .wrap{ padding-left:max(16px, env(safe-area-inset-left)); padding-right:max(16px, env(safe-area-inset-right)); padding-bottom:max(64px, calc(env(safe-area-inset-bottom) + 32px)); }
-  input,textarea,select{ font-size:16px; -webkit-appearance:none; appearance:none; border-radius:10px; min-height:44px; }
-  textarea{ min-height:76px; }
-  input[type=date]{ display:block; width:100%; min-width:0; background:#fff; }
-  select{ background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23767b85' stroke-width='2'/></svg>") no-repeat right 12px center; padding-right:32px; }
-  .btn{ min-height:44px; font-size:15px; }
-  .btn.small{ min-height:36px; padding:6px 12px; font-size:13px; }
-  .checks label{ min-height:40px; font-size:15px; }
-  .checks input{ width:22px; height:22px; min-height:0; -webkit-appearance:auto; appearance:auto; }
-  .asg{ min-height:40px; font-size:15px; }
-  .asg input{ width:22px; height:22px; min-height:0; -webkit-appearance:auto; appearance:auto; flex-shrink:0; }
-  .task .t{ word-break:break-word; line-height:1.4; }
-  .row > *{ min-width:0; }
-  @media (max-width:520px){
-    .wrap{ gap:14px; padding-top:max(16px, env(safe-area-inset-top)); }
-    .card{ padding:16px; border-radius:12px; }
-    .row > *{ flex:1 1 100%; }
-    h1{ font-size:18px; }
-    #filter{ min-width:110px; }
-  }
-  .tag.loan{ background:var(--accent-soft); color:var(--accent); margin-left:0; margin-right:6px; }
-  .steps{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-  .step{ display:flex; align-items:center; gap:6px; padding:6px 11px; border-radius:99px; border:1px solid var(--line); font-size:13.5px; color:var(--muted); background:#fff; }
-  .step .dot{ font-size:12px; }
-  .step.ok{ background:var(--green-soft); color:var(--green); border-color:transparent; }
-  .step.cur{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent); font-weight:700; }
-  .step small{ font-size:11px; opacity:.8; }
-  .stepbtns{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
-  #editOv{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:10; overflow:auto; padding:max(16px, env(safe-area-inset-top)) 16px 32px; -webkit-overflow-scrolling:touch; }
-  .rowbtns{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
-  /* 레이아웃: 모바일은 세로 한 줄, PC(1024px~)는 왼쪽 입력 / 오른쪽 목록 */
-  #side,#main{ display:flex; flex-direction:column; gap:18px; min-width:0; }
-  .pc-only{ display:none; }
-  .grp-h{ display:none; }
-  .summary{ gap:12px; }
-  .tile{ flex:1; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
-  .tile .n{ font-size:26px; font-weight:800; line-height:1.1; }
-  .tile .l{ font-size:12.5px; color:var(--muted); margin-top:4px; }
-  .tile.over .n{ color:var(--danger); } .tile.today .n{ color:var(--warn); } .tile.loan .n{ color:var(--accent); }
-  .toolbar{ gap:10px; margin-top:12px; }
-  .toolbar input{ flex:1; } .toolbar select{ width:auto; min-width:130px; }
-  @media (min-width:1024px){
-    .wrap{ max-width:1280px; display:grid; grid-template-columns:360px minmax(0,1fr); gap:24px; align-items:start; padding-top:28px; }
-    header{ grid-column:1 / -1; }
-    #side{ position:sticky; top:16px; max-height:calc(100vh - 32px); overflow-y:auto; padding-bottom:4px; }
-    .pc-only.summary{ display:flex; } .pc-only.toolbar{ display:flex; }
-    .grp-h{ display:block; font-size:14px; font-weight:800; margin:18px 0 8px; }
-    .grp-h:first-child{ margin-top:0; } .grp-h span{ color:var(--muted); font-weight:600; }
-    .group-items{ display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:12px; align-items:start; }
-    .group-items .task{ margin:0; }
-    .card{ padding:22px; }
-    body{ font-size:16px; background:#eef0f4; }
-    h1{ font-size:24px; } h2{ font-size:18px; }
-    /* PC: 아이폰처럼 크고 또렷하게 (입력 16px / 버튼 15px / 터치영역 넉넉히) */
-    input,textarea,select{ font-size:16px; min-height:46px; padding:10px 14px; border-color:#cfd4dc; }
-    select{ padding-right:36px; }
-    textarea{ min-height:84px; }
-    .btn{ font-size:15px; min-height:46px; padding:10px 22px; border-color:#cfd4dc; }
-    .btn.small{ font-size:14px; min-height:38px; padding:6px 16px; }
-    label{ font-size:14px; color:#4b5160; margin:14px 0 6px; }
-    .muted, .task .meta{ color:#5b616b; }
-    .task{ border-color:#d6dae1; padding:18px; }
-    .task .t{ font-size:17px; }
-    .task .meta{ font-size:14px; margin-top:4px; }
-    .checks label, .asg{ font-size:16px; min-height:38px; }
-    .checks input, .asg input{ width:20px; height:20px; }
-    .step{ font-size:14px; padding:6px 13px; }
-    .tag{ font-size:12.5px; padding:3px 10px; }
-    .card{ padding:26px; border-color:#dde1e7; box-shadow:0 1px 3px rgba(16,24,40,.06); }
-    .tile{ padding:18px 20px; border-color:#dde1e7; box-shadow:0 1px 3px rgba(16,24,40,.06); }
-    .tile .n{ font-size:30px; } .tile .l{ font-size:14px; color:#5b616b; }
-    .grp-h{ font-size:16px; margin:22px 0 10px; }
-    .group-items{ grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:14px; }
-    .wrap{ grid-template-columns:400px minmax(0,1fr); }
-  }
+  body{ margin:0; color:var(--ink); background:#0b3d91; -webkit-tap-highlight-color:transparent;
+    font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Segoe UI',sans-serif; letter-spacing:-0.01em; }
+  button,input,select,textarea{ font-family:inherit; font-size:16px; color:var(--ink); }
+  .muted{ color:var(--muted); font-size:13px; }
+
+  /* ---------- 로그인 ---------- */
   #login,#app{ display:none; }
-  .center{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px; }
-  .center .card{ width:100%; max-width:340px; text-align:center; }
+  #login{ min-height:100vh; align-items:center; justify-content:center; padding:16px;
+    background:linear-gradient(135deg,#1d4ed8 0%,#6d28d9 55%,#be3a8d 100%); }
+  .login-card{ background:#fff; border-radius:16px; padding:32px 28px; width:100%; max-width:340px; text-align:center; box-shadow:0 12px 40px rgba(9,30,66,.35); }
+  .login-card h1{ font-size:22px; margin:0 0 6px; }
+  .login-card input{ margin-top:8px; }
+
+  /* ---------- 공통 입력/버튼 ---------- */
+  input,textarea,select{ width:100%; padding:10px 12px; border:1px solid #cfd4dc; border-radius:8px; background:#fff; min-height:44px; -webkit-appearance:none; appearance:none; }
+  textarea{ min-height:84px; resize:vertical; }
+  input:focus,textarea:focus,select:focus{ outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent; }
+  select{ background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23626f86' stroke-width='2'/></svg>") no-repeat right 12px center; padding-right:34px; }
+  input[type=date]{ display:block; min-width:0; }
+  label{ display:block; font-size:13px; font-weight:600; color:#44546f; margin:14px 0 5px; }
+  .btn{ border:0; background:#091e420f; color:var(--ink); min-height:40px; padding:8px 16px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+  .btn:hover{ background:#091e4224; }
+  .btn.primary{ background:var(--accent); color:#fff; } .btn.primary:hover{ background:#0055cc; }
+  .btn.danger{ background:var(--danger-soft); color:var(--danger); }
+  .btn.small{ min-height:34px; padding:5px 12px; font-size:13px; }
+  .btn.glass{ background:rgba(255,255,255,.2); color:#fff; } .btn.glass:hover{ background:rgba(255,255,255,.32); }
+  .row{ display:flex; gap:10px; } .row > *{ flex:1; min-width:0; }
+  .checks{ display:flex; flex-wrap:wrap; gap:6px 18px; }
+  .checks label{ display:flex; align-items:center; gap:8px; margin:0; font-weight:500; color:var(--ink); font-size:15px; min-height:36px; }
+  .checks input{ width:20px; height:20px; min-height:0; -webkit-appearance:auto; appearance:auto; }
+
+  /* ---------- 앱 / 보드 ---------- */
+  #app{ min-height:100vh; min-height:100dvh; flex-direction:column;
+    background:linear-gradient(135deg,#1d4ed8 0%,#6d28d9 55%,#be3a8d 100%) fixed; }
+  .bar{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 16px; padding-top:max(10px, env(safe-area-inset-top));
+    background:rgba(0,0,0,.28); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#fff; }
+  .logo{ font-size:18px; font-weight:800; margin-right:4px; white-space:nowrap; }
+  .tabs{ display:flex; gap:4px; background:rgba(255,255,255,.16); padding:3px; border-radius:10px; }
+  .tab{ border:0; background:transparent; color:#fff; padding:7px 14px; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .tab.on{ background:#fff; color:var(--ink); }
+  .tab .n{ opacity:.7; font-weight:600; margin-left:4px; }
+  .spacer{ flex:1; }
+  .bar input[type=search]{ width:220px; min-height:36px; padding:6px 12px; font-size:14px; border:0; background:rgba(255,255,255,.2); color:#fff; border-radius:8px; }
+  .bar input[type=search]::placeholder{ color:rgba(255,255,255,.75); }
+  .pill{ font-size:12.5px; font-weight:700; padding:5px 10px; border-radius:99px; background:rgba(255,255,255,.2); color:#fff; white-space:nowrap; }
+  .pill.over{ background:var(--danger); } .pill.today{ background:#c25100; }
+  .pill.link{ cursor:pointer; }
+  .who{ font-size:13px; opacity:.9; white-space:nowrap; }
+
+  #tgBanner{ display:none; margin:12px 16px 0; background:#fff; border-radius:12px; padding:14px 16px; align-items:center; gap:12px; flex-wrap:wrap; box-shadow:0 2px 8px rgba(9,30,66,.25); }
+  #sumRow{ display:flex; gap:8px; padding:12px 16px 0; flex-wrap:wrap; }
+
+  #board{ flex:1; display:flex; gap:12px; align-items:flex-start; padding:12px 16px 24px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .col{ flex:1 1 0; min-width:200px; max-width:360px; background:var(--col); border-radius:12px; padding:8px; display:flex; flex-direction:column; max-height:calc(100vh - 150px); max-height:calc(100dvh - 150px); box-shadow:0 1px 1px #091e4240; }
+  .col.drop{ outline:3px dashed #fff; outline-offset:-3px; background:#e4e7ec; }
+  .col-h{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px 8px; font-size:15px; font-weight:800; }
+  .col-h .cnt{ font-weight:600; color:var(--muted); font-size:13px; background:#091e4214; border-radius:99px; padding:1px 9px; }
+  .col-cards{ overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding:2px; min-height:8px; flex:1 1 auto; }
+  .add{ margin-top:6px; border:0; background:transparent; color:#44546f; font-size:14px; font-weight:600; text-align:left; padding:8px; border-radius:8px; cursor:pointer; }
+  .add:hover{ background:#091e4214; }
+  .empty{ color:var(--muted); font-size:13px; padding:8px; text-align:center; }
+
+  .tcard{ background:var(--card); border-radius:8px; padding:10px 12px 10px; box-shadow:0 1px 1px #091e4240, 0 0 0 1px #091e4214; cursor:pointer; position:relative; }
+  .tcard:hover{ background:#f7f8f9; }
+  .tcard.dragging{ opacity:.45; }
+  .tcard.done{ opacity:.72; }
+  .lbls{ display:flex; gap:4px; flex-wrap:wrap; margin-bottom:7px; }
+  .lbl{ height:8px; min-width:36px; border-radius:99px; background:var(--lbl-general); }
+  .lbl.loan{ background:var(--lbl-loan); } .lbl.over{ background:var(--lbl-over); } .lbl.today{ background:var(--lbl-today); } .lbl.done{ background:var(--lbl-done); }
+  .tcard .t{ font-size:15px; font-weight:600; line-height:1.35; word-break:break-word; }
+  .tcard .sub{ font-size:12.5px; color:var(--muted); margin-top:3px; }
+  .badges{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:9px; }
+  .chip{ display:inline-flex; align-items:center; gap:4px; font-size:12.5px; font-weight:600; padding:2px 8px; border-radius:6px; background:#091e420f; color:#44546f; }
+  .chip.over{ background:var(--danger); color:#fff; } .chip.today{ background:#f5cd47; color:#533f04; }
+  .chip.ok{ background:var(--green-soft); color:var(--green); }
+  .avs{ margin-left:auto; display:flex; }
+  .av{ width:28px; height:28px; border-radius:50%; color:#fff; font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid #fff; margin-left:-6px; position:relative; }
+  .av.done::after{ content:'✓'; position:absolute; right:-5px; bottom:-5px; width:14px; height:14px; border-radius:50%; background:var(--green); color:#fff; font-size:9px; line-height:14px; text-align:center; border:1.5px solid #fff; }
+  .q{ margin-top:9px; width:100%; border:0; background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:13px; padding:7px 10px; border-radius:6px; cursor:pointer; text-align:left; }
+  .q:hover{ background:#cfe4ff; }
+
+  /* ---------- 모달 ---------- */
+  .ov{ display:none; position:fixed; inset:0; z-index:20; background:rgba(9,30,66,.6); overflow-y:auto; -webkit-overflow-scrolling:touch; padding:max(24px, env(safe-area-inset-top)) 12px 32px; }
+  .panel{ background:#fff; border-radius:14px; max-width:620px; margin:0 auto; padding:22px; box-shadow:0 12px 40px rgba(9,30,66,.4); }
+  .panel h2{ margin:0; font-size:19px; line-height:1.35; word-break:break-word; }
+  .ph{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .x{ border:0; background:#091e420f; width:34px; height:34px; border-radius:50%; font-size:16px; cursor:pointer; flex-shrink:0; }
+  .kv{ margin-top:14px; } .kv .k{ font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:4px; } .kv .v{ font-size:15px; white-space:pre-wrap; line-height:1.5; }
+  .steps{ display:flex; flex-wrap:wrap; gap:6px; }
+  .step{ display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:99px; border:1px solid var(--line); font-size:14px; color:var(--muted); background:#fff; }
+  .step.ok{ background:var(--green-soft); color:var(--green); border-color:transparent; }
+  .step.cur{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent); font-weight:800; }
+  .step small{ font-size:11px; opacity:.85; }
+  .acts{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .asg{ display:flex; align-items:center; gap:10px; min-height:40px; font-size:15px; }
+  .asg input{ width:22px; height:22px; min-height:0; -webkit-appearance:auto; appearance:auto; flex-shrink:0; }
+  .asg.ok{ color:var(--green); }
+  .foot{ display:flex; gap:8px; margin-top:20px; padding-top:16px; border-top:1px solid var(--line); flex-wrap:wrap; }
+
+  /* ---------- 모바일: 열이 한 장씩 스냅 ---------- */
+  @media (max-width:760px){
+    .bar{ gap:8px; padding:8px 12px; padding-top:max(8px, env(safe-area-inset-top)); }
+    .bar input[type=search]{ display:none; }
+    .who{ display:none; }
+    #board{ scroll-snap-type:x mandatory; padding:10px 12px 20px; gap:10px; }
+    .col{ flex:0 0 84vw; max-width:340px; scroll-snap-align:center; max-height:calc(100vh - 190px); max-height:calc(100dvh - 190px); }
+    #sumRow{ padding:10px 12px 0; }
+    #tgBanner{ margin:10px 12px 0; }
+  }
+  @media (min-width:761px){ #sumRow,.bar{ padding-left:20px; padding-right:20px; } #board{ padding-left:20px; padding-right:20px; } }
 </style>
 </head>
 <body>
-<div id="login" class="center"><div class="card">
+<div id="login"><div class="login-card">
   <h1>🧚 할일요정</h1>
   <p class="muted">등록된 이메일과 비밀번호로 로그인합니다.</p>
   <input id="emailInput" type="email" placeholder="이메일" autocomplete="username" />
-  <input id="pwInput" type="password" placeholder="비밀번호" autocomplete="current-password" style="margin-top:8px" />
-  <button class="btn primary" id="sendLink" style="width:100%;margin-top:10px">로그인</button>
+  <input id="pwInput" type="password" placeholder="비밀번호" autocomplete="current-password" />
+  <button class="btn primary" id="loginBtn" style="width:100%;margin-top:12px;min-height:46px">로그인</button>
   <p id="loginMsg" class="muted"></p>
 </div></div>
 
-<div id="editOv"><div class="card" style="max-width:560px;margin:0 auto">
-  <h2>업무 수정</h2>
-  <label>업무 내용</label><input id="eTitle" />
-  <label>상세</label><textarea id="eDetail" rows="2"></textarea>
-  <div class="row">
-    <div><label>지시자</label><input id="eBy" /></div>
-    <div><label>기한</label><input id="eDue" type="date" /></div>
+<div id="app">
+  <div class="bar">
+    <span class="logo">🧚 할일요정</span>
+    <div class="tabs" id="tabs"></div>
+    <span class="spacer"></span>
+    <input id="q" type="search" placeholder="🔍 검색" />
+    <span class="pill link" id="tgPill" title="텔레그램 다시 연결" style="display:none"></span>
+    <button class="btn glass small" id="newBtn">＋ 새 업무</button>
+    <span class="who" id="who"></span>
+    <button class="btn glass small" id="logout">로그아웃</button>
   </div>
-  <label>담당자</label><div class="checks" id="eAsg"></div>
-  <div class="rowbtns"><button class="btn primary" id="eSave">저장</button><button class="btn" id="eCancel">취소</button></div>
-</div></div>
+  <div id="tgBanner"><b>🔔 텔레그램 알림</b><span id="tgStatus" class="muted" style="flex:1"></span></div>
+  <div id="sumRow"></div>
+  <div id="board"></div>
+</div>
 
-<div id="app"><div class="wrap">
-  <header><h1>🧚 할일요정</h1><div><span class="muted" id="tgBadge" style="margin-right:10px;cursor:pointer" title="텔레그램 다시 연결"></span><span class="muted" id="who"></span> <button class="btn small" id="logout">로그아웃</button></div></header>
+<!-- 카드 상세 -->
+<div class="ov" id="detailOv"><div class="panel" id="detailPanel"></div></div>
 
-  <aside id="side">
-  <div class="card" id="tgCard">
-    <h2>🔔 텔레그램 알림</h2>
-    <div id="tgStatus" class="muted"></div>
-  </div>
-
-  <div class="card">
-    <h2>새 업무지시 등록</h2>
+<!-- 등록/수정 폼 -->
+<div class="ov" id="formOv"><div class="panel">
+  <div class="ph"><h2 id="fHead">새 업무 등록</h2><button class="x" id="fClose">✕</button></div>
+  <div id="fTypeRow">
     <label>업무 구분</label>
-    <select id="fType"><option value="general">일반업무 (단건 지시)</option><option value="loan">대출진행 (단계별)</option></select>
-    <div id="loanOpt" style="display:none"><label>현재 진행 단계 (이전 단계는 완료 처리됩니다)</label><select id="fStage"></select></div>
-    <label id="fTitleLabel">업무 내용</label><input id="fTitle" placeholder="예: 3분기 연체 현황 보고서 작성" />
-    <label>상세 (선택)</label><textarea id="fDetail" rows="2"></textarea>
-    <div class="row">
-      <div><label>지시자</label><input id="fBy" placeholder="예: 김상무" /></div>
-      <div><label>기한</label><input id="fDue" type="date" /></div>
-    </div>
-    <label>담당자 (체크한 사람에게 알림)</label><div class="checks" id="fAsg"></div>
-    <button class="btn primary" id="addBtn" style="margin-top:14px">등록</button>
+    <select id="fType"><option value="loan">대출진행 (단계별)</option><option value="general">일반업무 (단건 지시)</option></select>
+    <div id="fStageRow"><label>현재 진행 단계 (이전 단계는 완료 처리됩니다)</label><select id="fStage"></select></div>
   </div>
-  </aside>
-
-  <main id="main">
-  <div class="summary pc-only" id="summary"></div>
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <h2 style="margin:0">업무 목록</h2>
-      <select id="filter" style="width:auto"><option value="open">미완료</option><option value="all">전체</option><option value="done">완료</option></select>
-    </div>
-    <div class="toolbar pc-only">
-      <input id="q" type="search" placeholder="🔍 업무·고객명·지시자 검색" />
-      <select id="typeFilter"><option value="all">전체 구분</option><option value="general">일반업무</option><option value="loan">대출진행</option></select>
-    </div>
-    <div id="list" style="margin-top:14px"></div>
+  <label id="fTitleLabel">고객명 / 대출 건명</label><input id="fTitle" />
+  <label>상세 (선택)</label><textarea id="fDetail" rows="2"></textarea>
+  <div class="row">
+    <div><label>지시자</label><input id="fBy" placeholder="예: 김상무" /></div>
+    <div><label>기한</label><input id="fDue" type="date" /></div>
   </div>
-  </main>
+  <label>담당자 (체크한 사람에게 알림)</label><div class="checks" id="fAsg"></div>
+  <div class="acts" style="margin-top:20px"><button class="btn primary" id="fSave" style="min-height:44px;padding:8px 28px">저장</button><button class="btn" id="fCancel" style="min-height:44px">취소</button></div>
 </div></div>
 
 <script>
-  // 새 Supabase 프로젝트의 값으로 교체하세요 (Project Settings > API)
+  // 새 Supabase 프로젝트의 값 (Project Settings > API)
   const SUPABASE_URL = "https://mknsdknryqqewewxmbpf.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_7RCkTtp_pNvzXe2MuYKqpg_wtfyVPO8";
-  // 텔레그램 봇 사용자명 (@BotFather 에서 만든 봇, @ 제외)
+  // 텔레그램 봇 사용자명 (@ 제외)
   const BOT_USERNAME = "todo_fairy_bot";
 
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
   // 업무 유형별 단계 (나중에 채권관리 등 유형을 추가할 때 여기에 추가)
   const LOAN_STEPS = ['대출상담', '대출신청', '감정평가', '내부결재', '대출실행'];
-  let tasksById = {}, editingId = null;
-  let me = '', members = [], nameOf = (e) => e;
-  const fmtD = (iso) => { const d = new Date(iso); return `${d.getMonth()+1}/${d.getDate()}`; };
+  const GEN_COLS = [['over', '🔴 기한초과'], ['today', '🟠 오늘마감'], ['prog', '⚪ 예정'], ['done', '✅ 완료']];
+  const PALETTE = ['#e2483d', '#d97706', '#1f845a', '#0c66e4', '#8250df', '#c9348c', '#0f7a8a', '#5e6c84'];
 
+  let me = '', members = [], tasks = [], tab = 'loan', openId = null, formMode = 'new', editId = null;
+  try { tab = localStorage.getItem('tab') || 'loan'; } catch (e) {}
+
+  const nameOf = (e) => (members.find(m => m.email === e) || {}).name || e;
+  const colorOf = (e) => { let h = 0; for (const c of e) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PALETTE[h % PALETTE.length]; };
+  const initial = (e) => (nameOf(e) || '?').trim().slice(0, 1);
+  const kstToday = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const fmtMD = (d) => { const [, m, dd] = d.split('-'); return `${+m}/${+dd}`; };
+  const fmtTs = (iso) => { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()}`; };
+
+  // ---------- 로그인 ----------
   async function doLogin(){
     const email = $('emailInput').value.trim(), password = $('pwInput').value;
     if (!email || !password) return;
@@ -209,11 +215,11 @@
     const { error } = await sb.auth.signInWithPassword({ email, password });
     $('loginMsg').textContent = error ? '로그인 실패: 이메일 또는 비밀번호를 확인해주세요.' : '';
   }
-  $('sendLink').onclick = doLogin;
+  $('loginBtn').onclick = doLogin;
   $('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   $('logout').onclick = () => sb.auth.signOut();
   sb.auth.onAuthStateChange((_e, session) => session ? start(session) : show(false));
-  function show(on){ $('login').style.display = on ? 'none' : 'flex'; $('app').style.display = on ? 'block' : 'none'; }
+  function show(on){ $('login').style.display = on ? 'none' : 'flex'; $('app').style.display = on ? 'flex' : 'none'; }
 
   async function start(session){
     const { data: ok } = await sb.rpc('is_member');
@@ -221,22 +227,20 @@
     me = session.user.email; show(true);
     const { data } = await sb.from('team_members').select('email,name').order('name');
     members = data || [];
-    nameOf = (e) => (members.find(m => m.email === e) || {}).name || e;
     $('who').textContent = nameOf(me);
-    $('fAsg').innerHTML = members.map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${m.email===me?'checked':''}/> ${esc(m.name)}</label>`).join('');
     await loadTelegram(); await loadTasks();
   }
 
+  // ---------- 텔레그램 ----------
   async function loadTelegram(forceCard){
     const { data } = await sb.from('telegram_links').select('chat_id, link_code').eq('email', me).maybeSingle();
     const linked = !!(data && data.chat_id), pending = !!(data && data.link_code);
+    const pill = $('tgPill'), banner = $('tgBanner');
     if (linked && !pending && !forceCard){
-      $('tgCard').style.display = 'none';
-      $('tgBadge').textContent = '🔔 알림 연결됨 · 다시 연결';
-      $('tgBadge').onclick = () => loadTelegram(true);
+      banner.style.display = 'none'; pill.style.display = ''; pill.textContent = '🔔 알림 연결됨'; pill.onclick = () => loadTelegram(true);
       return;
     }
-    $('tgCard').style.display = ''; $('tgBadge').textContent = ''; $('tgBadge').onclick = null;
+    pill.style.display = 'none'; banner.style.display = 'flex';
     $('tgStatus').innerHTML = (linked ? '새 텔레그램으로 다시 연결합니다. ' : '연결되지 않았습니다. ')
       + '<button class="btn small primary" id="tgBtn">텔레그램 연결하기</button>'
       + (linked ? ' <button class="btn small" id="tgCancel">취소</button>' : '');
@@ -252,154 +256,245 @@
     };
   }
 
-  $('fStage').innerHTML = LOAN_STEPS.map((n, i) => `<option value="${i}">${n}</option>`).join('');
-  $('fType').onchange = () => {
-    const loan = $('fType').value === 'loan';
-    $('loanOpt').style.display = loan ? 'block' : 'none';
-    $('fTitleLabel').textContent = loan ? '고객명 / 대출 건명' : '업무 내용';
-    $('fTitle').placeholder = loan ? '예: 홍길동 담보대출 1억' : '예: 3분기 연체 현황 보고서 작성';
-  };
-
-  $('addBtn').onclick = async () => {
-    const title = $('fTitle').value.trim();
-    const emails = [...document.querySelectorAll('#fAsg input:checked')].map(i => i.value);
-    if (!title || !emails.length) return alert('업무 내용과 담당자를 입력해주세요.');
-    $('addBtn').disabled = true;
-    const { data: t, error } = await sb.from('work_tasks').insert({
-      title, detail: $('fDetail').value.trim() || null, directed_by: $('fBy').value.trim() || null, due_date: $('fDue').value || null,
-      task_type: $('fType').value
-    }).select('id').single();
-    if (error){ $('addBtn').disabled = false; return alert(error.message); }
-    await sb.from('work_task_assignees').insert(emails.map(email => ({ task_id: t.id, email })));
-    if ($('fType').value === 'loan'){
-      const startIdx = +$('fStage').value, now = new Date().toISOString();
-      const { error: e2 } = await sb.from('work_task_steps').insert(LOAN_STEPS.map((name, i) => ({ task_id: t.id, seq: i + 1, name, done_at: i < startIdx ? now : null })));
-      if (e2){ $('addBtn').disabled = false; return alert(e2.message); }
-    }
-    await sb.functions.invoke('task-notify', { body: { event: 'created', task_id: t.id } });
-    ['fTitle','fDetail','fDue'].forEach(id => $(id).value = '');
-    $('addBtn').disabled = false; loadTasks();
-  };
-
-  $('filter').onchange = loadTasks;
-  $('typeFilter').onchange = loadTasks;
-  let qTimer; $('q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(loadTasks, 250); };
-  function openEdit(id){
-    const t = tasksById[id]; if (!t) return;
-    editingId = id;
-    $('eTitle').value = t.title; $('eDetail').value = t.detail || ''; $('eBy').value = t.directed_by || ''; $('eDue').value = t.due_date || '';
-    const cur = new Set(t.work_task_assignees.map(a => a.email));
-    $('eAsg').innerHTML = members.map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${cur.has(m.email)?'checked':''}/> ${esc(m.name)}</label>`).join('');
-    $('editOv').style.display = 'block';
-  }
-  $('eCancel').onclick = () => { $('editOv').style.display = 'none'; editingId = null; };
-  $('eSave').onclick = async () => {
-    const t = tasksById[editingId]; if (!t) return;
-    const title = $('eTitle').value.trim();
-    const emails = [...document.querySelectorAll('#eAsg input:checked')].map(i => i.value);
-    if (!title || !emails.length) return alert('업무 내용과 담당자를 입력해주세요.');
-    $('eSave').disabled = true;
-    const patch = { title, detail: $('eDetail').value.trim() || null, directed_by: $('eBy').value.trim() || null, due_date: $('eDue').value || null };
-    const changed = ['title','detail','directed_by','due_date'].some(k => (t[k] || null) !== patch[k]);
-    const before = t.work_task_assignees.map(a => a.email);
-    const added = emails.filter(e => !before.includes(e)), removed = before.filter(e => !emails.includes(e));
-    let err = (await sb.from('work_tasks').update(patch).eq('id', t.id)).error;
-    if (!err && removed.length) err = (await sb.from('work_task_assignees').delete().eq('task_id', t.id).in('email', removed)).error;
-    if (!err && added.length) err = (await sb.from('work_task_assignees').insert(added.map(email => ({ task_id: t.id, email })))).error;
-    $('eSave').disabled = false;
-    if (err) return alert(err.message);
-    $('editOv').style.display = 'none'; editingId = null;
-    if (changed || added.length) await sb.functions.invoke('task-notify', { body: { event: 'updated', task_id: t.id, added, changed } });
-    loadTasks();
-  };
-
-  function loanBlock(t){
-    const steps = [...t.work_task_steps].sort((a, b) => a.seq - b.seq);
-    const cur = steps.find(s => !s.done_at);
-    const canAct = t.created_by === me || t.work_task_assignees.some(a => a.email === me);
-    const lastDone = [...steps].reverse().find(s => s.done_at);
-    const canUndo = canAct && lastDone && (t.created_by === me || lastDone.done_by === me);
-    const chips = steps.map(s => `<div class="step ${s.done_at ? 'ok' : (cur && cur.seq === s.seq ? 'cur' : '')}">
-      <span class="dot">${s.done_at ? '✓' : s.seq}</span><span>${esc(s.name)}</span>${s.done_at && s.done_by ? `<small>${esc(nameOf(s.done_by))} ${fmtD(s.done_at)}</small>` : ''}</div>`).join('');
-    const btns = canAct ? `<div class="stepbtns">
-      ${cur ? `<button class="btn small primary" data-step="${t.id}:${cur.seq}">✔ ${esc(cur.name)} 완료</button>` : ''}
-      ${canUndo ? `<button class="btn small" data-undo="${t.id}:${lastDone.seq}">↩ ${esc(lastDone.name)} 되돌리기</button>` : ''}</div>` : '';
-    return `<div class="meta">담당: ${esc(t.work_task_assignees.map(a => nameOf(a.email)).join(', '))}</div><div class="steps">${chips}</div>${btns}`;
-  }
-
+  // ---------- 데이터 ----------
   async function loadTasks(){
     const { data, error } = await sb.from('work_tasks')
-      .select('*, work_task_assignees(email, done_at), work_task_steps(seq, name, done_at, done_by)').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false });
-    if (error) { $('list').textContent = error.message; return; }
-    tasksById = Object.fromEntries((data || []).map(t => [t.id, t]));
-    const today = new Date(Date.now() + 9*3600e3).toISOString().slice(0,10);
-    const f = $('filter').value;
-    const isDone = (t) => t.task_type === 'loan'
-      ? t.work_task_steps.length > 0 && t.work_task_steps.every(s => s.done_at)
-      : t.work_task_assignees.every(a => a.done_at);
-    const rows = (data || []).filter(t => f === 'all' || (f === 'done' ? isDone(t) : !isDone(t)));
-    const cardHtml = (t) => {
-      const done = isDone(t);
-      const tag = done || !t.due_date ? '' : t.due_date < today ? '<span class="tag over">기한초과</span>' : t.due_date === today ? '<span class="tag today">오늘마감</span>' : '';
-      const meta = [t.directed_by && `지시: ${t.directed_by}`, t.due_date && `기한: ${t.due_date}`].filter(Boolean).join(' · ');
-      return `<div class="task ${done?'done':''}">
-        <div class="t">${t.task_type === 'loan' ? '<span class="tag loan">대출</span>' : ''}${esc(t.title)}${tag}</div>
-        <div class="meta">${esc(meta)}${t.detail ? '\n' + esc(t.detail) : ''}</div>
-        ${t.task_type === 'loan' ? loanBlock(t) : t.work_task_assignees.map(a => `<div class="asg ${a.done_at?'ok':''}">
-          <input type="checkbox" ${a.done_at?'checked':''} ${a.email===me?'':'disabled'} data-t="${t.id}" data-e="${esc(a.email)}" />
-          ${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}
-        ${t.created_by === me ? `<div class="rowbtns"><button class="btn small" data-edit="${t.id}">✏ 수정</button><button class="btn small" data-del="${t.id}">삭제</button></div>` : ''}
-      </div>`;
-    };
-
-    // 요약 타일 (PC) — 필터와 무관하게 전체 기준
-    const all = data || [];
-    const grpOf = (t) => isDone(t) ? 'done' : (t.due_date && t.due_date < today) ? 'over' : (t.due_date === today) ? 'today' : 'prog';
-    const open = all.filter(t => !isDone(t));
-    $('summary').innerHTML = [
-      ['over', open.filter(t => grpOf(t) === 'over').length, '기한초과'],
-      ['today', open.filter(t => grpOf(t) === 'today').length, '오늘마감'],
-      ['', open.length, '미완료 전체'],
-      ['loan', open.filter(t => t.task_type === 'loan').length, '진행 중 대출'],
-    ].map(([c, n, l]) => `<div class="tile ${c}"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
-
-    // 구분 필터·검색 (PC 입력칸은 모바일에서 숨겨져 기본값이라 영향 없음)
-    const tf = $('typeFilter').value, q = $('q').value.trim().toLowerCase();
-    const shown = rows.filter(t => (tf === 'all' || t.task_type === tf)
-      && (!q || [t.title, t.detail, t.directed_by].some(v => (v || '').toLowerCase().includes(q))));
-    const GROUPS = [['over', '🔴 기한초과'], ['today', '🟠 오늘마감'], ['prog', '⚪ 진행중'], ['done', '✅ 완료']];
-    $('list').innerHTML = GROUPS.map(([k, label]) => {
-      const items = shown.filter(t => grpOf(t) === k);
-      return items.length ? `<div class="grp-h">${label} <span>${items.length}</span></div><div class="group-items">${items.map(cardHtml).join('')}</div>` : '';
-    }).join('') || '<p class="muted">업무가 없습니다.</p>';
-    $('list').querySelectorAll('input[data-t]').forEach(cb => cb.onchange = async () => {
-      const { error } = await sb.from('work_task_assignees')
-        .update({ done_at: cb.checked ? new Date().toISOString() : null }).eq('task_id', cb.dataset.t).eq('email', cb.dataset.e);
-      if (error) return alert(error.message);
-      if (cb.checked) await sb.functions.invoke('task-notify', { body: { event: 'done', task_id: +cb.dataset.t } });
-      loadTasks();
-    });
-    $('list').querySelectorAll('[data-step]').forEach(b => b.onclick = async () => {
-      const [tid, seq] = b.dataset.step.split(':').map(Number);
-      b.disabled = true;
-      const { error } = await sb.from('work_task_steps').update({ done_at: new Date().toISOString() }).eq('task_id', tid).eq('seq', seq);
-      if (error){ alert(error.message); return loadTasks(); }
-      await sb.functions.invoke('task-notify', { body: { event: 'step_done', task_id: tid, seq } });
-      loadTasks();
-    });
-    $('list').querySelectorAll('[data-undo]').forEach(b => b.onclick = async () => {
-      const [tid, seq] = b.dataset.undo.split(':').map(Number);
-      if (!confirm('이 단계를 되돌릴까요?')) return;
-      const { error } = await sb.from('work_task_steps').update({ done_at: null }).eq('task_id', tid).eq('seq', seq);
-      if (error) alert(error.message);
-      loadTasks();
-    });
-    $('list').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEdit(+b.dataset.edit));
-    $('list').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
-      if (!confirm('이 업무를 삭제할까요?')) return;
-      await sb.from('work_tasks').delete().eq('id', b.dataset.del); loadTasks();
-    });
+      .select('*, work_task_assignees(email, done_at), work_task_steps(seq, name, done_at, done_by)')
+      .order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false });
+    if (error){ $('board').innerHTML = `<div class="empty" style="color:#fff">${esc(error.message)}</div>`; return; }
+    tasks = data || [];
+    render();
+    if (openId) { const t = byId(openId); if (t) renderDetail(t); else closeDetail(); }
   }
+  const byId = (id) => tasks.find(t => t.id === id);
+  const stepsOf = (t) => [...t.work_task_steps].sort((a, b) => a.seq - b.seq);
+  const isDone = (t) => t.task_type === 'loan' ? (t.work_task_steps.length > 0 && t.work_task_steps.every(s => s.done_at)) : t.work_task_assignees.every(a => a.done_at);
+  const curIdx = (t) => { const s = stepsOf(t); const i = s.findIndex(x => !x.done_at); return i < 0 ? s.length : i; };
+  const dueGrp = (t, today) => isDone(t) ? 'done' : (t.due_date && t.due_date < today) ? 'over' : (t.due_date === today) ? 'today' : 'prog';
+  const canAct = (t) => t.created_by === me || t.work_task_assignees.some(a => a.email === me);
+  const canUndoStep = (t, s) => t.created_by === me || s.done_by === me;
+
+  // ---------- 보드 렌더 ----------
+  function matches(t, q){ return !q || [t.title, t.detail, t.directed_by].some(v => (v || '').toLowerCase().includes(q)); }
+
+  function render(){
+    const today = kstToday(), q = $('q').value.trim().toLowerCase();
+    const loanT = tasks.filter(t => t.task_type === 'loan'), genT = tasks.filter(t => t.task_type !== 'loan');
+    const openN = (arr) => arr.filter(t => !isDone(t)).length;
+    $('tabs').innerHTML = `<button class="tab ${tab==='loan'?'on':''}" data-tab="loan">대출진행<span class="n">${openN(loanT)}</span></button>`
+      + `<button class="tab ${tab==='general'?'on':''}" data-tab="general">일반업무<span class="n">${openN(genT)}</span></button>`;
+    const open = tasks.filter(t => !isDone(t));
+    const over = open.filter(t => dueGrp(t, today) === 'over').length, tod = open.filter(t => dueGrp(t, today) === 'today').length;
+    $('sumRow').innerHTML = (over ? `<span class="pill over">🔴 기한초과 ${over}</span>` : '') + (tod ? `<span class="pill today">🟠 오늘마감 ${tod}</span>` : '')
+      + `<span class="pill">미완료 ${open.length}건</span>`;
+
+    let cols;
+    if (tab === 'loan'){
+      const names = [...LOAN_STEPS, '완료'];
+      cols = names.map((name, k) => ({
+        key: k, title: name, add: k < LOAN_STEPS.length,
+        items: loanT.filter(t => matches(t, q) && Math.min(curIdx(t), LOAN_STEPS.length) === k)
+      }));
+    } else {
+      cols = GEN_COLS.map(([key, title]) => ({ key, title, add: key !== 'done', items: genT.filter(t => matches(t, q) && dueGrp(t, today) === key) }));
+    }
+    $('board').innerHTML = cols.map(c => `<div class="col" data-col="${c.key}">
+      <div class="col-h"><span>${esc(c.title)}</span><span class="cnt">${c.items.length}</span></div>
+      <div class="col-cards">${c.items.map(t => cardHtml(t, today)).join('') || '<div class="empty">비어 있음</div>'}</div>
+      ${c.add ? `<button class="add" data-add="${c.key}">＋ 카드 추가</button>` : ''}</div>`).join('');
+  }
+
+  function cardHtml(t, today){
+    const g = dueGrp(t, today), loan = t.task_type === 'loan', steps = stepsOf(t);
+    const lbls = `<span class="lbl ${loan ? 'loan' : ''}"></span>` + (g === 'over' ? '<span class="lbl over"></span>' : g === 'today' ? '<span class="lbl today"></span>' : g === 'done' ? '<span class="lbl done"></span>' : '');
+    const due = t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '';
+    const prog = loan && steps.length ? `<span class="chip ${g === 'done' ? 'ok' : ''}">✔ ${steps.filter(s => s.done_at).length}/${steps.length}</span>` : '';
+    const avs = `<div class="avs">${t.work_task_assignees.map(a => `<span class="av ${!loan && a.done_at ? 'done' : ''}" style="background:${colorOf(a.email)}" title="${esc(nameOf(a.email))}">${esc(initial(a.email))}</span>`).join('')}</div>`;
+    let quick = '';
+    if (loan && g !== 'done' && canAct(t)){ const c = steps[curIdx(t)]; if (c) quick = `<button class="q" data-q="step:${t.id}:${c.seq}">✔ ${esc(c.name)} 완료</button>`; }
+    if (!loan && g !== 'done' && t.work_task_assignees.some(a => a.email === me && !a.done_at)) quick = `<button class="q" data-q="mine:${t.id}">✔ 내 일 완료</button>`;
+    const sub = t.directed_by ? `<div class="sub">지시: ${esc(t.directed_by)}</div>` : '';
+    const drag = loan && canAct(t) ? 'draggable="true"' : '';
+    return `<div class="tcard ${g === 'done' ? 'done' : ''}" data-id="${t.id}" ${drag}>
+      <div class="lbls">${lbls}</div><div class="t">${esc(t.title)}</div>${sub}
+      <div class="badges">${due}${prog}${avs}</div>${quick}</div>`;
+  }
+
+  // ---------- 동작 (공통) ----------
+  async function completeStep(tid, seq){
+    const { error } = await sb.from('work_task_steps').update({ done_at: new Date().toISOString() }).eq('task_id', tid).eq('seq', seq);
+    if (error){ alert(error.message); return false; }
+    await sb.functions.invoke('task-notify', { body: { event: 'step_done', task_id: tid, seq } });
+    return true;
+  }
+  async function undoStep(tid, seq){
+    const { error } = await sb.from('work_task_steps').update({ done_at: null }).eq('task_id', tid).eq('seq', seq);
+    if (error){ alert(error.message); return false; }
+    return true;
+  }
+  async function toggleAssignee(tid, email, checked){
+    const { error } = await sb.from('work_task_assignees').update({ done_at: checked ? new Date().toISOString() : null }).eq('task_id', tid).eq('email', email);
+    if (error){ alert(error.message); return; }
+    if (checked) await sb.functions.invoke('task-notify', { body: { event: 'done', task_id: tid } });
+  }
+  async function moveLoan(tid, target){
+    const t = byId(tid); if (!t) return;
+    const steps = stepsOf(t), c = curIdx(t);
+    if (target === c) return;
+    if (!canAct(t)) return alert('담당자나 등록자만 이동할 수 있습니다.');
+    if (target > c){
+      if (target - c > 1 && !confirm(`${steps[c].name}부터 ${steps[target - 1].name}까지 ${target - c}개 단계를 완료 처리할까요?`)) return;
+      let last = 0;
+      for (let i = c; i < target; i++){
+        const { error } = await sb.from('work_task_steps').update({ done_at: new Date().toISOString() }).eq('task_id', tid).eq('seq', steps[i].seq);
+        if (error){ alert(error.message); break; }
+        last = steps[i].seq;
+      }
+      if (last) await sb.functions.invoke('task-notify', { body: { event: 'step_done', task_id: tid, seq: last } });
+    } else {
+      const undo = steps.slice(target, c);
+      if (undo.some(s => !canUndoStep(t, s))) return alert('다른 사람이 완료한 단계는 되돌릴 수 없습니다.');
+      if (!confirm(`${steps[target].name} 단계로 되돌릴까요?`)) return;
+      for (let i = c - 1; i >= target; i--) if (!(await undoStep(tid, steps[i].seq))) break;
+    }
+    loadTasks();
+  }
+
+  // ---------- 이벤트 위임 ----------
+  $('tabs').onclick = (e) => { const b = e.target.closest('[data-tab]'); if (!b) return; tab = b.dataset.tab; try { localStorage.setItem('tab', tab); } catch (x) {} render(); };
+  let qTimer; $('q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(render, 200); };
+  $('board').addEventListener('click', async (e) => {
+    const add = e.target.closest('[data-add]');
+    if (add) return openForm('new', null, add.dataset.add);
+    const q = e.target.closest('[data-q]');
+    if (q){
+      e.stopPropagation(); q.disabled = true;
+      const [kind, tid, seq] = q.dataset.q.split(':');
+      if (kind === 'step') await completeStep(+tid, +seq); else await toggleAssignee(+tid, me, true);
+      return loadTasks();
+    }
+    const card = e.target.closest('[data-id]');
+    if (card) openDetail(+card.dataset.id);
+  });
+  // 드래그로 단계 이동 (대출진행 보드, PC)
+  let dragId = null;
+  $('board').addEventListener('dragstart', (e) => { const c = e.target.closest('.tcard'); if (!c) return; dragId = +c.dataset.id; c.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(dragId)); });
+  $('board').addEventListener('dragend', () => { dragId = null; document.querySelectorAll('.dragging,.drop').forEach(el => el.classList.remove('dragging', 'drop')); });
+  $('board').addEventListener('dragover', (e) => { const col = e.target.closest('.col'); if (!col || dragId == null || tab !== 'loan') return; e.preventDefault(); document.querySelectorAll('.col.drop').forEach(el => { if (el !== col) el.classList.remove('drop'); }); col.classList.add('drop'); });
+  $('board').addEventListener('drop', (e) => { const col = e.target.closest('.col'); if (!col || dragId == null || tab !== 'loan') return; e.preventDefault(); const id = dragId; dragId = null; col.classList.remove('drop'); moveLoan(id, +col.dataset.col); });
+
+  // ---------- 상세 ----------
+  function openDetail(id){ openId = id; renderDetail(byId(id)); $('detailOv').style.display = 'block'; document.body.style.overflow = 'hidden'; }
+  function closeDetail(){ openId = null; $('detailOv').style.display = 'none'; document.body.style.overflow = ''; }
+  $('detailOv').addEventListener('click', (e) => { if (e.target === $('detailOv')) closeDetail(); });
+
+  function renderDetail(t){
+    if (!t) return;
+    const loan = t.task_type === 'loan', today = kstToday(), g = dueGrp(t, today), steps = stepsOf(t);
+    const cur = steps[curIdx(t)];
+    let body = '';
+    if (t.detail) body += `<div class="kv"><div class="k">상세</div><div class="v">${esc(t.detail)}</div></div>`;
+    const info = [t.directed_by && `지시: ${t.directed_by}`, t.due_date && `기한: ${t.due_date}`].filter(Boolean).join('  ·  ');
+    if (info) body += `<div class="kv"><div class="k">정보</div><div class="v">${esc(info)}</div></div>`;
+    if (loan){
+      const lastDone = [...steps].reverse().find(s => s.done_at);
+      body += `<div class="kv"><div class="k">진행 단계</div><div class="steps">${steps.map(s => `<div class="step ${s.done_at ? 'ok' : (cur && cur.seq === s.seq ? 'cur' : '')}">
+        <span>${s.done_at ? '✓' : s.seq}</span><span>${esc(s.name)}</span>${s.done_at && s.done_by ? `<small>${esc(nameOf(s.done_by))} ${fmtTs(s.done_at)}</small>` : ''}</div>`).join('')}</div>
+        ${canAct(t) ? `<div class="acts">${cur ? `<button class="btn primary" data-d="step:${cur.seq}">✔ ${esc(cur.name)} 완료</button>` : ''}
+        ${lastDone && canUndoStep(t, lastDone) ? `<button class="btn" data-d="undo:${lastDone.seq}">↩ ${esc(lastDone.name)} 되돌리기</button>` : ''}</div>` : ''}</div>`;
+      body += `<div class="kv"><div class="k">담당자</div><div class="v">${esc(t.work_task_assignees.map(a => nameOf(a.email)).join(', '))}</div></div>`;
+    } else {
+      body += `<div class="kv"><div class="k">담당자별 진행</div>${t.work_task_assignees.map(a => `<div class="asg ${a.done_at ? 'ok' : ''}">
+        <input type="checkbox" ${a.done_at ? 'checked' : ''} ${a.email === me ? '' : 'disabled'} data-d="chk:${esc(a.email)}" />
+        <span class="av" style="background:${colorOf(a.email)};margin:0">${esc(initial(a.email))}</span>${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}</div>`;
+    }
+    const lbl = `<span class="chip" style="background:${loan ? '#e5e1fa' : '#dbeafe'};color:${loan ? '#5b3fc4' : '#0b5cc4'}">${loan ? '대출진행' : '일반업무'}</span> `
+      + (g === 'over' ? '<span class="chip over">기한초과</span>' : g === 'today' ? '<span class="chip today">오늘마감</span>' : g === 'done' ? '<span class="chip ok">완료</span>' : '');
+    $('detailPanel').innerHTML = `<div class="ph"><div><div style="margin-bottom:8px">${lbl}</div><h2>${esc(t.title)}</h2></div><button class="x" data-d="close">✕</button></div>${body}
+      ${t.created_by === me ? `<div class="foot"><button class="btn" data-d="edit">✏ 수정</button><button class="btn danger" data-d="del">삭제</button></div>` : ''}`;
+  }
+  $('detailPanel').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-d]'); if (!b || b.tagName === 'INPUT') return;
+    const t = byId(openId); if (!t) return;
+    const [kind, arg] = b.dataset.d.split(':');
+    if (kind === 'close') return closeDetail();
+    if (kind === 'edit') return openForm('edit', t.id);
+    if (kind === 'del'){ if (!confirm('이 업무를 삭제할까요?')) return; await sb.from('work_tasks').delete().eq('id', t.id); closeDetail(); return loadTasks(); }
+    b.disabled = true;
+    if (kind === 'step') await completeStep(t.id, +arg);
+    if (kind === 'undo' && confirm('이 단계를 되돌릴까요?')) await undoStep(t.id, +arg);
+    loadTasks();
+  });
+  $('detailPanel').addEventListener('change', async (e) => {
+    const cb = e.target.closest('input[data-d^="chk:"]'); if (!cb) return;
+    await toggleAssignee(openId, cb.dataset.d.slice(4), cb.checked); loadTasks();
+  });
+
+  // ---------- 등록/수정 폼 ----------
+  $('fStage').innerHTML = LOAN_STEPS.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+  function syncType(){
+    const loan = $('fType').value === 'loan';
+    $('fStageRow').style.display = loan ? 'block' : 'none';
+    $('fTitleLabel').textContent = loan ? '고객명 / 대출 건명' : '업무 내용';
+    $('fTitle').placeholder = loan ? '예: 홍길동 담보대출 1억' : '예: 3분기 연체 현황 보고서 작성';
+  }
+  $('fType').onchange = syncType;
+  function openForm(mode, id, colKey){
+    formMode = mode; editId = id;
+    const t = id ? byId(id) : null;
+    $('fHead').textContent = mode === 'edit' ? '업무 수정' : '새 업무 등록';
+    $('fTypeRow').style.display = mode === 'edit' ? 'none' : 'block';
+    if (mode === 'new'){
+      $('fType').value = tab; $('fStage').value = (tab === 'loan' && colKey !== undefined && colKey !== null && colKey !== '' && !isNaN(+colKey)) ? colKey : '0';
+      syncType();
+    } else {
+      $('fTitleLabel').textContent = t.task_type === 'loan' ? '고객명 / 대출 건명' : '업무 내용';
+    }
+    $('fTitle').value = t ? t.title : ''; $('fDetail').value = t ? (t.detail || '') : ''; $('fBy').value = t ? (t.directed_by || '') : ''; $('fDue').value = t ? (t.due_date || '') : '';
+    const cur = new Set(t ? t.work_task_assignees.map(a => a.email) : [me]);
+    $('fAsg').innerHTML = members.map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${cur.has(m.email) ? 'checked' : ''}/> ${esc(m.name)}</label>`).join('');
+    $('formOv').style.display = 'block'; document.body.style.overflow = 'hidden';
+    setTimeout(() => { try { $('fTitle').focus(); } catch (e) {} }, 50);
+  }
+  function closeForm(){ $('formOv').style.display = 'none'; editId = null; document.body.style.overflow = $('detailOv').style.display === 'block' ? 'hidden' : ''; }
+  $('fClose').onclick = closeForm; $('fCancel').onclick = closeForm;
+  $('formOv').addEventListener('click', (e) => { if (e.target === $('formOv')) closeForm(); });
+  $('newBtn').onclick = () => openForm('new', null, null);
+
+  $('fSave').onclick = async () => {
+    const title = $('fTitle').value.trim();
+    const emails = [...document.querySelectorAll('#fAsg input:checked')].map(i => i.value);
+    if (!title || !emails.length) return alert('내용과 담당자를 입력해주세요.');
+    const patch = { title, detail: $('fDetail').value.trim() || null, directed_by: $('fBy').value.trim() || null, due_date: $('fDue').value || null };
+    $('fSave').disabled = true;
+    try {
+      if (formMode === 'edit'){
+        const t = byId(editId); if (!t) return;
+        const changed = ['title', 'detail', 'directed_by', 'due_date'].some(k => (t[k] || null) !== patch[k]);
+        const before = t.work_task_assignees.map(a => a.email);
+        const added = emails.filter(e => !before.includes(e)), removed = before.filter(e => !emails.includes(e));
+        let err = (await sb.from('work_tasks').update(patch).eq('id', t.id)).error;
+        if (!err && removed.length) err = (await sb.from('work_task_assignees').delete().eq('task_id', t.id).in('email', removed)).error;
+        if (!err && added.length) err = (await sb.from('work_task_assignees').insert(added.map(email => ({ task_id: t.id, email })))).error;
+        if (err) return alert(err.message);
+        if (changed || added.length) await sb.functions.invoke('task-notify', { body: { event: 'updated', task_id: t.id, added, changed } });
+      } else {
+        const type = $('fType').value;
+        const { data: nt, error } = await sb.from('work_tasks').insert({ ...patch, task_type: type }).select('id').single();
+        if (error) return alert(error.message);
+        await sb.from('work_task_assignees').insert(emails.map(email => ({ task_id: nt.id, email })));
+        if (type === 'loan'){
+          const startIdx = +$('fStage').value, now = new Date().toISOString();
+          const { error: e2 } = await sb.from('work_task_steps').insert(LOAN_STEPS.map((name, i) => ({ task_id: nt.id, seq: i + 1, name, done_at: i < startIdx ? now : null })));
+          if (e2) return alert(e2.message);
+        }
+        await sb.functions.invoke('task-notify', { body: { event: 'created', task_id: nt.id } });
+        if (tab !== type){ tab = type; try { localStorage.setItem('tab', tab); } catch (x) {} }
+      }
+      closeForm(); await loadTasks();
+    } finally { $('fSave').disabled = false; }
+  };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('formOv').style.display === 'block') closeForm(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
 </body>
 </html>
