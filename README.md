@@ -1,4 +1,4 @@
-# 업무지시 체크 (task-reminder)
+# 할일요정 (task-reminder)
 
 기존 NFCF_CRM과 **별개**로 쓰는 독립 앱입니다. 새 Supabase 프로젝트 + 텔레그램 봇이 필요합니다.
 이 폴더만 새 저장소로 옮겨도 동작합니다.
