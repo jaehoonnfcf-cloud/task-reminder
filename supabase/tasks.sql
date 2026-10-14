@@ -98,3 +98,7 @@ grant execute on function public.is_member() to authenticated;
 -- 로그인 전(anon) 호출 차단
 revoke execute on function public.is_member(), public.task_is_owner(bigint), public.task_is_member(bigint) from public, anon;
 grant execute on function public.is_member(), public.task_is_owner(bigint), public.task_is_member(bigint) to authenticated;
+
+-- Edge Function(service_role)이 테이블을 읽고 쓰기 위한 권한 (Automatically expose new tables 를 끈 경우 필요)
+grant select, insert, update, delete on public.work_tasks, public.work_task_assignees, public.telegram_links, public.team_members to service_role;
+grant usage, select on all sequences in schema public to service_role;
