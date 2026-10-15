@@ -112,6 +112,13 @@
   .ahead{ display:grid; grid-template-columns:minmax(0,1.6fr) repeat(3, auto) auto; gap:10px 16px; font-size:12px; font-weight:700; color:var(--muted); padding-bottom:6px; border-bottom:1px solid var(--line); }
   .ahead span:nth-child(n+2):nth-child(-n+4){ min-width:48px; }
 
+  /* 사진 아바타 */
+  .av.img{ color:transparent; }
+  .av.big{ width:96px; height:96px; font-size:34px; border-width:3px; margin:0; box-shadow:0 2px 8px rgba(9,30,66,.25); }
+  .whoBtn{ display:flex; align-items:center; gap:8px; background:transparent; border:0; color:#fff; cursor:pointer; font-size:13.5px; font-weight:600; padding:3px 10px 3px 4px; border-radius:99px; white-space:nowrap; }
+  .whoBtn:hover{ background:rgba(255,255,255,.18); }
+  .arow .btns{ flex-wrap:wrap; }
+
   /* 요약 타일 */
   #tiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .tile{ background:rgba(255,255,255,.96); border-radius:14px; padding:14px 18px; cursor:pointer; border:2px solid transparent; box-shadow:0 1px 3px rgba(9,30,66,.18); text-align:left; }
@@ -196,7 +203,7 @@
     .bar{ padding:8px 12px; padding-top:max(8px, env(safe-area-inset-top)); gap:8px; flex-wrap:wrap; }
     .divs{ order:5; flex-basis:100%; margin-left:0; } .divs button{ flex:1; }
     .arow,.ahead{ grid-template-columns:1fr 1fr 1fr; } .arow .nm{ grid-column:1 / -1; } .arow .btns{ grid-column:1 / -1; } .ahead{ display:none; }
-    .who{ display:none; }
+    .whoBtn .wn{ display:none; } .whoBtn{ padding:3px; }
     .logo{ font-size:17px; }
     .pill{ font-size:12px; padding:5px 9px; }
     #wrap{ padding:12px 12px 32px; gap:12px; }
@@ -224,7 +231,7 @@
     <span class="pill ro" id="roPill" style="display:none" title="이 업무구분에 대한 등록·수정 권한이 없습니다">👀 보기 전용</span>
     <span class="pill link" id="tgPill" title="텔레그램 다시 연결" style="display:none"></span>
     <button class="btn glass small" id="newBtn">＋ 새 업무</button>
-    <span class="who" id="who"></span>
+    <button class="whoBtn" id="who" title="내 프로필 (사진·이름 변경)"></button>
     <button class="btn glass small" id="adminBtn" style="display:none">⚙ 관리자</button>
     <button class="btn glass small" id="logout">로그아웃</button>
   </div>
@@ -251,6 +258,23 @@
     </aside>
   </div>
 </div>
+
+<!-- 내 프로필 -->
+<div class="ov" id="profOv"><div class="panel" style="max-width:420px">
+  <div class="ph"><h2>내 프로필</h2><button class="x" id="pClose">✕</button></div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:16px">
+    <div id="pAvWrap"></div>
+    <div class="acts" style="justify-content:center;margin:0">
+      <button class="btn small primary" id="pPick">사진 선택</button>
+      <button class="btn small danger" id="pDel">사진 삭제</button>
+    </div>
+    <p class="muted" id="pMsg" style="margin:0;text-align:center">정사각형으로 자동 조정돼요. 로그인한 팀원에게만 보입니다.</p>
+  </div>
+  <label>이름</label><input id="pName" maxlength="30" />
+  <button class="btn primary" id="pSave" style="margin-top:14px;min-height:44px;padding:8px 26px">이름 저장</button>
+  <input type="file" id="pFile" accept="image/*" hidden />
+</div></div>
+<input type="file" id="aFile" accept="image/*" hidden />
 
 <!-- 관리자: 담당자 관리 -->
 <div class="ov" id="adminOv"><div class="panel" style="max-width:880px">
@@ -320,6 +344,23 @@
   const canWrite = (d) => permOf(d, meRow);
   const isAdmin = () => !!(meRow && meRow.is_admin);
   const taskDiv = (t) => t.division === 'deposit' ? 'deposit' : 'credit';
+  // 사진(아바타): 비공개 저장소의 임시 주소(서명 URL)로 보여준다
+  const avatarUrl = {};
+  const avPath = (email) => email.replace('@', '_at_') + '.jpg';
+  function avHtml(email, cls = '', extra = ''){
+    const url = avatarUrl[email];
+    const bg = url ? `background:#e4e6ea url('${esc(url)}') center/cover no-repeat;` : `background:${colorOf(email)};`;
+    return `<span class="av ${url ? 'img' : ''} ${cls}" style="${bg}${extra}" title="${esc(nameOf(email))}">${url ? '' : esc(initial(email))}</span>`;
+  }
+  async function loadAvatars(){
+    try {
+      for (const k of Object.keys(avatarUrl)) delete avatarUrl[k];
+      const withPhoto = members.filter(m => m.avatar_v);
+      if (!withPhoto.length) return;
+      const { data } = await sb.storage.from('avatars').createSignedUrls(withPhoto.map(m => avPath(m.email)), 3600);
+      (data || []).forEach((r, i) => { if (r && r.signedUrl) avatarUrl[withPhoto[i].email] = r.signedUrl + (r.signedUrl.includes('?') ? '&' : '?') + 'v=' + withPhoto[i].avatar_v; });
+    } catch (e) { /* 사진을 못 불러와도 글자 아바타로 보여준다 */ }
+  }
   const nameOf = (e) => (members.find(m => m.email === e) || {}).name || e;
   const colorOf = (e) => { let h = 0; for (const c of e) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PALETTE[h % PALETTE.length]; };
   const initial = (e) => (nameOf(e) || '?').trim().slice(0, 1);
@@ -346,15 +387,21 @@
     if (!ok){ await sb.auth.signOut(); show(false); $('loginMsg').textContent = '등록되지 않은 이메일입니다.'; return; }
     me = session.user.email; show(true);
     await reloadMembers();
-    $('who').textContent = nameOf(me);
+    renderWho();
+    setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
     divn = storedDiv === 'credit' || storedDiv === 'deposit' ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
     await loadTelegram(); await loadTasks(); ensureSide();
   }
 
   async function reloadMembers(){
-    const { data } = await sb.from('team_members').select('email,name,perm_credit,perm_deposit,is_admin').order('name');
+    const { data } = await sb.from('team_members').select('email,name,perm_credit,perm_deposit,is_admin,avatar_v').order('name');
     members = data || [];
     meRow = members.find(m => m.email === me) || meRow;
+    await loadAvatars();
+  }
+
+  function renderWho(){
+    $('who').innerHTML = avHtml(me, '', 'margin:0;width:30px;height:30px;font-size:13px;border-color:rgba(255,255,255,.75)') + `<span class="wn">${esc(nameOf(me))}</span>`;
   }
 
   // ---------- 텔레그램 ----------
@@ -472,7 +519,7 @@
       if (canAct(t) && asg.some(a => a.email === me && !a.done_at)) act = `<button class="go" data-go="mine:${t.id}">✔ 내 일 완료</button>`;
     }
     const due = t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '<span class="muted">-</span>';
-    const avs = `<div class="avs">${asg.map(a => `<span class="av ${!loan && a.done_at ? 'done' : ''}" style="background:${colorOf(a.email)}" title="${esc(nameOf(a.email))}">${esc(initial(a.email))}</span>`).join('')}</div>`;
+    const avs = `<div class="avs">${asg.map(a => avHtml(a.email, !loan && a.done_at ? 'done' : '')).join('')}</div>`;
     return `<div class="trow ${g === 'done' ? 'done' : ''}" data-id="${t.id}">
       <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span></div>
       <div class="c-title"><div class="tt">${esc(t.title)}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
@@ -591,7 +638,7 @@
     } else {
       body += `<div class="kv"><div class="k">담당자별 진행</div>${t.work_task_assignees.map(a => `<div class="asg ${a.done_at ? 'ok' : ''}">
         <input type="checkbox" ${a.done_at ? 'checked' : ''} ${a.email === me && canAct(t) ? '' : 'disabled'} data-d="chk:${esc(a.email)}" />
-        <span class="av" style="background:${colorOf(a.email)};margin:0">${esc(initial(a.email))}</span>${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}</div>`;
+        ${avHtml(a.email, '', 'margin:0')}${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}</div>`;
     }
     const lbl = `<span class="chip" style="background:#e9f2ff;color:#0b5cc4;margin-right:4px">${DIVS[taskDiv(t)]}</span><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출진행' : '일반업무'}</span> `
       + (g === 'over' ? '<span class="chip over">기한초과</span>' : g === 'today' ? '<span class="chip today">오늘마감</span>' : g === 'done' ? '<span class="chip ok">완료</span>' : '');
@@ -688,6 +735,66 @@
       closeForm(); await loadTasks();
     } finally { $('fSave').disabled = false; }
   };
+  // ---------- 사진 업로드 (정사각형으로 잘라 작은 JPEG 로 저장) ----------
+  function loadImage(file){
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); res(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('사진을 읽지 못했어요. JPG나 PNG 사진을 선택해주세요.')); };
+      img.src = url;
+    });
+  }
+  async function toJpegBlob(file, size = 240){
+    const img = await loadImage(file), side = Math.min(img.width, img.height);
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, size, size);
+    g.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+    return await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+  }
+  async function uploadAvatar(email, file){
+    if (!file) return false;
+    let blob;
+    try { blob = await toJpegBlob(file); } catch (e) { alert(e.message); return false; }
+    const up = await sb.storage.from('avatars').upload(avPath(email), blob, { upsert: true, contentType: 'image/jpeg' });
+    if (up.error){ alert('사진을 올리지 못했어요: ' + up.error.message); return false; }
+    const v = Date.now();
+    const r = email === me ? await sb.rpc('update_my_profile', { p_avatar_v: v }) : await sb.from('team_members').update({ avatar_v: v }).eq('email', email);
+    if (r.error){ alert('사진 정보를 저장하지 못했어요: ' + r.error.message); return false; }
+    await reloadMembers(); renderWho(); render();
+    return true;
+  }
+  async function removeAvatar(email){
+    await sb.storage.from('avatars').remove([avPath(email)]);
+    const r = email === me ? await sb.rpc('update_my_profile', { p_clear_avatar: true }) : await sb.from('team_members').update({ avatar_v: null }).eq('email', email);
+    if (r.error) return alert('사진을 삭제하지 못했어요: ' + r.error.message);
+    await reloadMembers(); renderWho(); render();
+  }
+
+  // ---------- 내 프로필 ----------
+  function renderProfile(){ $('pAvWrap').innerHTML = avHtml(me, 'big'); $('pDel').style.display = avatarUrl[me] ? '' : 'none'; }
+  $('who').onclick = () => { $('pName').value = nameOf(me); renderProfile(); $('profOv').style.display = 'block'; document.body.style.overflow = 'hidden'; };
+  const closeProfile = () => { $('profOv').style.display = 'none'; document.body.style.overflow = ''; };
+  $('pClose').onclick = closeProfile;
+  $('profOv').addEventListener('click', (e) => { if (e.target === $('profOv')) closeProfile(); });
+  $('pPick').onclick = () => $('pFile').click();
+  $('pFile').onchange = async () => {
+    const f = $('pFile').files[0]; $('pFile').value = '';
+    if (!f) return;
+    $('pMsg').textContent = '사진을 올리는 중...';
+    const ok = await uploadAvatar(me, f);
+    $('pMsg').textContent = ok ? '사진을 바꿨어요 ✓' : '정사각형으로 자동 조정돼요. 로그인한 팀원에게만 보입니다.';
+    renderProfile();
+  };
+  $('pDel').onclick = async () => { if (!confirm('사진을 삭제할까요?')) return; await removeAvatar(me); renderProfile(); };
+  $('pSave').onclick = async () => {
+    const name = $('pName').value.trim();
+    if (!name) return alert('이름을 입력해주세요.');
+    const { error } = await sb.rpc('update_my_profile', { p_name: name });
+    if (error) return alert('저장하지 못했어요: ' + error.message);
+    await reloadMembers(); renderWho(); render();
+    $('pMsg').textContent = '이름을 바꿨어요 ✓';
+  };
+
   // ---------- 관리자: 담당자 관리 ----------
   async function adminCall(body){
     const { data, error } = await sb.functions.invoke('admin-users', { body });
@@ -698,11 +805,11 @@
     $('aList').innerHTML = members.map(m => {
       const self = m.email === me;
       return `<div class="arow" data-email="${esc(m.email)}">
-        <div class="nm">${esc(m.name)}${self ? ' <span class="muted">(나)</span>' : ''}<div class="muted">${esc(m.email)}</div></div>
+        <div class="nm" style="display:flex;align-items:center;gap:12px">${avHtml(m.email, '', 'margin:0;width:38px;height:38px;font-size:15px;border-width:0')}<div style="min-width:0">${esc(m.name)}${self ? ' <span class="muted">(나)</span>' : ''}<div class="muted">${esc(m.email)}</div></div></div>
         <label class="chk"><input type="checkbox" data-p="perm_credit" ${m.perm_credit ? 'checked' : ''}/> 여신</label>
         <label class="chk"><input type="checkbox" data-p="perm_deposit" ${m.perm_deposit ? 'checked' : ''}/> 수신</label>
         <label class="chk"><input type="checkbox" data-p="is_admin" ${m.is_admin ? 'checked' : ''} ${self ? 'disabled title="본인의 관리자 권한은 해제할 수 없어요"' : ''}/> 관리자</label>
-        <div class="btns"><button class="btn small" data-act="pw">비밀번호 변경</button>${self ? '' : '<button class="btn small danger" data-act="del">삭제</button>'}</div></div>`;
+        <div class="btns"><button class="btn small" data-act="name">이름 수정</button><button class="btn small" data-act="photo">사진</button>${m.avatar_v ? '<button class="btn small" data-act="rmphoto">사진 삭제</button>' : ''}<button class="btn small" data-act="pw">비밀번호</button>${self ? '' : '<button class="btn small danger" data-act="del">삭제</button>'}</div></div>`;
     }).join('') || '<div class="blk-empty">등록된 담당자가 없어요.</div>';
   }
   $('adminBtn').onclick = () => { renderAdmin(); $('adminOv').style.display = 'block'; document.body.style.overflow = 'hidden'; };
@@ -719,7 +826,19 @@
   $('aList').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const email = b.closest('[data-email]').dataset.email, name = nameOf(email);
-    if (b.dataset.act === 'pw'){
+    if (b.dataset.act === 'name'){
+      const nn = prompt('새 이름을 입력하세요', name);
+      if (nn === null) return;
+      if (!nn.trim() || nn.trim().length > 30) return alert('이름은 1~30자로 입력해주세요.');
+      const { error } = await sb.from('team_members').update({ name: nn.trim() }).eq('email', email);
+      if (error) return alert('저장하지 못했어요: ' + error.message);
+      await reloadMembers(); renderAdmin(); renderWho(); render();
+    } else if (b.dataset.act === 'photo'){
+      aTarget = email; $('aFile').click();
+    } else if (b.dataset.act === 'rmphoto'){
+      if (!confirm(`${name}님의 사진을 삭제할까요?`)) return;
+      await removeAvatar(email); renderAdmin();
+    } else if (b.dataset.act === 'pw'){
       const pw = prompt(`${name}님의 새 비밀번호를 입력하세요 (8자 이상)`);
       if (!pw) return;
       const r = await adminCall({ action: 'reset', email, password: pw });
@@ -731,6 +850,11 @@
       await reloadMembers(); renderAdmin(); loadTasks();
     }
   });
+  let aTarget = null;
+  $('aFile').onchange = async () => {
+    const f = $('aFile').files[0]; $('aFile').value = '';
+    if (f && aTarget){ await uploadAvatar(aTarget, f); renderAdmin(); }
+  };
   $('aAdd').onclick = async () => {
     const body = { action: 'create', name: $('aName').value.trim(), email: $('aEmail').value.trim(), password: $('aPw').value,
       perm_credit: $('aCredit').checked, perm_deposit: $('aDeposit').checked, is_admin: $('aAdmin').checked };
@@ -744,7 +868,7 @@
     alert(r.created ? '담당자를 등록했어요. 이메일과 비밀번호를 전달해주세요.' : '이미 있는 계정이라 권한을 갱신했어요.');
   };
 
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('formOv').style.display === 'block') closeForm(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
 </body>
 </html>

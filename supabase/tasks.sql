@@ -165,3 +165,10 @@ create policy tasks_update on public.work_tasks for update to authenticated
 -- 규칙: 조회는 전 담당자 가능 / 등록·수정·단계수정·완료체크는 해당 구분 권한 필요
 --       담당자 구성 변경·삭제는 등록자 또는 관리자 / 담당자 목록 수정은 관리자만(admin-users 함수 경유)
 -- 초기값: jaehoon.nfcf@gmail.com = 여신+수신+관리자, 01021280429a@gmail.com = 여신
+
+-- ===== 프로필 사진 / 이름 변경 (적용 완료된 내용 기록) =====
+-- team_members.avatar_v (bigint): 사진 버전, 없으면 null
+-- Storage 버킷 'avatars' (비공개, 500KB 제한, JPEG): 파일명 = 이메일(@ → _at_) + '.jpg'
+--   읽기: 로그인한 팀원 / 올리기·수정·삭제: 본인 파일 또는 관리자
+-- 함수 update_my_profile(p_name, p_avatar_v, p_clear_avatar): 본인이 이름·사진만 바꾸는 전용 함수
+--   (team_members 직접 수정 권한은 관리자에게만 있어 본인이 자기 권한을 바꿀 수 없음)
