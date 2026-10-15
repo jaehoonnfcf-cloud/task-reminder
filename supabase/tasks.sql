@@ -172,3 +172,12 @@ create policy tasks_update on public.work_tasks for update to authenticated
 --   읽기: 로그인한 팀원 / 올리기·수정·삭제: 본인 파일 또는 관리자
 -- 함수 update_my_profile(p_name, p_avatar_v, p_clear_avatar): 본인이 이름·사진만 바꾸는 전용 함수
 --   (team_members 직접 수정 권한은 관리자에게만 있어 본인이 자기 권한을 바꿀 수 없음)
+
+-- ===== 개인업무 + 고정업무(반복) (적용 완료된 내용 기록) =====
+-- personal_tasks      : 개인 할 일 (owner_email, title, detail, due_date, lead_days, done_at, recurring_id)
+-- personal_recurring  : 고정업무 규칙 (freq: weekdays/weekly/monthly, weekday, month_day(0=말일),
+--                       every_months(1/3/6/12), anchor_month, weekend_rule(keep/before/after), lead_days, active)
+-- RLS: owner_email = auth.email() 인 행만 조회/수정 (관리자 포함 다른 사람은 볼 수 없음)
+-- gen_personal_occurrences(email): 고정업무의 앞으로 21일 이내 회차를 personal_tasks 로 생성 (중복 방지 unique index)
+--   - 서버 정기 작업(task-notify, 평일 09:00/16:00)이 전원분 실행, ensure_my_personal() 로 본인 것은 화면 진입 시 즉시 생성
+-- 알림: 기한 - lead_days 부터 기한 지난 뒤에도 완료할 때까지, 본인에게만 [개인]/[개인·고정] 표시로 전송

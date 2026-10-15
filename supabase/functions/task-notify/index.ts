@@ -69,6 +69,17 @@ async function handle(req: Request): Promise<Response> {
       if (!cur) continue;
       for (const a of (t as any).work_task_assignees) add(a.email, `• [대출] ${t.title} — ${cur.name} 진행중 (${cur.seq}/${steps.length})${dueTag(t.due_date)}`);
     }
+    // 개인업무 (본인에게만): 고정업무 다음 회차를 먼저 만들고, 알림 시작일(기한 - 알림 일수)이 된 미완료 건을 안내
+    await db.rpc("gen_personal_occurrences");
+    const dayMs = 864e5, t0 = Date.parse(today);
+    const { data: pers } = await db.from("personal_tasks")
+      .select("owner_email, title, due_date, lead_days, recurring_id").is("done_at", null).not("due_date", "is", null);
+    for (const t of pers ?? []) {
+      const diff = Math.round((Date.parse(t.due_date) - t0) / dayMs);   // 음수 = 기한 지남
+      if (diff > t.lead_days) continue;
+      const tag = diff < 0 ? ` 🔴기한초과(${t.due_date})` : diff === 0 ? " 🟠오늘마감" : ` (D-${diff})`;
+      add(t.owner_email, `• [개인${t.recurring_id ? "·고정" : ""}] ${t.title}${tag}`);
+    }
     for (const [email, lines] of byUser) await notify([email], `⏰ 아직 남은 업무가 ${lines.length}건 있어요\n${lines.join("\n")}`);
     return ok({ users: byUser.size });
   }

@@ -75,6 +75,8 @@ Deno.serve(async (req) => {
     if (b.action === "delete") {
       if (email === me) return fail("본인 계정은 삭제할 수 없습니다.");
       await db.from("telegram_links").delete().eq("email", email);
+      await db.from("personal_tasks").delete().eq("owner_email", email);
+      await db.from("personal_recurring").delete().eq("owner_email", email);
       await db.from("team_members").delete().eq("email", email);
       const user = await findUser(email);
       if (user) await db.auth.admin.deleteUser(user.id);

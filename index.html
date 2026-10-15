@@ -119,8 +119,25 @@
   .whoBtn:hover{ background:rgba(255,255,255,.18); }
   .arow .btns{ flex-wrap:wrap; }
 
+  /* 개인업무 (나만 보기) */
+  #shared,#personal{ display:flex; flex-direction:column; gap:14px; min-width:0; }
+  #app[data-div=personal]{ background:linear-gradient(135deg,#9d174d 0%,#7c3aed 55%,#2563eb 100%); }
+  .quick{ display:flex; gap:8px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .quick input[type=text]{ flex:1; min-width:170px; }
+  .quick input[type=date]{ width:auto; }
+  .prow{ display:grid; grid-template-columns:28px minmax(0,1fr) auto auto; gap:12px; align-items:center; padding:10px 18px; border-bottom:1px solid var(--line); }
+  .prow:hover{ background:#f6f8ff; }
+  .prow.done{ opacity:.6; } .prow.done .tt{ text-decoration:line-through; }
+  .pchk{ width:22px; height:22px; min-height:0; -webkit-appearance:auto; appearance:auto; cursor:pointer; }
+  .pbtns{ display:flex; gap:6px; align-items:center; }
+  .rrow{ display:grid; grid-template-columns:minmax(0,1fr) 150px auto; gap:12px; align-items:center; padding:12px 18px; border-bottom:1px solid var(--line); }
+  .rrow.off{ opacity:.55; }
+  .rrow .rnext{ font-size:13px; color:#44546f; }
+  .chip.rc{ background:#ede9fe; color:#5b21b6; }
+  .pfold{ cursor:pointer; user-select:none; }
+
   /* 요약 타일 */
-  #tiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  #tiles,#ptiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .tile{ background:rgba(255,255,255,.96); border-radius:14px; padding:14px 18px; cursor:pointer; border:2px solid transparent; box-shadow:0 1px 3px rgba(9,30,66,.18); text-align:left; }
   .tile:hover{ background:#fff; }
   .tile.sel{ border-color:var(--accent); }
@@ -196,7 +213,10 @@
     .sec-h{ padding:9px 14px; }
     .toolbar{ padding:10px 12px; }
     .toolbar .search{ order:9; flex-basis:100%; }
-    #tiles{ grid-template-columns:repeat(2,1fr); gap:10px; }
+    #tiles,#ptiles{ grid-template-columns:repeat(2,1fr); gap:10px; }
+    .prow{ grid-template-columns:28px minmax(0,1fr) auto; grid-template-areas:"chk title btns" ". due due"; gap:6px 10px; padding:12px 14px; }
+    .prow .pc{ grid-area:chk; } .prow .pt{ grid-area:title; } .prow .pdue{ grid-area:due; } .prow .pbtns{ grid-area:btns; }
+    .rrow{ grid-template-columns:minmax(0,1fr) auto; } .rrow .rnext{ grid-column:1 / -1; }
     .tile{ padding:12px 14px; } .tile .n{ font-size:24px; }
   }
   @media (max-width:760px){
@@ -226,6 +246,7 @@
     <div class="divs" id="divBtns">
       <button data-div="credit">여신업무<span class="n" id="nCredit"></span></button>
       <button data-div="deposit">수신업무<span class="n" id="nDeposit"></span></button>
+      <button data-div="personal">🔒 개인업무<span class="n" id="nPersonal"></span></button>
     </div>
     <span class="spacer"></span>
     <span class="pill ro" id="roPill" style="display:none" title="이 업무구분에 대한 등록·수정 권한이 없습니다">👀 보기 전용</span>
@@ -238,6 +259,7 @@
   <div id="wrap">
     <div id="tgBanner"><b>🔔 텔레그램 알림</b><span id="tgStatus" class="muted" style="flex:1"></span></div>
     <div id="main">
+    <div id="shared">
     <div id="tiles"></div>
     <div class="list-panel">
       <div class="toolbar">
@@ -252,12 +274,55 @@
       <div id="list"></div>
     </div>
     </div>
+    <div id="personal" style="display:none">
+      <div id="ptiles"></div>
+      <div class="list-panel">
+        <div class="toolbar">
+          <div class="seg" id="pSeg"><button data-pt="todo">할 일</button><button data-pt="rules">🔁 고정업무</button></div>
+          <span class="muted" style="margin-left:auto">🔒 나만 볼 수 있어요 · 알림도 나에게만 가요</span>
+        </div>
+        <div id="pbody"></div>
+      </div>
+    </div>
+    </div>
     <aside id="side">
       <div class="side-card"><div class="side-h"><span>📈 시세정보</span><span class="muted" id="qTime"></span></div><div id="quotes"><div class="side-empty">불러오는 중...</div></div></div>
       <div class="side-card"><div class="side-h"><span>📰 경제뉴스</span><span class="muted" id="nTime"></span></div><div id="news"><div class="side-empty">불러오는 중...</div></div></div>
     </aside>
   </div>
 </div>
+
+<!-- 개인 할 일 -->
+<div class="ov" id="pfOv"><div class="panel" style="max-width:480px">
+  <div class="ph"><h2 id="pfHead">개인 할 일</h2><button class="x" id="pfClose">✕</button></div>
+  <label>할 일</label><input id="pfTitle" maxlength="200" />
+  <label>메모 (선택)</label><textarea id="pfDetail" rows="2"></textarea>
+  <div class="row">
+    <div><label>기한 (선택)</label><input id="pfDue" type="date" /></div>
+    <div><label>알림 시작</label><select id="pfLead"><option value="0">기한 당일부터</option><option value="1">1일 전부터</option><option value="2">2일 전부터</option><option value="3">3일 전부터</option><option value="7">7일 전부터</option></select></div>
+  </div>
+  <p class="muted" style="margin:10px 0 0">기한이 있어야 알림이 와요. 기한이 지나도 완료할 때까지 계속 알려드려요.</p>
+  <div class="acts" style="margin-top:18px"><button class="btn primary" id="pfSave" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" id="pfCancel" style="min-height:44px">취소</button></div>
+</div></div>
+
+<!-- 고정업무 -->
+<div class="ov" id="prOv"><div class="panel" style="max-width:520px">
+  <div class="ph"><h2 id="prHead">고정업무 등록</h2><button class="x" id="prClose">✕</button></div>
+  <label>업무 이름</label><input id="prTitle" maxlength="200" placeholder="예: 월말 연체현황 보고" />
+  <label>메모 (선택)</label><textarea id="prDetail" rows="2"></textarea>
+  <label>반복 주기</label>
+  <select id="prFreq"><option value="weekdays">평일 매일</option><option value="weekly">매주</option><option value="m1" selected>매월</option><option value="m3">분기마다 (3개월)</option><option value="m6">반기마다 (6개월)</option><option value="m12">매년</option></select>
+  <div id="prWeekRow"><label>요일</label><select id="prWeekday"><option value="1">월요일</option><option value="2">화요일</option><option value="3">수요일</option><option value="4">목요일</option><option value="5">금요일</option><option value="6">토요일</option><option value="0">일요일</option></select></div>
+  <div id="prDayRow"><label>날짜 <span class="muted" style="font-weight:400">(짧은 달은 말일로 처리돼요)</span></label><select id="prDay"></select></div>
+  <div id="prAnchorRow"><label id="prAnchorLabel">기준 월</label><select id="prAnchor"></select></div>
+  <div id="prWeekendRow"><label>그날이 주말이면</label><select id="prWeekend"><option value="keep">그대로 두기</option><option value="before">금요일로 앞당기기</option><option value="after">월요일로 미루기</option></select></div>
+  <label>알림 시작</label>
+  <select id="prLead"><option value="0">당일부터</option><option value="1">1일 전부터</option><option value="2">2일 전부터</option><option value="3">3일 전부터</option><option value="5">5일 전부터</option><option value="7">7일 전부터</option></select>
+  <label class="chk" style="margin-top:14px"><input type="checkbox" id="prActive" checked /> 사용 중 (끄면 새 할 일이 생기지 않아요)</label>
+  <div id="prPreview" class="muted" style="margin-top:12px;line-height:1.6"></div>
+  <p class="muted" style="margin:6px 0 0">공휴일은 반영하지 않아요. 공휴일이 겹치면 직접 확인해주세요.</p>
+  <div class="acts" style="margin-top:18px"><button class="btn primary" id="prSave" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" id="prCancel" style="min-height:44px">취소</button></div>
+</div></div>
 
 <!-- 내 프로필 -->
 <div class="ov" id="profOv"><div class="panel" style="max-width:420px">
@@ -389,8 +454,8 @@
     await reloadMembers();
     renderWho();
     setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
-    divn = storedDiv === 'credit' || storedDiv === 'deposit' ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
-    await loadTelegram(); await loadTasks(); ensureSide();
+    divn = storedDiv === 'credit' || storedDiv === 'deposit' || storedDiv === 'personal' ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
+    await loadTelegram(); await loadTasks(); await loadPersonal(); ensureSide();
   }
 
   async function reloadMembers(){
@@ -451,13 +516,18 @@
 
   // ---------- 목록 렌더 ----------
   function applyDivUI(){
+    const personal = divn === 'personal';
     $('app').dataset.div = divn;
+    $('shared').style.display = personal ? 'none' : 'flex'; $('personal').style.display = personal ? 'flex' : 'none';
     document.querySelectorAll('#divBtns button').forEach(b => b.classList.toggle('on', b.dataset.div === divn));
+    const pToday = kstToday(), pDue = ptasks.filter(t => !t.done_at && t.due_date && t.due_date <= pToday).length;
+    $('nPersonal').textContent = pDue || ''; $('nPersonal').style.display = pDue ? '' : 'none';
     const myOpen = (d) => tasks.filter(t => taskDiv(t) === d && !isDone(t) && isMine(t)).length;
     $('nCredit').textContent = myOpen('credit') || ''; $('nDeposit').textContent = myOpen('deposit') || '';
     $('nCredit').style.display = myOpen('credit') ? '' : 'none'; $('nDeposit').style.display = myOpen('deposit') ? '' : 'none';
-    const w = canWrite(divn);
+    const w = personal || canWrite(divn);
     $('newBtn').style.display = w ? '' : 'none';
+    $('newBtn').textContent = personal ? '＋ 개인 할 일' : '＋ 새 업무';
     $('roPill').style.display = w ? 'none' : '';
     $('adminBtn').style.display = isAdmin() ? '' : 'none';
     $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
@@ -465,6 +535,7 @@
 
   function render(){
     applyDivUI();
+    if (divn === 'personal') return renderPersonal();
     const today = kstToday(), q = $('q').value.trim().toLowerCase(), status = $('status').value, mine = $('mine').checked;
     const effType = divn === 'credit' ? fType : 'all';
     const divTasks = tasks.filter(t => taskDiv(t) === divn);
@@ -601,6 +672,7 @@
     divn = b.dataset.div; fGrp = null; $('mine').checked = false; $('status').value = 'open'; foldOther = false;
     try { localStorage.setItem('div', divn); } catch (x) {}
     render();
+    if (divn === 'personal') loadPersonal();
   };
   $('list').addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]');
@@ -697,7 +769,7 @@
   function closeForm(){ $('formOv').style.display = 'none'; editId = null; document.body.style.overflow = $('detailOv').style.display === 'block' ? 'hidden' : ''; }
   $('fClose').onclick = closeForm; $('fCancel').onclick = closeForm;
   $('formOv').addEventListener('click', (e) => { if (e.target === $('formOv')) closeForm(); });
-  $('newBtn').onclick = () => openForm('new', null);
+  $('newBtn').onclick = () => divn === 'personal' ? openPf(null) : openForm('new', null);
 
   $('fSave').onclick = async () => {
     const title = $('fTitle').value.trim();
@@ -735,6 +807,237 @@
       closeForm(); await loadTasks();
     } finally { $('fSave').disabled = false; }
   };
+  // ---------- 개인업무 (나만 보기) ----------
+  let ptasks = [], prules = [], ptab = 'todo', foldPDone = true, pfId = null, prId = null;
+  const WD = ['일', '월', '화', '수', '목', '금', '토'];
+  const dateOf = (s) => new Date(s + 'T00:00:00');
+  const fmtMDW = (s) => { const d = dateOf(s); return `${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]})`; };
+  const diffDays = (s, today) => Math.round((dateOf(s) - dateOf(today)) / 864e5);
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  async function loadPersonal(){
+    try { await sb.rpc('ensure_my_personal'); } catch (e) { /* 다음 회차 생성은 서버 정기 작업이 다시 시도 */ }
+    const [t, r] = await Promise.all([
+      sb.from('personal_tasks').select('*').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false }),
+      sb.from('personal_recurring').select('*').order('id'),
+    ]);
+    ptasks = t.data || []; prules = r.data || [];
+    render();
+  }
+
+  // 고정업무 설명 문구 / 다음 날짜 (서버의 생성 규칙과 같은 계산)
+  function monthDue(y, m0, r){
+    const last = new Date(y, m0 + 1, 0).getDate(), day = !r.month_day ? last : Math.min(r.month_day, last), d = new Date(y, m0, day), w = d.getDay();
+    if (r.weekend_rule === 'before'){ if (w === 6) d.setDate(d.getDate() - 1); else if (w === 0) d.setDate(d.getDate() - 2); }
+    else if (r.weekend_rule === 'after'){ if (w === 6) d.setDate(d.getDate() + 2); else if (w === 0) d.setDate(d.getDate() + 1); }
+    return d;
+  }
+  function nextDue(r){
+    const t = dateOf(kstToday()), d = new Date(t);
+    if (r.freq === 'weekdays'){ while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1); return ymd(d); }
+    if (r.freq === 'weekly'){ while (d.getDay() !== r.weekday) d.setDate(d.getDate() + 1); return ymd(d); }
+    const n = r.every_months;
+    for (let i = 0; i < 30; i++){
+      const y = t.getFullYear() + Math.floor((t.getMonth() + i) / 12), m0 = (t.getMonth() + i) % 12;
+      if (n > 1 && ((((m0 + 1) - (r.anchor_month || 1)) % n) + n) % n !== 0) continue;
+      const c = monthDue(y, m0, r);
+      if (c >= t) return ymd(c);
+    }
+    return null;
+  }
+  function ruleText(r){
+    const lead = r.lead_days ? ` · ${r.lead_days}일 전부터 알림` : '';
+    if (r.freq === 'weekdays') return '평일 매일' + lead;
+    if (r.freq === 'weekly') return `매주 ${WD[r.weekday]}요일` + lead;
+    const n = r.every_months, day = !r.month_day ? '말일' : `${r.month_day}일`;
+    const months = [...Array(12 / n)].map((_, i) => ((((r.anchor_month || 1) - 1) + i * n) % 12) + 1).sort((a, b) => a - b).join('·') + '월';
+    const cyc = n === 1 ? '매월' : n === 12 ? `매년 ${r.anchor_month}월` : `${n === 3 ? '분기' : '반기'}마다(${months})`;
+    const wk = r.weekend_rule === 'before' ? ' · 주말이면 금요일로' : r.weekend_rule === 'after' ? ' · 주말이면 월요일로' : '';
+    return `${cyc} ${day}${wk}${lead}`;
+  }
+
+  function renderPersonal(){
+    const today = kstToday(), open = ptasks.filter(t => !t.done_at);
+    const over = open.filter(t => t.due_date && t.due_date < today).length, tod = open.filter(t => t.due_date === today).length;
+    const soon = open.filter(t => t.due_date && t.due_date > today && diffDays(t.due_date, today) <= 7).length;
+    const activeRules = prules.filter(r => r.active).length;
+    $('ptiles').innerHTML = [['over', over, '기한초과', 'todo'], ['today', tod, '오늘마감', 'todo'], ['', soon, '7일 이내 예정', 'todo'], ['loan', activeRules, '🔁 고정업무', 'rules']]
+      .map(([c, n, l, tab]) => `<button class="tile ${c} ${ptab === tab && tab === 'rules' ? 'sel' : ''}" data-pt="${tab}"><div class="n">${n}</div><div class="l">${l}</div></button>`).join('');
+    document.querySelectorAll('#pSeg button').forEach(b => b.classList.toggle('on', b.dataset.pt === ptab));
+    $('pbody').innerHTML = ptab === 'todo' ? todoHtml(today) : rulesHtml();
+  }
+
+  function ptRow(t, today){
+    const g = t.done_at ? 'done' : (t.due_date && t.due_date < today) ? 'over' : t.due_date === today ? 'today' : 'prog';
+    const dd = t.due_date ? diffDays(t.due_date, today) : null;
+    const when = g === 'over' ? ` · ${-dd}일 지남` : g === 'today' ? ' · 오늘' : dd === 1 ? ' · 내일' : dd > 1 ? ` · D-${dd}` : '';
+    const chip = t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMDW(t.due_date)}${g === 'done' ? '' : when}</span>` : '';
+    return `<div class="prow ${t.done_at ? 'done' : ''}" data-pid="${t.id}">
+      <input type="checkbox" class="pchk pc" ${t.done_at ? 'checked' : ''} title="완료 체크" />
+      <div class="pt"><div class="tt">${esc(t.title)}${t.recurring_id ? ' <span class="chip rc">🔁 고정</span>' : ''}</div>${t.detail ? `<div class="ts">${esc(t.detail)}</div>` : ''}</div>
+      <div class="pdue">${chip}</div>
+      <div class="pbtns"><button class="btn small" data-pa="edit" title="수정">✏</button><button class="btn small danger" data-pa="del" title="삭제">🗑</button></div></div>`;
+  }
+  function todoHtml(today){
+    const open = ptasks.filter(t => !t.done_at);
+    const done = ptasks.filter(t => t.done_at).sort((a, b) => b.done_at.localeCompare(a.done_at)).slice(0, 30);
+    const bucket = (t) => !t.due_date ? 'later' : t.due_date < today ? 'over' : t.due_date === today ? 'today' : diffDays(t.due_date, today) <= 7 ? 'week' : 'later';
+    const defs = [['over', '🔴 기한초과', 'over'], ['today', '🟠 오늘마감', 'today'], ['week', '🗓 이번 주 (7일 이내)', 'prog'], ['later', '⚪ 이후 · 기한 없음', 'prog']];
+    let html = `<div class="quick"><input id="pqTitle" type="text" placeholder="할 일을 입력하고 Enter" maxlength="200" /><input id="pqDue" type="date" title="기한 (선택)" /><button class="btn primary" id="pqAdd">추가</button></div>`;
+    for (const [k, label, cls] of defs){
+      const items = open.filter(t => bucket(t) === k);
+      if (items.length) html += `<div class="sec-h ${cls}">${label}<span class="n">${items.length}</span></div>${items.map(t => ptRow(t, today)).join('')}`;
+    }
+    if (!open.length) html += `<div class="empty">남은 개인 할 일이 없어요 🎉</div>`;
+    if (done.length){
+      html += `<div class="sec-h done pfold" id="pfoldDone">✅ 최근 완료<span class="n">${done.length}</span><span style="margin-left:auto;font-size:12px;opacity:.8">${foldPDone ? '▶ 펼치기' : '▼ 접기'}</span></div>`;
+      if (!foldPDone) html += done.map(t => ptRow(t, today)).join('');
+    }
+    return html;
+  }
+  function rulesHtml(){
+    let html = `<div class="quick"><button class="btn primary" id="prNew">＋ 고정업무 추가</button><span class="muted">매월·매주 반복되는 일을 등록해 두면, 날짜가 다가올 때 할 일이 자동으로 생기고 알림이 와요.</span></div>`;
+    if (!prules.length) return html + `<div class="empty">등록된 고정업무가 없어요.<br><span class="muted">예) 매월 5일 보고서 제출 · 매월 말일 마감 점검 · 매주 월요일 주간계획 · 분기마다 점검</span></div>`;
+    return html + prules.map(r => {
+      const nx = r.active ? nextDue(r) : null;
+      return `<div class="rrow ${r.active ? '' : 'off'}" data-rid="${r.id}">
+        <div><div class="tt">🔁 ${esc(r.title)}</div><div class="ts" style="white-space:normal">${esc(ruleText(r))}${r.detail ? ' · ' + esc(r.detail) : ''}</div></div>
+        <div class="rnext">${nx ? `다음 일정 <b>${fmtMDW(nx)}</b>` : (r.active ? '' : '사용 안 함')}</div>
+        <div class="pbtns"><label class="chk" style="font-size:13px"><input type="checkbox" data-ra="toggle" ${r.active ? 'checked' : ''}/> 사용</label>
+          <button class="btn small" data-ra="edit" title="수정">✏</button><button class="btn small danger" data-ra="del" title="삭제">🗑</button></div></div>`;
+    }).join('');
+  }
+
+  // 목록 이벤트
+  $('pSeg').onclick = (e) => { const b = e.target.closest('[data-pt]'); if (!b) return; ptab = b.dataset.pt; renderPersonal(); };
+  $('ptiles').onclick = (e) => { const b = e.target.closest('[data-pt]'); if (!b) return; ptab = b.dataset.pt; renderPersonal(); };
+  async function pQuickAdd(){
+    const title = ($('pqTitle').value || '').trim(); if (!title) return;
+    const { error } = await sb.from('personal_tasks').insert({ title, due_date: $('pqDue').value || null });
+    if (error) return alert('저장하지 못했어요: ' + error.message);
+    await loadPersonal();
+    const i = $('pqTitle'); if (i) i.focus();
+  }
+  $('pbody').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'pqTitle'){ e.preventDefault(); pQuickAdd(); } });
+  $('pbody').addEventListener('change', async (e) => {
+    const chk = e.target.closest('.pchk');
+    if (chk){
+      const id = +chk.closest('[data-pid]').dataset.pid;
+      const { error } = await sb.from('personal_tasks').update({ done_at: chk.checked ? new Date().toISOString() : null }).eq('id', id);
+      if (error) alert('저장하지 못했어요: ' + error.message);
+      return loadPersonal();
+    }
+    const tg = e.target.closest('input[data-ra="toggle"]');
+    if (tg){
+      const id = +tg.closest('[data-rid]').dataset.rid, today = kstToday();
+      const { error } = await sb.from('personal_recurring').update({ active: tg.checked }).eq('id', id);
+      if (error) return alert('저장하지 못했어요: ' + error.message);
+      if (!tg.checked) await sb.from('personal_tasks').delete().eq('recurring_id', id).is('done_at', null).gte('due_date', today);   // 앞으로 올 미완료 회차 정리
+      loadPersonal();
+    }
+  });
+  $('pbody').addEventListener('click', async (e) => {
+    if (e.target.closest('#pqAdd')) return pQuickAdd();
+    if (e.target.closest('#pfoldDone')){ foldPDone = !foldPDone; return renderPersonal(); }
+    if (e.target.closest('#prNew')) return openPr(null);
+    const pa = e.target.closest('[data-pa]');
+    if (pa){
+      const id = +pa.closest('[data-pid]').dataset.pid;
+      if (pa.dataset.pa === 'edit') return openPf(id);
+      const t = ptasks.find(x => x.id === id);
+      if (!confirm(t && t.recurring_id ? '이번 회차를 삭제할까요?\n(고정업무는 그대로 유지되고, 다음 회차는 계속 생겨요)' : '이 할 일을 삭제할까요?')) return;
+      await sb.from('personal_tasks').delete().eq('id', id);
+      return loadPersonal();
+    }
+    const ra = e.target.closest('button[data-ra]');
+    if (ra){
+      const id = +ra.closest('[data-rid]').dataset.rid;
+      if (ra.dataset.ra === 'edit') return openPr(id);
+      if (!confirm('이 고정업무를 삭제할까요?\n아직 완료하지 않은 회차도 함께 삭제되고, 완료한 기록은 남아요.')) return;
+      await sb.from('personal_tasks').delete().eq('recurring_id', id).is('done_at', null);
+      await sb.from('personal_recurring').delete().eq('id', id);
+      loadPersonal();
+    }
+  });
+
+  // 개인 할 일 (추가/수정)
+  function openPf(id){
+    pfId = id; const t = id ? ptasks.find(x => x.id === id) : null;
+    $('pfHead').textContent = t ? '개인 할 일 수정' : '개인 할 일 추가';
+    $('pfTitle').value = t ? t.title : ''; $('pfDetail').value = t ? (t.detail || '') : ''; $('pfDue').value = t ? (t.due_date || '') : '';
+    $('pfLead').value = String(t ? t.lead_days : 0); if (!$('pfLead').value) $('pfLead').value = '0';
+    $('pfOv').style.display = 'block'; document.body.style.overflow = 'hidden';
+    setTimeout(() => { try { $('pfTitle').focus(); } catch (e) {} }, 50);
+  }
+  function closePf(){ $('pfOv').style.display = 'none'; pfId = null; document.body.style.overflow = ''; }
+  $('pfClose').onclick = closePf; $('pfCancel').onclick = closePf;
+  $('pfOv').addEventListener('click', (e) => { if (e.target === $('pfOv')) closePf(); });
+  $('pfSave').onclick = async () => {
+    const title = $('pfTitle').value.trim();
+    if (!title) return alert('할 일을 입력해주세요.');
+    const row = { title, detail: $('pfDetail').value.trim() || null, due_date: $('pfDue').value || null, lead_days: +$('pfLead').value };
+    const { error } = pfId ? await sb.from('personal_tasks').update(row).eq('id', pfId) : await sb.from('personal_tasks').insert(row);
+    if (error) return alert('저장하지 못했어요: ' + error.message);
+    closePf(); loadPersonal();
+  };
+
+  // 고정업무 (추가/수정)
+  $('prDay').innerHTML = [...Array(31)].map((_, i) => `<option value="${i + 1}">${i + 1}일</option>`).join('') + '<option value="0">말일 (그 달의 마지막 날)</option>';
+  $('prAnchor').innerHTML = [...Array(12)].map((_, i) => `<option value="${i + 1}">${i + 1}월</option>`).join('');
+  function ruleFromForm(){
+    const f = $('prFreq').value, base = { title: $('prTitle').value.trim(), detail: $('prDetail').value.trim() || null, lead_days: +$('prLead').value, active: $('prActive').checked };
+    if (f === 'weekdays') return { ...base, freq: 'weekdays', weekday: null, month_day: null, every_months: 1, anchor_month: null, weekend_rule: 'keep' };
+    if (f === 'weekly') return { ...base, freq: 'weekly', weekday: +$('prWeekday').value, month_day: null, every_months: 1, anchor_month: null, weekend_rule: 'keep' };
+    const n = +f.slice(1);
+    return { ...base, freq: 'monthly', weekday: null, month_day: +$('prDay').value, every_months: n, anchor_month: n > 1 ? +$('prAnchor').value : null, weekend_rule: $('prWeekend').value };
+  }
+  function updatePrUI(){
+    const f = $('prFreq').value, monthly = f.startsWith('m'), n = monthly ? +f.slice(1) : 1;
+    $('prWeekRow').style.display = f === 'weekly' ? 'block' : 'none';
+    $('prDayRow').style.display = monthly ? 'block' : 'none'; $('prWeekendRow').style.display = monthly ? 'block' : 'none';
+    $('prAnchorRow').style.display = n > 1 ? 'block' : 'none';
+    $('prAnchorLabel').textContent = n === 3 ? '분기 시작 월 (이 달부터 3개월마다)' : n === 6 ? '반기 시작 월 (이 달부터 6개월마다)' : '매년 몇 월';
+    const r = ruleFromForm(), nx = nextDue(r);
+    $('prPreview').innerHTML = `📅 <b>${esc(ruleText(r))}</b><br>${nx ? `다음 일정: <b>${fmtMDW(nx)}</b>` : ''}`;
+  }
+  ['prFreq', 'prWeekday', 'prDay', 'prAnchor', 'prWeekend', 'prLead'].forEach(id => $(id).addEventListener('change', updatePrUI));
+  function openPr(id){
+    prId = id; const r = id ? prules.find(x => x.id === id) : null;
+    $('prHead').textContent = r ? '고정업무 수정' : '고정업무 등록';
+    $('prTitle').value = r ? r.title : ''; $('prDetail').value = r ? (r.detail || '') : '';
+    $('prFreq').value = !r ? 'm1' : r.freq === 'monthly' ? 'm' + r.every_months : r.freq;
+    $('prWeekday').value = r && r.weekday !== null ? String(r.weekday) : '1';
+    $('prDay').value = r && r.month_day !== null ? String(r.month_day) : '1';
+    $('prAnchor').value = String(r && r.anchor_month ? r.anchor_month : new Date().getMonth() + 1);
+    $('prWeekend').value = r ? r.weekend_rule : 'keep'; $('prLead').value = String(r ? r.lead_days : 0); if (!$('prLead').value) $('prLead').value = '0';
+    $('prActive').checked = r ? r.active : true;
+    updatePrUI();
+    $('prOv').style.display = 'block'; document.body.style.overflow = 'hidden';
+    setTimeout(() => { try { $('prTitle').focus(); } catch (e) {} }, 50);
+  }
+  function closePr(){ $('prOv').style.display = 'none'; prId = null; document.body.style.overflow = ''; }
+  $('prClose').onclick = closePr; $('prCancel').onclick = closePr;
+  $('prOv').addEventListener('click', (e) => { if (e.target === $('prOv')) closePr(); });
+  $('prSave').onclick = async () => {
+    const row = ruleFromForm();
+    if (!row.title) return alert('업무 이름을 입력해주세요.');
+    const today = kstToday();
+    $('prSave').disabled = true;
+    try {
+      if (prId){
+        const { error } = await sb.from('personal_recurring').update(row).eq('id', prId);
+        if (error) return alert('저장하지 못했어요: ' + error.message);
+        // 앞으로 올 미완료 회차는 새 규칙으로 다시 만들고, 이미 지난 미완료 회차는 이름/알림만 맞춘다
+        await sb.from('personal_tasks').delete().eq('recurring_id', prId).is('done_at', null).gte('due_date', today);
+        await sb.from('personal_tasks').update({ title: row.title, detail: row.detail, lead_days: row.lead_days }).eq('recurring_id', prId).is('done_at', null);
+      } else {
+        const { error } = await sb.from('personal_recurring').insert(row);
+        if (error) return alert('저장하지 못했어요: ' + error.message);
+      }
+      closePr(); await loadPersonal();
+    } finally { $('prSave').disabled = false; }
+  };
+
   // ---------- 사진 업로드 (정사각형으로 잘라 작은 JPEG 로 저장) ----------
   function loadImage(file){
     return new Promise((res, rej) => {
@@ -868,7 +1171,7 @@
     alert(r.created ? '담당자를 등록했어요. 이메일과 비밀번호를 전달해주세요.' : '이미 있는 계정이라 권한을 갱신했어요.');
   };
 
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
 </body>
 </html>
