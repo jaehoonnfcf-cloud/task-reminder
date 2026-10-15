@@ -208,7 +208,7 @@
         </div>
         <select id="status"><option value="open">미완료</option><option value="done">완료</option><option value="all">전체 상태</option></select>
         <label class="chk"><input type="checkbox" id="mine" /> 내 업무만</label>
-        <input id="q" class="search" type="search" placeholder="🔍 업무·고객명·지시자 검색" />
+        <input id="q" class="search" type="search" placeholder="🔍 업무·고객명·요청자 검색" />
       </div>
       <div class="thead"><span>구분</span><span>업무</span><span>진행</span><span>담당</span><span>기한</span><span></span></div>
       <div id="list"></div>
@@ -229,13 +229,13 @@
   <div class="ph"><h2 id="fHead">새 업무 등록</h2><button class="x" id="fClose">✕</button></div>
   <div id="fTypeRow">
     <label>업무 구분</label>
-    <select id="fType"><option value="loan">대출진행 (단계별)</option><option value="general">일반업무 (단건 지시)</option></select>
+    <select id="fType"><option value="loan">대출진행 (단계별)</option><option value="general">일반업무 (단건)</option></select>
     <div id="fStageRow"><label>현재 진행 단계 (이전 단계는 완료 처리됩니다)</label><select id="fStage"></select></div>
   </div>
   <label id="fTitleLabel">고객명 / 대출 건명</label><input id="fTitle" />
   <label>상세 (선택)</label><textarea id="fDetail" rows="2"></textarea>
   <div class="row">
-    <div><label>지시자</label><input id="fBy" placeholder="예: 김상무" /></div>
+    <div><label>요청자</label><input id="fBy" placeholder="예: 김상무" /></div>
     <div><label>기한</label><input id="fDue" type="date" /></div>
   </div>
   <label>담당자 (체크한 사람에게 알림)</label><div class="checks" id="fAsg"></div>
@@ -369,7 +369,7 @@
 
   function rowHtml(t){
     const today = kstToday(), g = dueGrp(t, today), loan = t.task_type === 'loan', steps = stepsOf(t), asg = t.work_task_assignees;
-    const sub = [t.directed_by && `지시: ${t.directed_by}`, t.detail].filter(Boolean).join(' · ');
+    const sub = [t.directed_by && `요청: ${t.directed_by}`, t.detail].filter(Boolean).join(' · ');
     let prog, act = '';
     if (loan){
       const ci = curIdx(t), c = steps[ci];
@@ -481,7 +481,7 @@
     const cur = steps[curIdx(t)];
     let body = '';
     if (t.detail) body += `<div class="kv"><div class="k">상세</div><div class="v">${esc(t.detail)}</div></div>`;
-    const info = [t.directed_by && `지시: ${t.directed_by}`, t.due_date && `기한: ${t.due_date}`].filter(Boolean).join('  ·  ');
+    const info = [t.directed_by && `요청: ${t.directed_by}`, t.due_date && `기한: ${t.due_date}`].filter(Boolean).join('  ·  ');
     if (info) body += `<div class="kv"><div class="k">정보</div><div class="v">${esc(info)}</div></div>`;
     if (loan){
       const lastDone = [...steps].reverse().find(s => s.done_at);

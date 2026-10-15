@@ -1,4 +1,4 @@
-// 업무지시 텔레그램 알림 Edge Function (verify_jwt=false 로 배포, 내부에서 직접 인증)
+// 업무 텔레그램 알림 Edge Function (verify_jwt=false 로 배포, 내부에서 직접 인증)
 // 필요한 시크릿: TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, CRON_SECRET
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -69,7 +69,7 @@ async function handle(req: Request): Promise<Response> {
       if (!cur) continue;
       for (const a of (t as any).work_task_assignees) add(a.email, `• [대출] ${t.title} — ${cur.name} 진행중 (${cur.seq}/${steps.length})${dueTag(t.due_date)}`);
     }
-    for (const [email, lines] of byUser) await notify([email], `⏰ 미처리 업무 ${lines.length}건\n${lines.join("\n")}`);
+    for (const [email, lines] of byUser) await notify([email], `⏰ 아직 남은 업무가 ${lines.length}건 있어요\n${lines.join("\n")}`);
     return ok({ users: byUser.size });
   }
 
@@ -89,10 +89,10 @@ async function handle(req: Request): Promise<Response> {
   const who = (e: string) => names.get(e) ?? e;
 
   const due = task.due_date ? `\n기한: ${task.due_date}` : "";
-  const by = task.directed_by ? `\n지시: ${task.directed_by}` : "";
+  const by = task.directed_by ? `\n요청: ${task.directed_by}` : "";
   const cur = steps.find((x) => !x.done_at);
   const everyone = [task.created_by, ...asg.map((a) => a.email)];   // 누른 사람 본인 포함
-  const newHead = task.task_type === "loan" ? `📌 새 대출 업무\n${task.title}${cur ? `\n현재 단계: ${cur.name}` : ""}` : `📌 새 업무지시\n${task.title}`;
+  const newHead = task.task_type === "loan" ? `📌 새 대출 업무가 도착했어요\n${task.title}${cur ? `\n현재 단계: ${cur.name}` : ""}` : `📌 새 할 일이 도착했어요\n${task.title}`;
 
   if (event === "created" && task.created_by === me) {
     await notify(everyone, `${newHead}${by}${due}`);
@@ -102,22 +102,22 @@ async function handle(req: Request): Promise<Response> {
     if (added.length) await notify(added, `${newHead}${by}${due}`);
     if (body.changed) {
       const rest = everyone.filter((e) => !added.includes(e));
-      await notify(rest, `✏️ 업무 수정\n${task.title}${by}${due}`);
+      await notify(rest, `✏️ 업무 내용이 바뀌었어요\n${task.title}${by}${due}`);
     }
   } else if (event === "step_done" && task.task_type === "loan" && (task.created_by === me || asg.some((a) => a.email === me))) {
     const step = steps.find((x) => x.seq === seq);
     if (!step?.done_at) return new Response("bad request", { status: 400 });
     const next = steps.find((x) => !x.done_at);
     await notify(everyone, next
-      ? `✅ [대출] ${task.title}\n${who(me)}: ${step.name} 완료 → 다음 단계: ${next.name} (${next.seq}/${steps.length})`
-      : `🎉 [대출] ${task.title}\n${step.name}까지 전 단계 완료되었습니다.`);
+      ? `✅ [대출] ${task.title}\n${who(me)}님이 ${step.name}을(를) 완료했어요 → 다음 단계: ${next.name} (${next.seq}/${steps.length})`
+      : `🎉 [대출] ${task.title}\n모든 단계를 마쳤어요 (${step.name} 완료)`);
   } else if (event === "step_undo" && task.task_type === "loan" && (task.created_by === me || asg.some((a) => a.email === me))) {
     const step = steps.find((x) => x.seq === seq);
     if (!step || step.done_at) return new Response("bad request", { status: 400 });
-    await notify(everyone, `↩ [대출] ${task.title}\n${who(me)}: ${step.name} 완료 취소 → 현재 단계: ${cur ? cur.name : step.name}`);
+    await notify(everyone, `↩ [대출] ${task.title}\n${who(me)}님이 ${step.name} 완료를 취소했어요 → 현재 단계: ${cur ? cur.name : step.name}`);
   } else if (event === "done" && asg.some((a) => a.email === me)) {
     const all = asg.every((a) => a.done_at);
-    await notify(everyone, all ? `🎉 전원 완료: ${task.title}` : `✅ ${who(me)} 완료: ${task.title}`);
+    await notify(everyone, all ? `🎉 모두 완료했어요\n${task.title}` : `✅ ${who(me)}님이 완료했어요\n${task.title}`);
   } else return new Response("bad request", { status: 400 });
   return ok();
 }
