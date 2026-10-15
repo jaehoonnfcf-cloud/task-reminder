@@ -220,7 +220,7 @@
     .tile{ padding:12px 14px; } .tile .n{ font-size:24px; }
   }
   @media (max-width:760px){
-    .bar{ padding:8px 12px; padding-top:max(8px, env(safe-area-inset-top)); gap:8px; flex-wrap:wrap; }
+    .bar{ padding:8px 12px; padding-top:max(8px, env(safe-area-inset-top)); gap:8px; flex-wrap:wrap; backdrop-filter:none; -webkit-backdrop-filter:none; }
     .divs{ order:5; flex-basis:100%; margin-left:0; } .divs button{ flex:1; }
     .arow,.ahead{ grid-template-columns:1fr 1fr 1fr; } .arow .nm{ grid-column:1 / -1; } .arow .btns{ grid-column:1 / -1; } .ahead{ display:none; }
     .whoBtn .wn{ display:none; } .whoBtn{ padding:3px; }
