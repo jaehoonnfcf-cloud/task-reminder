@@ -96,13 +96,13 @@ async function handle(req: Request): Promise<Response> {
 
   if (event === "created" && task.created_by === me) {
     await notify(everyone, `${newHead}${by}${due}`);
-  } else if (event === "updated" && task.created_by === me) {
+  } else if (event === "updated" && (task.created_by === me || asg.some((a) => a.email === me))) {
     // 새로 추가된 담당자에게는 신규 안내, 기존 담당자에게는 수정 안내
     const added: string[] = (body.added ?? []).filter((e: string) => asg.some((a) => a.email === e));
     if (added.length) await notify(added, `${newHead}${by}${due}`);
     if (body.changed) {
       const rest = everyone.filter((e) => !added.includes(e));
-      await notify(rest, `✏️ 업무 내용이 바뀌었어요\n${task.title}${by}${due}`);
+      await notify(rest, `✏️ 업무 내용이 바뀌었어요\n${task.title}${by}${due}\n수정: ${who(me)}님`);
     }
   } else if (event === "step_done" && task.task_type === "loan" && (task.created_by === me || asg.some((a) => a.email === me))) {
     const step = steps.find((x) => x.seq === seq);

@@ -151,3 +151,9 @@ grant select, insert, update, delete on public.work_task_steps to service_role;
 -- 등록자가 수정할 수 있는 컬럼만 허용 (task_type, created_by 변조 방지)
 revoke update on public.work_tasks from authenticated;
 grant update (title, detail, directed_by, due_date) on public.work_tasks to authenticated;
+
+-- 업무 내용 수정은 등록자 + 담당자 모두 가능 (수정 가능한 컬럼은 위에서 4개로 제한)
+drop policy if exists tasks_update on public.work_tasks;
+create policy tasks_update on public.work_tasks for update to authenticated
+  using (created_by = auth.email() or public.task_is_member(id))
+  with check (created_by = auth.email() or public.task_is_member(id));

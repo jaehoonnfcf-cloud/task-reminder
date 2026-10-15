@@ -238,7 +238,7 @@
     <div><label>요청자</label><select id="fBy"></select></div>
     <div><label>기한</label><input id="fDue" type="date" /></div>
   </div>
-  <label>담당자 (체크한 사람에게 알림)</label><div class="checks" id="fAsg"></div>
+  <div id="fAsgWrap"><label>담당자 (체크한 사람에게 알림)</label><div class="checks" id="fAsg"></div></div>
   <div class="acts" style="margin-top:20px"><button class="btn primary" id="fSave" style="min-height:44px;padding:8px 28px">저장</button><button class="btn" id="fCancel" style="min-height:44px">취소</button></div>
 </div></div>
 
@@ -499,7 +499,7 @@
     const lbl = `<span class="tp ${loan ? 'loan' : ''}">${loan ? '대출진행' : '일반업무'}</span> `
       + (g === 'over' ? '<span class="chip over">기한초과</span>' : g === 'today' ? '<span class="chip today">오늘마감</span>' : g === 'done' ? '<span class="chip ok">완료</span>' : '');
     $('detailPanel').innerHTML = `<div class="ph"><div><div style="margin-bottom:8px">${lbl}</div><h2>${esc(t.title)}</h2></div><button class="x" data-d="close">✕</button></div>${body}
-      ${t.created_by === me ? `<div class="foot"><button class="btn" data-d="edit">✏ 수정</button><button class="btn danger" data-d="del">삭제</button></div>` : ''}`;
+      ${canAct(t) ? `<div class="foot"><button class="btn" data-d="edit">✏ 수정</button>${t.created_by === me ? '<button class="btn danger" data-d="del">삭제</button>' : ''}</div>` : ''}`;
   }
   $('detailPanel').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-d]'); if (!b || b.tagName === 'INPUT') return;
@@ -542,6 +542,7 @@
     $('fTitle').value = t ? t.title : ''; $('fDetail').value = t ? (t.detail || '') : ''; fillRequesters(t ? t.directed_by : ''); $('fDue').value = t ? (t.due_date || '') : '';
     const cur = new Set(t ? t.work_task_assignees.map(a => a.email) : [me]);
     $('fAsg').innerHTML = members.map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${cur.has(m.email) ? 'checked' : ''}/> ${esc(m.name)}</label>`).join('');
+    $('fAsgWrap').style.display = (!t || t.created_by === me) ? 'block' : 'none';   // 담당자 구성 변경은 등록자만
     $('formOv').style.display = 'block'; document.body.style.overflow = 'hidden';
     setTimeout(() => { try { $('fTitle').focus(); } catch (e) {} }, 50);
   }
@@ -561,7 +562,8 @@
         const t = byId(editId); if (!t) return;
         const changed = ['title', 'detail', 'directed_by', 'due_date'].some(k => (t[k] || null) !== patch[k]);
         const before = t.work_task_assignees.map(a => a.email);
-        const added = emails.filter(e => !before.includes(e)), removed = before.filter(e => !emails.includes(e));
+        const isOwner = t.created_by === me;
+        const added = isOwner ? emails.filter(e => !before.includes(e)) : [], removed = isOwner ? before.filter(e => !emails.includes(e)) : [];
         let err = (await sb.from('work_tasks').update(patch).eq('id', t.id)).error;
         if (!err && removed.length) err = (await sb.from('work_task_assignees').delete().eq('task_id', t.id).in('email', removed)).error;
         if (!err && added.length) err = (await sb.from('work_task_assignees').insert(added.map(email => ({ task_id: t.id, email })))).error;
