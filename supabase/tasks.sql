@@ -87,8 +87,8 @@ grant execute on function public.is_member() to authenticated;
 
 -- ===== 정기 독촉 알림 (Edge Function 배포 + 시크릿 설정 후 실행) =====
 -- create extension if not exists pg_cron; create extension if not exists pg_net;
--- 평일 09:00, 16:00 (KST) = UTC 00:00, 07:00
--- select cron.schedule('task-remind', '0 0,7 * * 1-5', $$
+-- 평일 08:30 (KST) = 전날 UTC 23:30 → 일~목 UTC 이므로 요일이 0-4
+-- select cron.schedule('task-remind', '30 23 * * 0-4', $$
 --   select net.http_post(
 --     url := 'https://neepcdiumutjjwuxzjyt.supabase.co/functions/v1/task-notify',
 --     headers := jsonb_build_object('x-cron-secret', '<CRON_SECRET>', 'Content-Type', 'application/json'),
@@ -181,3 +181,8 @@ create policy tasks_update on public.work_tasks for update to authenticated
 -- gen_personal_occurrences(email): 고정업무의 앞으로 21일 이내 회차를 personal_tasks 로 생성 (중복 방지 unique index)
 --   - 서버 정기 작업(task-notify, 평일 09:00/16:00)이 전원분 실행, ensure_my_personal() 로 본인 것은 화면 진입 시 즉시 생성
 -- 알림: 기한 - lead_days 부터 기한 지난 뒤에도 완료할 때까지, 본인에게만 [개인]/[개인·고정] 표시로 전송
+
+-- ===== 알림 시각 변경 (적용 완료) =====
+-- 평일 08:30 KST : task-remind     '30 23 * * 0-4'  (UTC 일~목 23:30 = 한국 월~금 08:30)
+-- 평일 15:30 KST : task-remind-pm  '30 6 * * 1-5'   (UTC 월~금 06:30 = 한국 월~금 15:30)
+-- 두 작업은 같은 호출 내용(CRON_SECRET 포함)을 사용: cron.schedule('task-remind-pm', '30 6 * * 1-5', (select command from cron.job where jobname='task-remind'))

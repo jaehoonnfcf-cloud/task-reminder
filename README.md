@@ -11,7 +11,7 @@
    시크릿 설정: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`(임의 문자열), `CRON_SECRET`(임의 문자열)
 4. **웹훅 등록** (브라우저/터미널 1회):
    `https://api.telegram.org/bot<토큰>/setWebhook?url=https://<프로젝트>.supabase.co/functions/v1/task-notify&secret_token=<TELEGRAM_WEBHOOK_SECRET>`
-5. **정기 알림**: `tasks.sql` 하단 pg_cron 주석을 `<CRON_SECRET>` 채워서 실행 (평일 09:00·16:00)
+5. **정기 알림**: `tasks.sql` 하단 pg_cron 주석을 `<CRON_SECRET>` 채워서 실행 (평일 08:30·15:30)
 6. `index.html` 상단의 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `BOT_USERNAME` 교체 후 호스팅(GitHub Pages 등)
 7. Supabase Auth > URL Configuration 에 호스팅 주소를 Site URL/Redirect 로 추가
 8. 각자 페이지에서 **텔레그램 연결하기** 1회 클릭
