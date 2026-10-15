@@ -55,10 +55,10 @@ async function handle(req: Request): Promise<Response> {
     const add = (email: string, line: string) => byUser.set(email, [...(byUser.get(email) ?? []), line]);
     // 일반업무: 담당자별 미완료
     const { data } = await db.from("work_task_assignees")
-      .select("email, work_tasks!inner(title, due_date, task_type)").is("done_at", null).eq("work_tasks.task_type", "general");
+      .select("email, work_tasks!inner(title, due_date, task_type, division)").is("done_at", null).eq("work_tasks.task_type", "general");
     for (const r of data ?? []) {
       const t = (r as any).work_tasks;
-      add(r.email, `• ${t.title}${dueTag(t.due_date)}`);
+      add(r.email, `• [${t.division === "deposit" ? "수신" : "여신"}] ${t.title}${dueTag(t.due_date)}`);
     }
     // 대출진행: 현재 단계 안내 (담당자 전원에게)
     const { data: loans } = await db.from("work_tasks")
@@ -87,37 +87,42 @@ async function handle(req: Request): Promise<Response> {
   if (!task || !asg) return new Response("not found", { status: 404 });
   const names = await nameMap();
   const who = (e: string) => names.get(e) ?? e;
+  const division = task.division === "deposit" ? "deposit" : "credit";
+  const dv = division === "deposit" ? "수신" : "여신";
+  const { data: perm } = await db.from("team_members").select("perm_credit, perm_deposit, is_admin").eq("email", me).maybeSingle();
+  const okDiv = !!perm && (perm.is_admin || (division === "credit" ? perm.perm_credit : perm.perm_deposit));
+  const involved = task.created_by === me || asg.some((a) => a.email === me) || okDiv;
 
   const due = task.due_date ? `\n기한: ${task.due_date}` : "";
   const by = task.directed_by ? `\n요청: ${task.directed_by}` : "";
   const cur = steps.find((x) => !x.done_at);
   const everyone = [task.created_by, ...asg.map((a) => a.email)];   // 누른 사람 본인 포함
-  const newHead = task.task_type === "loan" ? `📌 새 대출 업무가 도착했어요\n${task.title}${cur ? `\n현재 단계: ${cur.name}` : ""}` : `📌 새 할 일이 도착했어요\n${task.title}`;
+  const newHead = task.task_type === "loan" ? `📌 [여신] 새 대출 업무가 도착했어요\n${task.title}${cur ? `\n현재 단계: ${cur.name}` : ""}` : `📌 [${dv}] 새 할 일이 도착했어요\n${task.title}`;
 
   if (event === "created" && task.created_by === me) {
     await notify(everyone, `${newHead}${by}${due}`);
-  } else if (event === "updated" && (task.created_by === me || asg.some((a) => a.email === me))) {
+  } else if (event === "updated" && involved) {
     // 새로 추가된 담당자에게는 신규 안내, 기존 담당자에게는 수정 안내
     const added: string[] = (body.added ?? []).filter((e: string) => asg.some((a) => a.email === e));
     if (added.length) await notify(added, `${newHead}${by}${due}`);
     if (body.changed) {
       const rest = everyone.filter((e) => !added.includes(e));
-      await notify(rest, `✏️ 업무 내용이 바뀌었어요\n${task.title}${by}${due}\n수정: ${who(me)}님`);
+      await notify(rest, `✏️ [${dv}] 업무 내용이 바뀌었어요\n${task.title}${by}${due}\n수정: ${who(me)}님`);
     }
-  } else if (event === "step_done" && task.task_type === "loan" && (task.created_by === me || asg.some((a) => a.email === me))) {
+  } else if (event === "step_done" && task.task_type === "loan" && involved) {
     const step = steps.find((x) => x.seq === seq);
     if (!step?.done_at) return new Response("bad request", { status: 400 });
     const next = steps.find((x) => !x.done_at);
     await notify(everyone, next
       ? `✅ [대출] ${task.title}\n${who(me)}님이 ${step.name}을(를) 완료했어요 → 다음 단계: ${next.name} (${next.seq}/${steps.length})`
       : `🎉 [대출] ${task.title}\n모든 단계를 마쳤어요 (${step.name} 완료)`);
-  } else if (event === "step_undo" && task.task_type === "loan" && (task.created_by === me || asg.some((a) => a.email === me))) {
+  } else if (event === "step_undo" && task.task_type === "loan" && involved) {
     const step = steps.find((x) => x.seq === seq);
     if (!step || step.done_at) return new Response("bad request", { status: 400 });
     await notify(everyone, `↩ [대출] ${task.title}\n${who(me)}님이 ${step.name} 완료를 취소했어요 → 현재 단계: ${cur ? cur.name : step.name}`);
-  } else if (event === "done" && asg.some((a) => a.email === me)) {
+  } else if (event === "done" && (asg.some((a) => a.email === me) || okDiv)) {
     const all = asg.every((a) => a.done_at);
-    await notify(everyone, all ? `🎉 모두 완료했어요\n${task.title}` : `✅ ${who(me)}님이 완료했어요\n${task.title}`);
+    await notify(everyone, all ? `🎉 [${dv}] 모두 완료했어요\n${task.title}` : `✅ [${dv}] ${who(me)}님이 완료했어요\n${task.title}`);
   } else return new Response("bad request", { status: 400 });
   return ok();
 }

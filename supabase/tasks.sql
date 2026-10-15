@@ -157,3 +157,11 @@ drop policy if exists tasks_update on public.work_tasks;
 create policy tasks_update on public.work_tasks for update to authenticated
   using (created_by = auth.email() or public.task_is_member(id))
   with check (created_by = auth.email() or public.task_is_member(id));
+
+-- ===== 여신/수신 업무구분 + 담당자 권한 (적용 완료된 내용 기록) =====
+-- team_members: perm_credit(여신), perm_deposit(수신), is_admin(관리자) 컬럼
+-- work_tasks.division: 'credit'(여신, 기본값) | 'deposit'(수신)
+-- 함수: has_div(text), is_admin(), task_div(bigint)  (security definer, 로그인 사용자만 실행)
+-- 규칙: 조회는 전 담당자 가능 / 등록·수정·단계수정·완료체크는 해당 구분 권한 필요
+--       담당자 구성 변경·삭제는 등록자 또는 관리자 / 담당자 목록 수정은 관리자만(admin-users 함수 경유)
+-- 초기값: jaehoon.nfcf@gmail.com = 여신+수신+관리자, 01021280429a@gmail.com = 여신

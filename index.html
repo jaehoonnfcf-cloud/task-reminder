@@ -54,7 +54,7 @@
   /* ---------- 앱 ---------- */
   #app{ min-height:100vh; min-height:100dvh; flex-direction:column;
     background:linear-gradient(135deg,#1d4ed8 0%,#6d28d9 55%,#be3a8d 100%); }
-  .bar{ display:flex; align-items:center; gap:10px; padding:10px 20px; padding-top:max(10px, env(safe-area-inset-top));
+  .bar{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 20px; padding-top:max(10px, env(safe-area-inset-top));
     background:rgba(0,0,0,.28); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#fff; }
   .logo{ font-size:19px; font-weight:800; white-space:nowrap; }
   .spacer{ flex:1; }
@@ -88,6 +88,29 @@
     #tgBanner{ grid-column:1 / -1; }
     #side{ display:flex; flex-direction:column; gap:14px; position:sticky; top:16px; }
   }
+
+  /* 업무구분(여신/수신) 버튼 + 구분별 배경 */
+  .divs{ display:flex; gap:4px; background:rgba(255,255,255,.16); padding:3px; border-radius:10px; margin-left:6px; }
+  .divs button{ border:0; background:transparent; color:#fff; padding:7px 14px; border-radius:8px; font-size:14px; font-weight:800; cursor:pointer; white-space:nowrap; }
+  .divs button.on{ background:#fff; color:var(--ink); }
+  .divs .n{ font-size:11.5px; font-weight:800; margin-left:6px; padding:1px 7px; border-radius:99px; background:rgba(255,255,255,.28); }
+  .divs button.on .n{ background:var(--accent-soft); color:var(--accent); }
+  #app[data-div=deposit]{ background:linear-gradient(135deg,#0f766e 0%,#2563eb 55%,#6d28d9 100%); }
+  .pill.ro{ background:#fff3d6; color:#7a4b00; }
+
+  /* 내 업무 / 참고(다른 담당자) 블록 */
+  .blk-h{ display:flex; align-items:center; gap:8px; padding:11px 18px; font-size:14.5px; font-weight:800; border-bottom:1px solid var(--line); background:#e9f2ff; color:#0b5cc4; }
+  .blk-h.other{ background:#f1f2f4; color:#44546f; cursor:pointer; user-select:none; }
+  .blk-h .n{ font-weight:700; opacity:.75; } .blk-h .fold{ margin-left:auto; font-size:12px; opacity:.8; }
+  .blk-empty{ padding:16px 18px; color:var(--muted); font-size:13.5px; border-bottom:1px solid var(--line); }
+
+  /* 관리자 화면 */
+  .arow{ display:grid; grid-template-columns:minmax(0,1.6fr) repeat(3, auto) auto; gap:10px 16px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
+  .arow .nm{ font-weight:700; } .arow .nm .muted{ font-weight:400; word-break:break-all; }
+  .arow .chk{ font-size:13.5px; }
+  .arow .btns{ display:flex; gap:6px; }
+  .ahead{ display:grid; grid-template-columns:minmax(0,1.6fr) repeat(3, auto) auto; gap:10px 16px; font-size:12px; font-weight:700; color:var(--muted); padding-bottom:6px; border-bottom:1px solid var(--line); }
+  .ahead span:nth-child(n+2):nth-child(-n+4){ min-width:48px; }
 
   /* 요약 타일 */
   #tiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
@@ -170,7 +193,9 @@
     .tile{ padding:12px 14px; } .tile .n{ font-size:24px; }
   }
   @media (max-width:760px){
-    .bar{ padding:8px 12px; padding-top:max(8px, env(safe-area-inset-top)); gap:8px; }
+    .bar{ padding:8px 12px; padding-top:max(8px, env(safe-area-inset-top)); gap:8px; flex-wrap:wrap; }
+    .divs{ order:5; flex-basis:100%; margin-left:0; } .divs button{ flex:1; }
+    .arow,.ahead{ grid-template-columns:1fr 1fr 1fr; } .arow .nm{ grid-column:1 / -1; } .arow .btns{ grid-column:1 / -1; } .ahead{ display:none; }
     .who{ display:none; }
     .logo{ font-size:17px; }
     .pill{ font-size:12px; padding:5px 9px; }
@@ -191,10 +216,16 @@
 <div id="app">
   <div class="bar">
     <span class="logo">🧚 할일요정</span>
+    <div class="divs" id="divBtns">
+      <button data-div="credit">여신업무<span class="n" id="nCredit"></span></button>
+      <button data-div="deposit">수신업무<span class="n" id="nDeposit"></span></button>
+    </div>
     <span class="spacer"></span>
+    <span class="pill ro" id="roPill" style="display:none" title="이 업무구분에 대한 등록·수정 권한이 없습니다">👀 보기 전용</span>
     <span class="pill link" id="tgPill" title="텔레그램 다시 연결" style="display:none"></span>
     <button class="btn glass small" id="newBtn">＋ 새 업무</button>
     <span class="who" id="who"></span>
+    <button class="btn glass small" id="adminBtn" style="display:none">⚙ 관리자</button>
     <button class="btn glass small" id="logout">로그아웃</button>
   </div>
   <div id="wrap">
@@ -220,6 +251,24 @@
     </aside>
   </div>
 </div>
+
+<!-- 관리자: 담당자 관리 -->
+<div class="ov" id="adminOv"><div class="panel" style="max-width:880px">
+  <div class="ph"><h2>⚙ 관리자 · 담당자 관리</h2><button class="x" id="aClose">✕</button></div>
+  <div class="kv"><div class="k">담당자 목록 · 체크하면 바로 저장됩니다 (권한이 없는 구분은 보기만 가능)</div>
+    <div id="aList"></div></div>
+  <div class="kv" style="margin-top:24px"><div class="k">＋ 담당자 등록</div>
+    <div class="row"><input id="aName" placeholder="이름 (예: 홍길동)" maxlength="30" /><input id="aEmail" type="email" placeholder="로그인 이메일" /></div>
+    <div class="row" style="margin-top:8px"><input id="aPw" type="text" placeholder="초기 비밀번호 (8자 이상)" autocomplete="off" /></div>
+    <div class="checks" style="margin-top:10px">
+      <label><input type="checkbox" id="aCredit" checked /> 여신업무</label>
+      <label><input type="checkbox" id="aDeposit" /> 수신업무</label>
+      <label><input type="checkbox" id="aAdmin" /> 관리자</label>
+    </div>
+    <button class="btn primary" id="aAdd" style="margin-top:14px;min-height:44px;padding:8px 26px">등록</button>
+    <p class="muted" style="margin:10px 0 0">이미 계정이 있는 이메일이면 권한만 갱신하고, 비밀번호를 적으면 그 비밀번호로 바꿉니다.</p>
+  </div>
+</div></div>
 
 <!-- 업무 상세 -->
 <div class="ov" id="detailOv"><div class="panel" id="detailPanel"></div></div>
@@ -259,10 +308,18 @@
   const REQUESTERS = ['상무', '과장'];   // 요청자 선택 목록 (추가하려면 여기에 이름을 넣으세요)
   const PALETTE = ['#e2483d', '#d97706', '#1f845a', '#0c66e4', '#8250df', '#c9348c', '#0f7a8a', '#5e6c84'];
 
-  let me = '', members = [], tasks = [], openId = null, formMode = 'new', editId = null;
+  const DIVS = { credit: '여신업무', deposit: '수신업무' };
+  let me = '', meRow = null, members = [], tasks = [], openId = null, formMode = 'new', editId = null;
+  let divn = 'credit', foldOther = false;
   let fType = 'all', fGrp = null;     // 구분 필터 / 타일로 고른 그룹
-  try { fType = localStorage.getItem('fType') || 'all'; } catch (e) {}
+  let storedDiv = null;
+  try { fType = localStorage.getItem('fType') || 'all'; storedDiv = localStorage.getItem('div'); } catch (e) {}
 
+  // 권한: 해당 업무구분의 등록·수정·단계수정 가능 여부 (DB 에서도 같은 규칙으로 막음)
+  const permOf = (d, m) => !!m && (d === 'credit' ? m.perm_credit : m.perm_deposit);
+  const canWrite = (d) => permOf(d, meRow);
+  const isAdmin = () => !!(meRow && meRow.is_admin);
+  const taskDiv = (t) => t.division === 'deposit' ? 'deposit' : 'credit';
   const nameOf = (e) => (members.find(m => m.email === e) || {}).name || e;
   const colorOf = (e) => { let h = 0; for (const c of e) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PALETTE[h % PALETTE.length]; };
   const initial = (e) => (nameOf(e) || '?').trim().slice(0, 1);
@@ -288,10 +345,16 @@
     const { data: ok } = await sb.rpc('is_member');
     if (!ok){ await sb.auth.signOut(); show(false); $('loginMsg').textContent = '등록되지 않은 이메일입니다.'; return; }
     me = session.user.email; show(true);
-    const { data } = await sb.from('team_members').select('email,name').order('name');
-    members = data || [];
+    await reloadMembers();
     $('who').textContent = nameOf(me);
+    divn = storedDiv === 'credit' || storedDiv === 'deposit' ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
     await loadTelegram(); await loadTasks(); ensureSide();
+  }
+
+  async function reloadMembers(){
+    const { data } = await sb.from('team_members').select('email,name,perm_credit,perm_deposit,is_admin').order('name');
+    members = data || [];
+    meRow = members.find(m => m.email === me) || meRow;
   }
 
   // ---------- 텔레그램 ----------
@@ -334,38 +397,64 @@
   const isDone = (t) => t.task_type === 'loan' ? (t.work_task_steps.length > 0 && t.work_task_steps.every(s => s.done_at)) : t.work_task_assignees.every(a => a.done_at);
   const curIdx = (t) => { const s = stepsOf(t); const i = s.findIndex(x => !x.done_at); return i < 0 ? s.length : i; };
   const dueGrp = (t, today) => isDone(t) ? 'done' : (t.due_date && t.due_date < today) ? 'over' : (t.due_date === today) ? 'today' : 'prog';
-  const canAct = (t) => t.created_by === me || t.work_task_assignees.some(a => a.email === me);
-  const canUndoStep = (t, s) => t.created_by === me || s.done_by === me;
+  const canAct = (t) => canWrite(taskDiv(t));                       // 등록·수정·단계수정 권한
+  const ownerOrAdmin = (t) => t.created_by === me || isAdmin();     // 담당자 구성 변경 / 삭제
+  const isMine = (t) => t.work_task_assignees.some(a => a.email === me);
+  const canUndoStep = (t, s) => canAct(t) && (ownerOrAdmin(t) || s.done_by === me);
 
   // ---------- 목록 렌더 ----------
-  function render(){
-    const today = kstToday(), q = $('q').value.trim().toLowerCase(), status = $('status').value, mine = $('mine').checked;
+  function applyDivUI(){
+    $('app').dataset.div = divn;
+    document.querySelectorAll('#divBtns button').forEach(b => b.classList.toggle('on', b.dataset.div === divn));
+    const myOpen = (d) => tasks.filter(t => taskDiv(t) === d && !isDone(t) && isMine(t)).length;
+    $('nCredit').textContent = myOpen('credit') || ''; $('nDeposit').textContent = myOpen('deposit') || '';
+    $('nCredit').style.display = myOpen('credit') ? '' : 'none'; $('nDeposit').style.display = myOpen('deposit') ? '' : 'none';
+    const w = canWrite(divn);
+    $('newBtn').style.display = w ? '' : 'none';
+    $('roPill').style.display = w ? 'none' : '';
+    $('adminBtn').style.display = isAdmin() ? '' : 'none';
+    $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
+  }
 
-    // 요약 타일 (필터와 무관한 전체 기준)
-    const open = tasks.filter(t => !isDone(t));
+  function render(){
+    applyDivUI();
+    const today = kstToday(), q = $('q').value.trim().toLowerCase(), status = $('status').value, mine = $('mine').checked;
+    const effType = divn === 'credit' ? fType : 'all';
+    const divTasks = tasks.filter(t => taskDiv(t) === divn);
+
+    // 요약 타일 (이 업무구분 전체 기준)
+    const open = divTasks.filter(t => !isDone(t));
     const cnt = (g) => open.filter(t => dueGrp(t, today) === g).length;
     const tiles = [
       ['over', cnt('over'), '기한초과', 'grp:over'], ['today', cnt('today'), '오늘마감', 'grp:today'],
-      ['', open.length, '미완료 전체', 'grp:'], ['loan', open.filter(t => t.task_type === 'loan').length, '진행 중 대출', 'type:loan'],
+      ['loan', open.filter(isMine).length, '내 미완료', 'mine:'], ['', open.length, '미완료 전체', 'grp:'],
     ];
     $('tiles').innerHTML = tiles.map(([c, n, l, act]) => {
-      const sel = (act === 'grp:' && !fGrp && fType === 'all') || (act.startsWith('grp:') && act.slice(4) && fGrp === act.slice(4)) || (act === 'type:loan' && fType === 'loan' && !fGrp);
+      const sel = act === 'grp:' ? (!fGrp && !mine && effType === 'all') : act === 'mine:' ? (mine && !fGrp) : fGrp === act.slice(4);
       return `<button class="tile ${c} ${sel ? 'sel' : ''}" data-tile="${act}"><div class="n">${n}</div><div class="l">${l}</div></button>`;
     }).join('');
     document.querySelectorAll('#typeSeg button').forEach(b => b.classList.toggle('on', b.dataset.type === fType));
 
     // 필터
-    const shown = tasks.filter(t =>
-      (fType === 'all' || (fType === 'loan') === (t.task_type === 'loan'))
-      && (!mine || t.work_task_assignees.some(a => a.email === me))
+    const shown = divTasks.filter(t =>
+      (effType === 'all' || (effType === 'loan') === (t.task_type === 'loan'))
+      && (!mine || isMine(t))
       && (status === 'all' || (status === 'done') === isDone(t))
       && (!fGrp || dueGrp(t, today) === fGrp)
       && (!q || [t.title, t.detail, t.directed_by].some(v => (v || '').toLowerCase().includes(q))));
 
-    $('list').innerHTML = GROUPS.map(([k, label]) => {
-      const items = shown.filter(t => dueGrp(t, today) === k);
+    const groups = (arr) => GROUPS.map(([k, label]) => {
+      const items = arr.filter(t => dueGrp(t, today) === k);
       return items.length ? `<div class="sec-h ${k}">${label}<span class="n">${items.length}</span></div>${items.map(rowHtml).join('')}` : '';
-    }).join('') || '<div class="empty">표시할 업무가 없습니다.</div>';
+    }).join('');
+    const mineRows = shown.filter(isMine), otherRows = shown.filter(t => !isMine(t));
+    let html = `<div class="blk-h">★ 내 업무<span class="n">${mineRows.length}</span></div>`
+      + (mineRows.length ? groups(mineRows) : `<div class="blk-empty">${mine || fGrp || q ? '조건에 맞는 내 업무가 없어요.' : '내게 배정된 업무가 없어요.'}</div>`);
+    if (!mine && otherRows.length){
+      html += `<div class="blk-h other" id="foldOther">참고 · 다른 담당자 업무<span class="n">${otherRows.length}</span><span class="fold">${foldOther ? '▶ 펼치기' : '▼ 접기'}</span></div>`
+        + (foldOther ? '' : groups(otherRows));
+    }
+    $('list').innerHTML = html;
   }
 
   function rowHtml(t){
@@ -380,7 +469,7 @@
     } else {
       const pend = asg.filter(a => !a.done_at);
       prog = pend.length ? `<span class="pl">${asg.length - pend.length}/${asg.length} 완료 · <b>${esc(pend.map(a => nameOf(a.email)).join(', '))}</b> 대기</span>` : `<span class="pl ok">전원 완료</span>`;
-      if (asg.some(a => a.email === me && !a.done_at)) act = `<button class="go" data-go="mine:${t.id}">✔ 내 일 완료</button>`;
+      if (canAct(t) && asg.some(a => a.email === me && !a.done_at)) act = `<button class="go" data-go="mine:${t.id}">✔ 내 일 완료</button>`;
     }
     const due = t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '<span class="muted">-</span>';
     const avs = `<div class="avs">${asg.map(a => `<span class="av ${!loan && a.done_at ? 'done' : ''}" style="background:${colorOf(a.email)}" title="${esc(nameOf(a.email))}">${esc(initial(a.email))}</span>`).join('')}</div>`;
@@ -455,8 +544,15 @@
   $('tiles').onclick = (e) => {
     const b = e.target.closest('[data-tile]'); if (!b) return;
     const [kind, val] = b.dataset.tile.split(':');
-    if (kind === 'grp'){ fGrp = val || null; if (fGrp){ $('status').value = 'open'; } else { fType = 'all'; $('status').value = 'open'; } }
-    else { fType = val; fGrp = null; $('status').value = 'open'; }
+    $('status').value = 'open';
+    if (kind === 'grp'){ fGrp = val || null; $('mine').checked = false; if (!fGrp) fType = 'all'; }
+    else { fGrp = null; $('mine').checked = true; }          // 내 미완료
+    render();
+  };
+  $('divBtns').onclick = (e) => {
+    const b = e.target.closest('[data-div]'); if (!b || b.dataset.div === divn) return;
+    divn = b.dataset.div; fGrp = null; $('mine').checked = false; $('status').value = 'open'; foldOther = false;
+    try { localStorage.setItem('div', divn); } catch (x) {}
     render();
   };
   $('list').addEventListener('click', async (e) => {
@@ -467,6 +563,7 @@
       if (kind === 'step') await completeStep(+tid, +seq); else await toggleAssignee(+tid, me, true);
       return loadTasks();
     }
+    if (e.target.closest('#foldOther')){ foldOther = !foldOther; return render(); }
     const row = e.target.closest('[data-id]');
     if (row) openDetail(+row.dataset.id);
   });
@@ -493,13 +590,13 @@
       body += `<div class="kv"><div class="k">담당자</div><div class="v">${esc(t.work_task_assignees.map(a => nameOf(a.email)).join(', '))}</div></div>`;
     } else {
       body += `<div class="kv"><div class="k">담당자별 진행</div>${t.work_task_assignees.map(a => `<div class="asg ${a.done_at ? 'ok' : ''}">
-        <input type="checkbox" ${a.done_at ? 'checked' : ''} ${a.email === me ? '' : 'disabled'} data-d="chk:${esc(a.email)}" />
+        <input type="checkbox" ${a.done_at ? 'checked' : ''} ${a.email === me && canAct(t) ? '' : 'disabled'} data-d="chk:${esc(a.email)}" />
         <span class="av" style="background:${colorOf(a.email)};margin:0">${esc(initial(a.email))}</span>${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}</div>`;
     }
-    const lbl = `<span class="tp ${loan ? 'loan' : ''}">${loan ? '대출진행' : '일반업무'}</span> `
+    const lbl = `<span class="chip" style="background:#e9f2ff;color:#0b5cc4;margin-right:4px">${DIVS[taskDiv(t)]}</span><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출진행' : '일반업무'}</span> `
       + (g === 'over' ? '<span class="chip over">기한초과</span>' : g === 'today' ? '<span class="chip today">오늘마감</span>' : g === 'done' ? '<span class="chip ok">완료</span>' : '');
     $('detailPanel').innerHTML = `<div class="ph"><div><div style="margin-bottom:8px">${lbl}</div><h2>${esc(t.title)}</h2></div><button class="x" data-d="close">✕</button></div>${body}
-      ${canAct(t) ? `<div class="foot"><button class="btn" data-d="edit">✏ 수정</button>${t.created_by === me ? '<button class="btn danger" data-d="del">삭제</button>' : ''}</div>` : ''}`;
+      ${canAct(t) ? `<div class="foot"><button class="btn" data-d="edit">✏ 수정</button>${ownerOrAdmin(t) ? '<button class="btn danger" data-d="del">삭제</button>' : ''}</div>` : `<div class="foot"><span class="muted">👀 이 업무구분에 대한 권한이 없어 보기만 할 수 있어요.</span></div>`}`;
   }
   $('detailPanel').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-d]'); if (!b || b.tagName === 'INPUT') return;
@@ -535,14 +632,18 @@
   function openForm(mode, id){
     formMode = mode; editId = id;
     const t = id ? byId(id) : null;
-    $('fHead').textContent = mode === 'edit' ? '업무 수정' : '새 업무 등록';
-    $('fTypeRow').style.display = mode === 'edit' ? 'none' : 'block';
-    if (mode === 'new'){ $('fType').value = fType === 'general' ? 'general' : 'loan'; $('fStage').value = '0'; syncType(); }
+    if (mode === 'new' && !canWrite(divn)) return alert(`${DIVS[divn]}에 등록할 권한이 없어요. 관리자에게 문의해주세요.`);
+    const fdiv = t ? taskDiv(t) : divn;
+    $('fHead').textContent = mode === 'edit' ? '업무 수정' : `새 업무 등록 · ${DIVS[fdiv]}`;
+    $('fTypeRow').style.display = mode === 'edit' || fdiv === 'deposit' ? 'none' : 'block';     // 수신업무는 일반업무만
+    if (mode === 'new'){ $('fType').value = fdiv === 'deposit' || fType === 'general' ? 'general' : 'loan'; $('fStage').value = '0'; syncType(); }
     else $('fTitleLabel').textContent = t.task_type === 'loan' ? '고객명 / 대출 건명' : '업무 내용';
     $('fTitle').value = t ? t.title : ''; $('fDetail').value = t ? (t.detail || '') : ''; fillRequesters(t ? t.directed_by : ''); $('fDue').value = t ? (t.due_date || '') : '';
     const cur = new Set(t ? t.work_task_assignees.map(a => a.email) : [me]);
-    $('fAsg').innerHTML = members.map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${cur.has(m.email) ? 'checked' : ''}/> ${esc(m.name)}</label>`).join('');
-    $('fAsgWrap').style.display = (!t || t.created_by === me) ? 'block' : 'none';   // 담당자 구성 변경은 등록자만
+    // 담당자 후보: 해당 업무구분 권한이 있는 사람 (이미 배정된 사람은 유지)
+    $('fAsg').innerHTML = members.filter(m => permOf(fdiv, m) || cur.has(m.email))
+      .map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${cur.has(m.email) ? 'checked' : ''}/> ${esc(m.name)}</label>`).join('');
+    $('fAsgWrap').style.display = (!t || ownerOrAdmin(t)) ? 'block' : 'none';   // 담당자 구성 변경은 등록자·관리자만
     $('formOv').style.display = 'block'; document.body.style.overflow = 'hidden';
     setTimeout(() => { try { $('fTitle').focus(); } catch (e) {} }, 50);
   }
@@ -562,7 +663,7 @@
         const t = byId(editId); if (!t) return;
         const changed = ['title', 'detail', 'directed_by', 'due_date'].some(k => (t[k] || null) !== patch[k]);
         const before = t.work_task_assignees.map(a => a.email);
-        const isOwner = t.created_by === me;
+        const isOwner = ownerOrAdmin(t);
         const added = isOwner ? emails.filter(e => !before.includes(e)) : [], removed = isOwner ? before.filter(e => !emails.includes(e)) : [];
         let err = (await sb.from('work_tasks').update(patch).eq('id', t.id)).error;
         if (!err && removed.length) err = (await sb.from('work_task_assignees').delete().eq('task_id', t.id).in('email', removed)).error;
@@ -571,7 +672,7 @@
         if (changed || added.length) await sb.functions.invoke('task-notify', { body: { event: 'updated', task_id: t.id, added, changed } });
       } else {
         const type = $('fType').value;
-        const { data: nt, error } = await sb.from('work_tasks').insert({ ...patch, task_type: type }).select('id').single();
+        const { data: nt, error } = await sb.from('work_tasks').insert({ ...patch, task_type: type, division: divn }).select('id').single();
         if (error) return alert(error.message);
         await sb.from('work_task_assignees').insert(emails.map(email => ({ task_id: nt.id, email })));
         if (type === 'loan'){
@@ -581,12 +682,69 @@
         }
         await sb.functions.invoke('task-notify', { body: { event: 'created', task_id: nt.id } });
         if (fType !== 'all' && fType !== type) fType = 'all';   // 새로 등록한 업무가 필터에 가려지지 않게
+        $('mine').checked = false;
         fGrp = null; $('status').value = 'open';
       }
       closeForm(); await loadTasks();
     } finally { $('fSave').disabled = false; }
   };
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('formOv').style.display === 'block') closeForm(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
+  // ---------- 관리자: 담당자 관리 ----------
+  async function adminCall(body){
+    const { data, error } = await sb.functions.invoke('admin-users', { body });
+    if (error) return { error: '요청에 실패했어요. 잠시 후 다시 시도해주세요. (' + error.message + ')' };
+    return data || {};
+  }
+  function renderAdmin(){
+    $('aList').innerHTML = members.map(m => {
+      const self = m.email === me;
+      return `<div class="arow" data-email="${esc(m.email)}">
+        <div class="nm">${esc(m.name)}${self ? ' <span class="muted">(나)</span>' : ''}<div class="muted">${esc(m.email)}</div></div>
+        <label class="chk"><input type="checkbox" data-p="perm_credit" ${m.perm_credit ? 'checked' : ''}/> 여신</label>
+        <label class="chk"><input type="checkbox" data-p="perm_deposit" ${m.perm_deposit ? 'checked' : ''}/> 수신</label>
+        <label class="chk"><input type="checkbox" data-p="is_admin" ${m.is_admin ? 'checked' : ''} ${self ? 'disabled title="본인의 관리자 권한은 해제할 수 없어요"' : ''}/> 관리자</label>
+        <div class="btns"><button class="btn small" data-act="pw">비밀번호 변경</button>${self ? '' : '<button class="btn small danger" data-act="del">삭제</button>'}</div></div>`;
+    }).join('') || '<div class="blk-empty">등록된 담당자가 없어요.</div>';
+  }
+  $('adminBtn').onclick = () => { renderAdmin(); $('adminOv').style.display = 'block'; document.body.style.overflow = 'hidden'; };
+  const closeAdmin = () => { $('adminOv').style.display = 'none'; document.body.style.overflow = ''; };
+  $('aClose').onclick = closeAdmin;
+  $('adminOv').addEventListener('click', (e) => { if (e.target === $('adminOv')) closeAdmin(); });
+  $('aList').addEventListener('change', async (e) => {
+    const cb = e.target.closest('input[data-p]'); if (!cb) return;
+    const email = cb.closest('[data-email]').dataset.email;
+    const { error } = await sb.from('team_members').update({ [cb.dataset.p]: cb.checked }).eq('email', email);
+    if (error) alert('저장하지 못했어요: ' + error.message);
+    await reloadMembers(); renderAdmin(); render();
+  });
+  $('aList').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const email = b.closest('[data-email]').dataset.email, name = nameOf(email);
+    if (b.dataset.act === 'pw'){
+      const pw = prompt(`${name}님의 새 비밀번호를 입력하세요 (8자 이상)`);
+      if (!pw) return;
+      const r = await adminCall({ action: 'reset', email, password: pw });
+      alert(r.error || `${name}님의 비밀번호를 바꿨어요.`);
+    } else if (b.dataset.act === 'del'){
+      if (!confirm(`${name}님을 삭제할까요?\n로그인 계정과 텔레그램 연결도 함께 삭제됩니다.`)) return;
+      const r = await adminCall({ action: 'delete', email });
+      if (r.error) return alert(r.error);
+      await reloadMembers(); renderAdmin(); loadTasks();
+    }
+  });
+  $('aAdd').onclick = async () => {
+    const body = { action: 'create', name: $('aName').value.trim(), email: $('aEmail').value.trim(), password: $('aPw').value,
+      perm_credit: $('aCredit').checked, perm_deposit: $('aDeposit').checked, is_admin: $('aAdmin').checked };
+    if (!body.name || !body.email) return alert('이름과 이메일을 입력해주세요.');
+    $('aAdd').disabled = true;
+    const r = await adminCall(body);
+    $('aAdd').disabled = false;
+    if (r.error) return alert(r.error);
+    ['aName', 'aEmail', 'aPw'].forEach(id => $(id).value = ''); $('aDeposit').checked = false; $('aAdmin').checked = false; $('aCredit').checked = true;
+    await reloadMembers(); renderAdmin(); render();
+    alert(r.created ? '담당자를 등록했어요. 이메일과 비밀번호를 전달해주세요.' : '이미 있는 계정이라 권한을 갱신했어요.');
+  };
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('formOv').style.display === 'block') closeForm(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
 </body>
 </html>
