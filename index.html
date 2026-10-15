@@ -235,7 +235,7 @@
   <label id="fTitleLabel">고객명 / 대출 건명</label><input id="fTitle" />
   <label>상세 (선택)</label><textarea id="fDetail" rows="2"></textarea>
   <div class="row">
-    <div><label>요청자</label><input id="fBy" placeholder="예: 김상무" /></div>
+    <div><label>요청자</label><select id="fBy"></select></div>
     <div><label>기한</label><input id="fDue" type="date" /></div>
   </div>
   <label>담당자 (체크한 사람에게 알림)</label><div class="checks" id="fAsg"></div>
@@ -256,6 +256,7 @@
   // 업무 유형별 단계 (나중에 채권관리 등 유형을 추가할 때 여기에 추가)
   const LOAN_STEPS = ['대출상담', '대출신청', '감정평가', '내부결재', '대출실행'];
   const GROUPS = [['over', '🔴 기한초과'], ['today', '🟠 오늘마감'], ['prog', '⚪ 진행중'], ['done', '✅ 완료']];
+  const REQUESTERS = ['상무', '과장'];   // 요청자 선택 목록 (추가하려면 여기에 이름을 넣으세요)
   const PALETTE = ['#e2483d', '#d97706', '#1f845a', '#0c66e4', '#8250df', '#c9348c', '#0f7a8a', '#5e6c84'];
 
   let me = '', members = [], tasks = [], openId = null, formMode = 'new', editId = null;
@@ -526,6 +527,11 @@
     $('fTitle').placeholder = loan ? '예: 홍길동 담보대출 1억' : '예: 3분기 연체 현황 보고서 작성';
   }
   $('fType').onchange = syncType;
+  function fillRequesters(current){
+    const list = current && !REQUESTERS.includes(current) ? [...REQUESTERS, current] : REQUESTERS;   // 예전에 직접 입력한 값도 유지
+    $('fBy').innerHTML = '<option value="">선택 안 함</option>' + list.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    $('fBy').value = current || '';
+  }
   function openForm(mode, id){
     formMode = mode; editId = id;
     const t = id ? byId(id) : null;
@@ -533,7 +539,7 @@
     $('fTypeRow').style.display = mode === 'edit' ? 'none' : 'block';
     if (mode === 'new'){ $('fType').value = fType === 'general' ? 'general' : 'loan'; $('fStage').value = '0'; syncType(); }
     else $('fTitleLabel').textContent = t.task_type === 'loan' ? '고객명 / 대출 건명' : '업무 내용';
-    $('fTitle').value = t ? t.title : ''; $('fDetail').value = t ? (t.detail || '') : ''; $('fBy').value = t ? (t.directed_by || '') : ''; $('fDue').value = t ? (t.due_date || '') : '';
+    $('fTitle').value = t ? t.title : ''; $('fDetail').value = t ? (t.detail || '') : ''; fillRequesters(t ? t.directed_by : ''); $('fDue').value = t ? (t.due_date || '') : '';
     const cur = new Set(t ? t.work_task_assignees.map(a => a.email) : [me]);
     $('fAsg').innerHTML = members.map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${cur.has(m.email) ? 'checked' : ''}/> ${esc(m.name)}</label>`).join('');
     $('formOv').style.display = 'block'; document.body.style.overflow = 'hidden';
@@ -548,7 +554,7 @@
     const title = $('fTitle').value.trim();
     const emails = [...document.querySelectorAll('#fAsg input:checked')].map(i => i.value);
     if (!title || !emails.length) return alert('내용과 담당자를 입력해주세요.');
-    const patch = { title, detail: $('fDetail').value.trim() || null, directed_by: $('fBy').value.trim() || null, due_date: $('fDue').value || null };
+    const patch = { title, detail: $('fDetail').value.trim() || null, directed_by: $('fBy').value || null, due_date: $('fDue').value || null };
     $('fSave').disabled = true;
     try {
       if (formMode === 'edit'){
