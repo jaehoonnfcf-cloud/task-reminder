@@ -25,7 +25,14 @@ async function nameMap() {
 }
 const ok = (b: unknown = { ok: true }) => new Response(JSON.stringify(b), { headers: { "Content-Type": "application/json" } });
 
-Deno.serve(async (req) => {
+// 브라우저(페이지)에서 호출하므로 CORS 허용이 필요하다 (없으면 preflight 에서 막혀 알림이 가지 않음)
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+async function handle(req: Request): Promise<Response> {
   // 1) 텔레그램 웹훅: 사용자가 봇에 /start <코드> 를 보내면 chat_id 연결
   if (req.headers.get("x-telegram-bot-api-secret-token")) {
     if (req.headers.get("x-telegram-bot-api-secret-token") !== Deno.env.get("TELEGRAM_WEBHOOK_SECRET")) return new Response("forbidden", { status: 403 });
@@ -110,4 +117,12 @@ Deno.serve(async (req) => {
     await notify(others, all ? `🎉 전원 완료: ${task.title}` : `✅ ${who(me)} 완료: ${task.title}`);
   } else return new Response("bad request", { status: 400 });
   return ok();
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  const res = await handle(req);
+  const h = new Headers(res.headers);
+  for (const [k, v] of Object.entries(CORS)) h.set(k, v);
+  return new Response(res.body, { status: res.status, headers: h });
 });

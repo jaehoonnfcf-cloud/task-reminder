@@ -65,6 +65,30 @@
   #wrap{ width:100%; max-width:1280px; margin:0 auto; padding:16px 20px 40px; display:flex; flex-direction:column; gap:14px; }
   #tgBanner{ display:none; background:#fff; border-radius:12px; padding:14px 16px; align-items:center; gap:12px; flex-wrap:wrap; box-shadow:0 2px 8px rgba(9,30,66,.25); }
 
+  /* 업무 목록 + (넓은 화면) 오른쪽 시세/뉴스 열 */
+  #main{ display:flex; flex-direction:column; gap:14px; min-width:0; }
+  #side{ display:none; }
+  .side-card{ background:#fff; border-radius:14px; box-shadow:0 2px 10px rgba(9,30,66,.22); overflow:hidden; }
+  .side-h{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px; font-size:15px; font-weight:800; border-bottom:1px solid var(--line); }
+  .side-h .muted{ font-weight:500; font-size:12px; }
+  .q-row{ display:grid; grid-template-columns:1fr auto auto; gap:10px; align-items:baseline; padding:8px 16px; font-size:14px; border-bottom:1px solid #f0f1f3; }
+  .q-row:last-child{ border-bottom:0; }
+  .q-name{ color:#44546f; font-weight:600; } .q-price{ font-weight:800; font-variant-numeric:tabular-nums; }
+  .q-chg{ font-size:12.5px; font-weight:700; min-width:92px; text-align:right; font-variant-numeric:tabular-nums; }
+  .q-chg.up{ color:#d6342c; } .q-chg.down{ color:#0c66e4; } .q-chg.flat{ color:var(--muted); }
+  #news{ overflow-y:auto; max-height:calc(100vh - 520px); min-height:260px; }
+  .ni{ display:block; padding:11px 16px; border-bottom:1px solid #f0f1f3; text-decoration:none; color:var(--ink); }
+  .ni:hover{ background:#f6f8ff; }
+  .ni .nm{ display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); margin-bottom:3px; }
+  .ni .src{ font-weight:800; color:#5b3fc4; background:#e5e1fa; padding:1px 7px; border-radius:5px; }
+  .ni .nt{ font-size:14px; font-weight:600; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .side-empty{ padding:22px 16px; color:var(--muted); font-size:13.5px; text-align:center; }
+  @media (min-width:1500px){
+    #wrap{ max-width:1680px; display:grid; grid-template-columns:minmax(0,1fr) 350px; gap:14px 18px; align-items:start; }
+    #tgBanner{ grid-column:1 / -1; }
+    #side{ display:flex; flex-direction:column; gap:14px; position:sticky; top:16px; }
+  }
+
   /* 요약 타일 */
   #tiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .tile{ background:rgba(255,255,255,.96); border-radius:14px; padding:14px 18px; cursor:pointer; border:2px solid transparent; box-shadow:0 1px 3px rgba(9,30,66,.18); text-align:left; }
@@ -175,6 +199,7 @@
   </div>
   <div id="wrap">
     <div id="tgBanner"><b>🔔 텔레그램 알림</b><span id="tgStatus" class="muted" style="flex:1"></span></div>
+    <div id="main">
     <div id="tiles"></div>
     <div class="list-panel">
       <div class="toolbar">
@@ -188,6 +213,11 @@
       <div class="thead"><span>구분</span><span>업무</span><span>진행</span><span>담당</span><span>기한</span><span></span></div>
       <div id="list"></div>
     </div>
+    </div>
+    <aside id="side">
+      <div class="side-card"><div class="side-h"><span>📈 시세정보</span><span class="muted" id="qTime"></span></div><div id="quotes"><div class="side-empty">불러오는 중...</div></div></div>
+      <div class="side-card"><div class="side-h"><span>📰 경제뉴스</span><span class="muted" id="nTime"></span></div><div id="news"><div class="side-empty">불러오는 중...</div></div></div>
+    </aside>
   </div>
 </div>
 
@@ -260,7 +290,7 @@
     const { data } = await sb.from('team_members').select('email,name').order('name');
     members = data || [];
     $('who').textContent = nameOf(me);
-    await loadTelegram(); await loadTasks();
+    await loadTelegram(); await loadTasks(); ensureSide();
   }
 
   // ---------- 텔레그램 ----------
@@ -358,6 +388,44 @@
       <div class="c-title"><div class="tt">${esc(t.title)}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
       <div class="c-prog prog">${prog}</div><div class="c-who">${avs}</div><div class="c-due">${due}</div><div class="c-act">${act}</div></div>`;
   }
+
+  // ---------- 오른쪽 열: 시세 / 경제뉴스 (넓은 화면에서만) ----------
+  const wide = () => window.matchMedia('(min-width:1500px)').matches;
+  const hhmm = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const ago = (iso) => { if (!iso) return ''; const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.floor(m / 60)}시간 전` : `${Math.floor(m / 1440)}일 전`; };
+  const fnum = (n, d) => Number(n).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
+  let quotesOk = false, newsOk = false;
+  async function loadQuotes(){
+    const { data, error } = await sb.functions.invoke('info-feed', { body: { type: 'quotes' } });
+    if (error || !data || !data.quotes || !data.quotes.length){ if (!quotesOk) $('quotes').innerHTML = '<div class="side-empty">시세를 불러오지 못했습니다.<br>잠시 후 다시 시도합니다.</div>'; return; }
+    quotesOk = true;
+    $('qTime').textContent = hhmm(data.updated) + ' 기준';
+    $('quotes').innerHTML = data.quotes.map(q => {
+      const cls = Math.abs(q.pct) < 0.005 ? 'flat' : q.change > 0 ? 'up' : 'down', arrow = cls === 'flat' ? '' : q.change > 0 ? '▲' : '▼';
+      return `<div class="q-row"><span class="q-name">${esc(q.name)}</span><span class="q-price">${esc(q.prefix)}${fnum(q.price, q.dec)}${esc(q.suffix)}</span>
+        <span class="q-chg ${cls}">${arrow} ${fnum(Math.abs(q.change), q.dec)} (${fnum(Math.abs(q.pct), 2)}%)</span></div>`;
+    }).join('');
+  }
+  async function loadNews(){
+    const { data, error } = await sb.functions.invoke('info-feed', { body: { type: 'news' } });
+    if (error || !data || !data.items || !data.items.length){ if (!newsOk) $('news').innerHTML = '<div class="side-empty">뉴스를 불러오지 못했습니다.<br>잠시 후 다시 시도합니다.</div>'; return; }
+    newsOk = true;
+    $('nTime').textContent = hhmm(data.updated) + ' 기준';
+    $('news').innerHTML = data.items.filter(n => /^https?:\/\//.test(n.link)).map(n =>
+      `<a class="ni" href="${esc(n.link)}" target="_blank" rel="noopener noreferrer"><div class="nm"><span class="src">${esc(n.source)}</span><span>${ago(n.date)}</span></div><div class="nt">${esc(n.title)}</div></a>`).join('');
+  }
+  let sideTimers = false;
+  function ensureSide(){
+    if (!wide()) return;
+    if (!quotesOk) loadQuotes();
+    if (!newsOk) loadNews();
+    if (!sideTimers){
+      sideTimers = true;
+      setInterval(() => { if (!document.hidden && wide()) loadQuotes(); }, 60000);     // 시세 1분마다
+      setInterval(() => { if (!document.hidden && wide()) loadNews(); }, 300000);       // 뉴스 5분마다
+    }
+  }
+  let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(ensureSide, 300); });
 
   // ---------- 동작 (공통) ----------
   async function completeStep(tid, seq){
