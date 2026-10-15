@@ -55,7 +55,7 @@
   #app{ min-height:100vh; min-height:100dvh; flex-direction:column;
     background:linear-gradient(135deg,#1d4ed8 0%,#6d28d9 55%,#be3a8d 100%); }
   .bar{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 20px; padding-top:max(10px, env(safe-area-inset-top));
-    background:rgba(0,0,0,.28); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#fff; }
+    background:rgba(0,0,0,.28); color:#fff; }
   .logo{ font-size:19px; font-weight:800; white-space:nowrap; }
   .spacer{ flex:1; }
   .pill{ font-size:12.5px; font-weight:700; padding:5px 10px; border-radius:99px; background:rgba(255,255,255,.2); color:#fff; white-space:nowrap; }
@@ -220,7 +220,7 @@
     .tile{ padding:12px 14px; } .tile .n{ font-size:24px; }
   }
   @media (max-width:760px){
-    .bar{ padding:8px 12px; padding-top:max(8px, env(safe-area-inset-top)); gap:8px; flex-wrap:wrap; backdrop-filter:none; -webkit-backdrop-filter:none; }
+    .bar{ padding:8px 12px; padding-top:max(8px, env(safe-area-inset-top)); gap:8px; flex-wrap:wrap; }
     .divs{ order:5; flex-basis:100%; margin-left:0; } .divs button{ flex:1; }
     .arow,.ahead{ grid-template-columns:1fr 1fr 1fr; } .arow .nm{ grid-column:1 / -1; } .arow .btns{ grid-column:1 / -1; } .ahead{ display:none; }
     .whoBtn .wn{ display:none; } .whoBtn{ padding:3px; }
