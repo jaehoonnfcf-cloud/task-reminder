@@ -437,6 +437,7 @@
   async function undoStep(tid, seq){
     const { error } = await sb.from('work_task_steps').update({ done_at: null }).eq('task_id', tid).eq('seq', seq);
     if (error){ alert(error.message); return false; }
+    await sb.functions.invoke('task-notify', { body: { event: 'step_undo', task_id: tid, seq } });
     return true;
   }
   async function toggleAssignee(tid, email, checked){
