@@ -120,6 +120,8 @@
   .whoBtn:hover{ background:rgba(255,255,255,.18); }
   .arow .btns{ flex-wrap:wrap; }
 
+  .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#172b4d; color:#fff; padding:12px 18px; border-radius:12px; font-size:14px; font-weight:600; z-index:60; box-shadow:0 8px 24px rgba(9,30,66,.4); max-width:90vw; text-align:center; cursor:pointer; }
+
   /* 개인업무 (나만 보기) */
   #shared,#personal{ display:flex; flex-direction:column; gap:14px; min-width:0; }
   #app[data-div=personal]{ background:linear-gradient(135deg,#9d174d 0%,#7c3aed 55%,#2563eb 100%); }
@@ -446,7 +448,10 @@
   $('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   $('logout').onclick = () => sb.auth.signOut();
   sb.auth.onAuthStateChange((_e, session) => session ? start(session) : show(false));
-  function show(on){ $('login').style.display = on ? 'none' : 'flex'; $('app').style.display = on ? 'flex' : 'none'; }
+  function show(on){
+    $('login').style.display = on ? 'none' : 'flex'; $('app').style.display = on ? 'flex' : 'none';
+    if (!on) stopRealtime();
+  }
 
   async function start(session){
     const { data: ok } = await sb.rpc('is_member');
@@ -456,7 +461,7 @@
     renderWho();
     setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
     divn = storedDiv === 'credit' || storedDiv === 'deposit' || storedDiv === 'personal' ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
-    await loadTelegram(); await loadTasks(); await loadPersonal(); ensureSide();
+    await loadTelegram(); await loadTasks(); await loadPersonal(); ensureSide(); startRealtime();
   }
 
   async function reloadMembers(){
@@ -635,6 +640,34 @@
     }
   }
   let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(ensureSide, 300); });
+
+  // ---------- 실시간 갱신 (새로고침 없이 반영) ----------
+  let rtChan = null, rtTimer = null, toastTimer = null;
+  function toast(msg){
+    let t = $('toast'); if (!t){ t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; t.onclick = () => t.remove(); document.body.appendChild(t); }
+    t.textContent = msg; clearTimeout(toastTimer); toastTimer = setTimeout(() => { const x = $('toast'); if (x) x.remove(); }, 5000);
+  }
+  function scheduleReload(){ clearTimeout(rtTimer); rtTimer = setTimeout(() => { if (me) loadTasks(); }, 400); }   // 여러 변경이 연달아 와도 한 번만
+  let memberTimer = null;
+  function scheduleMembers(){ clearTimeout(memberTimer); memberTimer = setTimeout(async () => { if (!me) return; await reloadMembers(); renderWho(); render(); }, 400); }
+  function startRealtime(){
+    if (rtChan) return;
+    try {
+      rtChan = sb.channel('tasks-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'work_tasks' }, (p) => {
+          if (p.eventType === 'INSERT' && p.new && p.new.created_by !== me) toast(`📌 새 업무가 등록됐어요: ${p.new.title}`);
+          scheduleReload();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_assignees' }, scheduleReload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_steps' }, scheduleReload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, scheduleMembers)
+        .subscribe();
+    } catch (e) { rtChan = null; }
+  }
+  function stopRealtime(){ try { if (rtChan) sb.removeChannel(rtChan); } catch (e) {} rtChan = null; }
+  // 실시간 연결이 끊겨도 놓치지 않도록: 화면에 다시 돌아오면 갱신 + 1분마다 갱신
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && me){ loadTasks(); loadPersonal(); } });
+  setInterval(() => { if (!document.hidden && me) loadTasks(); }, 60000);
 
   // ---------- 동작 (공통) ----------
   async function completeStep(tid, seq){

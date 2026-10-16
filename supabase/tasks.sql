@@ -186,3 +186,7 @@ create policy tasks_update on public.work_tasks for update to authenticated
 -- 평일 08:30 KST : task-remind     '30 23 * * 0-4'  (UTC 일~목 23:30 = 한국 월~금 08:30)
 -- 평일 15:30 KST : task-remind-pm  '30 6 * * 1-5'   (UTC 월~금 06:30 = 한국 월~금 15:30)
 -- 두 작업은 같은 호출 내용(CRON_SECRET 포함)을 사용: cron.schedule('task-remind-pm', '30 6 * * 1-5', (select command from cron.job where jobname='task-remind'))
+
+-- ===== 실시간 갱신 (적용 완료) =====
+-- alter publication supabase_realtime add table public.work_tasks, public.work_task_assignees, public.work_task_steps, public.team_members;
+-- 화면이 이 테이블의 변경을 구독해 새로고침 없이 갱신 (RLS 가 적용되어 볼 수 있는 행만 전달됨)
