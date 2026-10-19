@@ -202,3 +202,4 @@ create policy tasks_update on public.work_tasks for update to authenticated
 alter table public.work_tasks add column if not exists scope text not null default '본점';
 alter table public.work_tasks add constraint work_tasks_scope_chk check (scope in ('본점','지점','통합'));
 alter table public.work_tasks alter column scope drop default;
+grant update (scope) on public.work_tasks to authenticated;
