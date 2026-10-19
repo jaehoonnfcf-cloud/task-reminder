@@ -190,3 +190,10 @@ create policy tasks_update on public.work_tasks for update to authenticated
 -- ===== 실시간 갱신 (적용 완료) =====
 -- alter publication supabase_realtime add table public.work_tasks, public.work_task_assignees, public.work_task_steps, public.team_members;
 -- 화면이 이 테이블의 변경을 구독해 새로고침 없이 갱신 (RLS 가 적용되어 볼 수 있는 행만 전달됨)
+
+-- ===== 대출 미진행 (적용 완료된 내용 기록) =====
+-- work_tasks: dropped_at, dropped_by, dropped_step(중단된 단계 seq), drop_reason
+-- 함수 set_loan_dropped(p_task, p_drop, p_reason): 해당 구분 권한자만 처리/재개 (대출 업무만, 이미 처리된 건 거부)
+-- 함수 task_active(p_task): 미진행 업무는 단계 변경 불가 (steps_update 정책에 반영)
+-- 미진행 업무는 기본 목록(미완료)과 정기 알림에서 제외, 상태 필터 '미진행'에서 조회, '진행 재개'로 되돌림
+-- 처리/재개 시 담당자 전원에게 텔레그램 알림

@@ -62,7 +62,7 @@ async function handle(req: Request): Promise<Response> {
     }
     // 대출진행: 현재 단계 안내 (담당자 전원에게)
     const { data: loans } = await db.from("work_tasks")
-      .select("title, due_date, work_task_assignees(email), work_task_steps(seq, name, done_at)").eq("task_type", "loan");
+      .select("title, due_date, work_task_assignees(email), work_task_steps(seq, name, done_at)").eq("task_type", "loan").is("dropped_at", null);   // 미진행 업무는 알림 제외
     for (const t of loans ?? []) {
       const steps = [...(t as any).work_task_steps].sort((a: any, b: any) => a.seq - b.seq);
       const cur = steps.find((x: any) => !x.done_at);
@@ -131,6 +131,11 @@ async function handle(req: Request): Promise<Response> {
     const step = steps.find((x) => x.seq === seq);
     if (!step || step.done_at) return new Response("bad request", { status: 400 });
     await notify(everyone, `↩ [대출] ${task.title}\n${who(me)}님이 ${step.name} 완료를 취소했어요 → 현재 단계: ${cur ? cur.name : step.name}`);
+  } else if (event === "dropped" && task.task_type === "loan" && involved && task.dropped_at) {
+    const stepName = steps.find((x) => x.seq === task.dropped_step)?.name ?? "";
+    await notify(everyone, `⛔ [대출] ${task.title}\n${who(me)}님이 ${stepName} 단계에서 미진행 처리했어요${task.drop_reason ? `\n사유: ${task.drop_reason}` : ""}`);
+  } else if (event === "resumed" && task.task_type === "loan" && involved && !task.dropped_at) {
+    await notify(everyone, `↩ [대출] ${task.title}\n${who(me)}님이 진행을 재개했어요 → 현재 단계: ${cur ? cur.name : "-"}`);
   } else if (event === "done" && (asg.some((a) => a.email === me) || okDiv)) {
     const all = asg.every((a) => a.done_at);
     await notify(everyone, all ? `🎉 [${dv}] 모두 완료했어요\n${task.title}` : `✅ [${dv}] ${who(me)}님이 완료했어요\n${task.title}`);

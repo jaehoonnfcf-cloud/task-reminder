@@ -164,7 +164,7 @@
   .sec-h{ display:flex; align-items:center; gap:8px; padding:9px 18px; font-size:14px; font-weight:800; border-bottom:1px solid var(--line); }
   .sec-h .n{ font-weight:700; opacity:.7; }
   .sec-h.over{ background:var(--danger-soft); color:var(--danger); } .sec-h.today{ background:var(--warn-soft); color:var(--warn); }
-  .sec-h.prog{ background:#f1f2f4; color:#44546f; } .sec-h.done{ background:var(--green-soft); color:var(--green); }
+  .sec-h.prog{ background:#f1f2f4; color:#44546f; } .sec-h.done{ background:var(--green-soft); color:var(--green); } .sec-h.drop{ background:#f1e9e9; color:#7a3b3b; }
   .trow{ min-height:58px; padding-top:9px; padding-bottom:9px; border-bottom:1px solid var(--line); cursor:pointer; }
   .trow:hover{ background:#f6f8ff; }
   .trow.done{ opacity:.7; }
@@ -175,9 +175,9 @@
   .prog{ display:flex; align-items:center; gap:9px; min-width:0; }
   .segs{ display:flex; gap:3px; flex-shrink:0; }
   .segs i{ display:block; width:20px; height:8px; border-radius:99px; background:#dcdfe4; }
-  .segs i.ok{ background:var(--green); } .segs i.cur{ background:var(--accent); }
+  .segs i.ok{ background:var(--green); } .segs i.cur{ background:var(--accent); } .segs i.stop{ background:var(--danger); }
   .pl{ font-size:13px; color:#44546f; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .pl b{ color:var(--ink); } .pl.ok{ color:var(--green); font-weight:700; }
+  .pl b{ color:var(--ink); } .pl.ok{ color:var(--green); font-weight:700; } .pl.drop{ color:#7a3b3b; font-weight:700; }
   .avs{ display:flex; padding-left:6px; }
   .av{ width:28px; height:28px; border-radius:50%; color:#fff; font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid #fff; margin-left:-6px; position:relative; flex-shrink:0; }
   .av.done::after{ content:'✓'; position:absolute; right:-5px; bottom:-5px; width:14px; height:14px; border-radius:50%; background:var(--green); color:#fff; font-size:9px; line-height:14px; text-align:center; border:1.5px solid #fff; }
@@ -189,6 +189,7 @@
 
   /* ---------- 모달 ---------- */
   .ov{ display:none; position:fixed; inset:0; z-index:20; background:rgba(9,30,66,.6); overflow-y:auto; -webkit-overflow-scrolling:touch; padding:max(24px, env(safe-area-inset-top)) 12px 32px; }
+  #dropOv{ z-index:30; }
   .panel{ background:#fff; border-radius:14px; max-width:620px; margin:0 auto; padding:22px; box-shadow:0 12px 40px rgba(9,30,66,.4); }
   .panel h2{ margin:0; font-size:19px; line-height:1.35; word-break:break-word; }
   .ph{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
@@ -197,8 +198,10 @@
   .steps{ display:flex; flex-wrap:wrap; gap:6px; }
   .step{ display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:99px; border:1px solid var(--line); font-size:14px; color:var(--muted); background:#fff; }
   .step.ok{ background:var(--green-soft); color:var(--green); border-color:transparent; }
+  .step.stop{ background:var(--danger-soft); color:var(--danger); border-color:var(--danger); font-weight:800; }
   .step.cur{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent); font-weight:800; }
   .step small{ font-size:11px; opacity:.85; }
+  .reasons{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
   .acts{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
   .asg{ display:flex; align-items:center; gap:10px; min-height:40px; font-size:15px; }
   .asg input{ width:22px; height:22px; min-height:0; -webkit-appearance:auto; appearance:auto; flex-shrink:0; }
@@ -269,7 +272,7 @@
         <div class="seg" id="typeSeg">
           <button data-type="all">전체</button><button data-type="loan">대출진행</button><button data-type="general">일반업무</button>
         </div>
-        <select id="status"><option value="open">미완료</option><option value="done">완료</option><option value="all">전체 상태</option></select>
+        <select id="status"><option value="open">미완료</option><option value="done">완료</option><option value="drop">미진행</option><option value="all">전체 상태</option></select>
         <label class="chk"><input type="checkbox" id="mine" /> 내 업무만</label>
         <input id="q" class="search" type="search" placeholder="🔍 업무·고객명·요청자 검색" />
       </div>
@@ -362,6 +365,18 @@
   </div>
 </div></div>
 
+<!-- 대출 미진행 처리 -->
+<div class="ov" id="dropOv"><div class="panel" style="max-width:460px">
+  <div class="ph"><h2>⛔ 대출 미진행 처리</h2><button class="x" id="dClose">✕</button></div>
+  <p id="dInfo" style="margin:14px 0 0;line-height:1.55"></p>
+  <label>사유 (선택)</label><input id="dReason" maxlength="100" placeholder="직접 입력하거나 아래에서 고르세요" />
+  <div class="reasons" id="dChips">
+    <button type="button" class="btn small">고객 철회</button><button type="button" class="btn small">한도·조건 미달</button><button type="button" class="btn small">심사 부결</button><button type="button" class="btn small">담보 문제</button><button type="button" class="btn small">서류 미비</button>
+  </div>
+  <p class="muted" style="margin:14px 0 0;line-height:1.5">미진행으로 처리하면 기본 목록(미완료)에서 빠지고 알림도 오지 않아요. 상태 필터의 <b>미진행</b>에서 볼 수 있고, 언제든 <b>진행 재개</b>로 되돌릴 수 있어요.</p>
+  <div class="acts" style="margin-top:18px"><button class="btn danger" id="dSave" style="min-height:44px;padding:8px 24px">미진행 처리</button><button class="btn" id="dCancel" style="min-height:44px">취소</button></div>
+</div></div>
+
 <!-- 업무 상세 -->
 <div class="ov" id="detailOv"><div class="panel" id="detailPanel"></div></div>
 
@@ -396,7 +411,7 @@
 
   // 업무 유형별 단계 (나중에 채권관리 등 유형을 추가할 때 여기에 추가)
   const LOAN_STEPS = ['대출상담', '대출신청', '감정평가', '내부결재', '대출실행'];
-  const GROUPS = [['over', '🔴 기한초과'], ['today', '🟠 오늘마감'], ['prog', '⚪ 진행중'], ['done', '✅ 완료']];
+  const GROUPS = [['over', '🔴 기한초과'], ['today', '🟠 오늘마감'], ['prog', '⚪ 진행중'], ['done', '✅ 완료'], ['drop', '⛔ 미진행']];
   const REQUESTERS = ['상무', '과장'];   // 요청자 선택 목록 (추가하려면 여기에 이름을 넣으세요)
   const PALETTE = ['#e2483d', '#d97706', '#1f845a', '#0c66e4', '#8250df', '#c9348c', '#0f7a8a', '#5e6c84'];
 
@@ -514,7 +529,10 @@
   const stepsOf = (t) => [...t.work_task_steps].sort((a, b) => a.seq - b.seq);
   const isDone = (t) => t.task_type === 'loan' ? (t.work_task_steps.length > 0 && t.work_task_steps.every(s => s.done_at)) : t.work_task_assignees.every(a => a.done_at);
   const curIdx = (t) => { const s = stepsOf(t); const i = s.findIndex(x => !x.done_at); return i < 0 ? s.length : i; };
-  const dueGrp = (t, today) => isDone(t) ? 'done' : (t.due_date && t.due_date < today) ? 'over' : (t.due_date === today) ? 'today' : 'prog';
+  const isDropped = (t) => !!t.dropped_at;                       // 대출 미진행 (중간에 닫힘)
+  const isOpen = (t) => !isDone(t) && !isDropped(t);
+  const statusOk = (t, st) => st === 'all' ? true : st === 'drop' ? isDropped(t) : st === 'done' ? (isDone(t) && !isDropped(t)) : isOpen(t);
+  const dueGrp = (t, today) => isDropped(t) ? 'drop' : isDone(t) ? 'done' : (t.due_date && t.due_date < today) ? 'over' : (t.due_date === today) ? 'today' : 'prog';
   const canAct = (t) => canWrite(taskDiv(t));                       // 등록·수정·단계수정 권한
   const ownerOrAdmin = (t) => t.created_by === me || isAdmin();     // 담당자 구성 변경 / 삭제
   const isMine = (t) => t.work_task_assignees.some(a => a.email === me);
@@ -528,7 +546,7 @@
     document.querySelectorAll('#divBtns button').forEach(b => b.classList.toggle('on', b.dataset.div === divn));
     const pToday = kstToday(), pDue = ptasks.filter(t => !t.done_at && t.due_date && t.due_date <= pToday).length;
     $('nPersonal').textContent = pDue || ''; $('nPersonal').style.display = pDue ? '' : 'none';
-    const myOpen = (d) => tasks.filter(t => taskDiv(t) === d && !isDone(t) && isMine(t)).length;
+    const myOpen = (d) => tasks.filter(t => taskDiv(t) === d && isOpen(t) && isMine(t)).length;
     $('nCredit').textContent = myOpen('credit') || ''; $('nDeposit').textContent = myOpen('deposit') || '';
     $('nCredit').style.display = myOpen('credit') ? '' : 'none'; $('nDeposit').style.display = myOpen('deposit') ? '' : 'none';
     const w = personal || canWrite(divn);
@@ -547,7 +565,7 @@
     const divTasks = tasks.filter(t => taskDiv(t) === divn);
 
     // 요약 타일 (이 업무구분 전체 기준)
-    const open = divTasks.filter(t => !isDone(t));
+    const open = divTasks.filter(isOpen);
     const cnt = (g) => open.filter(t => dueGrp(t, today) === g).length;
     const tiles = [
       ['over', cnt('over'), '기한초과', 'grp:over'], ['today', cnt('today'), '오늘마감', 'grp:today'],
@@ -563,7 +581,7 @@
     const shown = divTasks.filter(t =>
       (effType === 'all' || (effType === 'loan') === (t.task_type === 'loan'))
       && (!mine || isMine(t))
-      && (status === 'all' || (status === 'done') === isDone(t))
+      && statusOk(t, status)
       && (!fGrp || dueGrp(t, today) === fGrp)
       && (!q || [t.title, t.detail, t.directed_by].some(v => (v || '').toLowerCase().includes(q))));
 
@@ -583,9 +601,13 @@
 
   function rowHtml(t){
     const today = kstToday(), g = dueGrp(t, today), loan = t.task_type === 'loan', steps = stepsOf(t), asg = t.work_task_assignees;
-    const sub = [t.directed_by && `요청: ${t.directed_by}`, t.detail].filter(Boolean).join(' · ');
+    const sub = [t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
     let prog, act = '';
-    if (loan){
+    if (loan && isDropped(t)){
+      const ds = steps.find(s => s.seq === t.dropped_step);
+      prog = `<span class="segs">${steps.map(s => `<i class="${s.done_at ? 'ok' : s.seq === t.dropped_step ? 'stop' : ''}"></i>`).join('')}</span>`
+        + `<span class="pl drop">⛔ 미진행 · <b>${esc(ds ? ds.name : '')}</b> 단계</span>`;
+    } else if (loan){
       const ci = curIdx(t), c = steps[ci];
       prog = `<span class="segs">${steps.map((s, i) => `<i class="${s.done_at ? 'ok' : i === ci ? 'cur' : ''}"></i>`).join('')}</span>`
         + (c ? `<span class="pl"><b>${esc(c.name)}</b> ${ci + 1}/${steps.length}</span>` : `<span class="pl ok">전 단계 완료</span>`);
@@ -597,7 +619,7 @@
     }
     const due = t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '<span class="muted">-</span>';
     const avs = `<div class="avs">${asg.map(a => avHtml(a.email, !loan && a.done_at ? 'done' : '')).join('')}</div>`;
-    return `<div class="trow ${g === 'done' ? 'done' : ''}" data-id="${t.id}">
+    return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}" data-id="${t.id}">
       <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span></div>
       <div class="c-title"><div class="tt">${esc(t.title)}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
       <div class="c-prog prog">${prog}</div><div class="c-who">${avs}</div><div class="c-due">${due}</div><div class="c-act">${act}</div></div>`;
@@ -735,11 +757,17 @@
     const info = [t.directed_by && `요청: ${t.directed_by}`, t.due_date && `기한: ${t.due_date}`].filter(Boolean).join('  ·  ');
     if (info) body += `<div class="kv"><div class="k">정보</div><div class="v">${esc(info)}</div></div>`;
     if (loan){
-      const lastDone = [...steps].reverse().find(s => s.done_at);
-      body += `<div class="kv"><div class="k">진행 단계</div><div class="steps">${steps.map(s => `<div class="step ${s.done_at ? 'ok' : (cur && cur.seq === s.seq ? 'cur' : '')}">
+      const lastDone = [...steps].reverse().find(s => s.done_at), dropped = isDropped(t);
+      if (dropped){
+        const ds = steps.find(s => s.seq === t.dropped_step);
+        body += `<div class="kv"><div class="k">미진행</div><div class="v">⛔ <b>${esc(ds ? ds.name : '')}</b> 단계에서 미진행 처리됐어요<br><span class="muted">${esc(nameOf(t.dropped_by))} · ${fmtTs(t.dropped_at)}${t.drop_reason ? ' · 사유: ' + esc(t.drop_reason) : ''}</span></div>
+          ${canAct(t) ? `<div class="acts"><button class="btn" data-d="resume">↩ 진행 재개</button></div>` : ''}</div>`;
+      }
+      body += `<div class="kv"><div class="k">진행 단계</div><div class="steps">${steps.map(s => `<div class="step ${s.done_at ? 'ok' : dropped ? (s.seq === t.dropped_step ? 'stop' : '') : (cur && cur.seq === s.seq ? 'cur' : '')}">
         <span>${s.done_at ? '✓' : s.seq}</span><span>${esc(s.name)}</span>${s.done_at && s.done_by ? `<small>${esc(nameOf(s.done_by))} ${fmtTs(s.done_at)}</small>` : ''}</div>`).join('')}</div>
-        ${canAct(t) ? `<div class="acts">${cur ? `<button class="btn primary" data-d="step:${cur.seq}">✔ ${esc(cur.name)} 완료</button>` : ''}
-        ${lastDone && canUndoStep(t, lastDone) ? `<button class="btn" data-d="undo:${lastDone.seq}">↩ ${esc(lastDone.name)} 되돌리기</button>` : ''}</div>` : ''}</div>`;
+        ${canAct(t) && !dropped ? `<div class="acts">${cur ? `<button class="btn primary" data-d="step:${cur.seq}">✔ ${esc(cur.name)} 완료</button>` : ''}
+        ${lastDone && canUndoStep(t, lastDone) ? `<button class="btn" data-d="undo:${lastDone.seq}">↩ ${esc(lastDone.name)} 되돌리기</button>` : ''}
+        ${cur ? `<button class="btn danger" data-d="drop">⛔ 미진행 처리</button>` : ''}</div>` : ''}</div>`;
       body += `<div class="kv"><div class="k">담당자</div><div class="v">${esc(t.work_task_assignees.map(a => nameOf(a.email)).join(', '))}</div></div>`;
     } else {
       body += `<div class="kv"><div class="k">담당자별 진행</div>${t.work_task_assignees.map(a => `<div class="asg ${a.done_at ? 'ok' : ''}">
@@ -747,7 +775,7 @@
         ${avHtml(a.email, '', 'margin:0')}${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}</div>`;
     }
     const lbl = `<span class="chip" style="background:#e9f2ff;color:#0b5cc4;margin-right:4px">${DIVS[taskDiv(t)]}</span><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출진행' : '일반업무'}</span> `
-      + (g === 'over' ? '<span class="chip over">기한초과</span>' : g === 'today' ? '<span class="chip today">오늘마감</span>' : g === 'done' ? '<span class="chip ok">완료</span>' : '');
+      + (g === 'drop' ? '<span class="chip" style="background:#f1e9e9;color:#7a3b3b">미진행</span>' : g === 'over' ? '<span class="chip over">기한초과</span>' : g === 'today' ? '<span class="chip today">오늘마감</span>' : g === 'done' ? '<span class="chip ok">완료</span>' : '');
     $('detailPanel').innerHTML = `<div class="ph"><div><div style="margin-bottom:8px">${lbl}</div><h2>${esc(t.title)}</h2></div><button class="x" data-d="close">✕</button></div>${body}
       ${canAct(t) ? `<div class="foot"><button class="btn" data-d="edit">✏ 수정</button>${ownerOrAdmin(t) ? '<button class="btn danger" data-d="del">삭제</button>' : ''}</div>` : `<div class="foot"><span class="muted">👀 이 업무구분에 대한 권한이 없어 보기만 할 수 있어요.</span></div>`}`;
   }
@@ -757,6 +785,14 @@
     const [kind, arg] = b.dataset.d.split(':');
     if (kind === 'close') return closeDetail();
     if (kind === 'edit') return openForm('edit', t.id);
+    if (kind === 'drop') return openDrop(t);
+    if (kind === 'resume'){
+      if (!confirm('미진행을 해제하고 진행을 재개할까요?')) return;
+      const { error } = await sb.rpc('set_loan_dropped', { p_task: t.id, p_drop: false });
+      if (error) return alert(error.message);
+      await sb.functions.invoke('task-notify', { body: { event: 'resumed', task_id: t.id } });
+      return loadTasks();
+    }
     if (kind === 'del'){ if (!confirm('이 업무를 삭제할까요?')) return; await sb.from('work_tasks').delete().eq('id', t.id); closeDetail(); return loadTasks(); }
     b.disabled = true;
     if (kind === 'step') await completeStep(t.id, +arg);
@@ -767,6 +803,30 @@
     const cb = e.target.closest('input[data-d^="chk:"]'); if (!cb) return;
     await toggleAssignee(openId, cb.dataset.d.slice(4), cb.checked); loadTasks();
   });
+
+  // ---------- 대출 미진행 처리 ----------
+  let dropId = null;
+  function openDrop(t){
+    dropId = t.id; const c = stepsOf(t)[curIdx(t)];
+    $('dInfo').innerHTML = `<b>${esc(t.title)}</b><br>현재 <b>${esc(c ? c.name : '')}</b> 단계에서 미진행으로 처리합니다.`;
+    $('dReason').value = '';
+    $('dropOv').style.display = 'block';
+    setTimeout(() => { try { $('dReason').focus(); } catch (e) {} }, 50);
+  }
+  function closeDrop(){ $('dropOv').style.display = 'none'; dropId = null; }
+  $('dClose').onclick = closeDrop; $('dCancel').onclick = closeDrop;
+  $('dropOv').addEventListener('click', (e) => { if (e.target === $('dropOv')) closeDrop(); });
+  $('dChips').onclick = (e) => { const b = e.target.closest('button'); if (b) $('dReason').value = b.textContent; };
+  $('dSave').onclick = async () => {
+    if (!dropId) return;
+    const id = dropId; $('dSave').disabled = true;
+    try {
+      const { error } = await sb.rpc('set_loan_dropped', { p_task: id, p_drop: true, p_reason: $('dReason').value.trim() || null });
+      if (error) return alert(error.message);
+      await sb.functions.invoke('task-notify', { body: { event: 'dropped', task_id: id } });
+      closeDrop(); await loadTasks();
+    } finally { $('dSave').disabled = false; }
+  };
 
   // ---------- 등록/수정 폼 ----------
   $('fStage').innerHTML = LOAN_STEPS.map((n, i) => `<option value="${i}">${n}</option>`).join('');
@@ -1205,7 +1265,7 @@
     alert(r.created ? '담당자를 등록했어요. 이메일과 비밀번호를 전달해주세요.' : '이미 있는 계정이라 권한을 갱신했어요.');
   };
 
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
 </body>
 </html>
