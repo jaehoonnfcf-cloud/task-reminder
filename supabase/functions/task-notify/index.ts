@@ -59,7 +59,7 @@ async function handle(req: Request): Promise<Response> {
       .select("email, work_tasks!inner(title, due_date, task_type, division, scope)").is("done_at", null).eq("work_tasks.task_type", "general");
     for (const r of data ?? []) {
       const t = (r as any).work_tasks;
-      add(r.email, `• [${t.division === "deposit" ? "수신" : "여신"}]${sc(t.scope)} ${t.title}${dueTag(t.due_date)}`);
+      add(r.email, `• [${t.division === "deposit" ? "수신/기타" : "여신"}]${sc(t.scope)} ${t.title}${dueTag(t.due_date)}`);
     }
     // 대출진행: 현재 단계 안내 (담당자 전원에게)
     const { data: loans } = await db.from("work_tasks")
@@ -100,7 +100,7 @@ async function handle(req: Request): Promise<Response> {
   const names = await nameMap();
   const who = (e: string) => names.get(e) ?? e;
   const division = task.division === "deposit" ? "deposit" : "credit";
-  const dv = division === "deposit" ? "수신" : "여신";
+  const dv = division === "deposit" ? "수신/기타" : "여신";
   const sg = sc(task.scope);
   const { data: perm } = await db.from("team_members").select("perm_credit, perm_deposit, is_admin").eq("email", me).maybeSingle();
   const okDiv = !!perm && (perm.is_admin || (division === "credit" ? perm.perm_credit : perm.perm_deposit));

@@ -252,7 +252,7 @@
     <span class="logo">🧚 할일요정</span>
     <div class="divs" id="divBtns">
       <button data-div="credit">여신업무<span class="n" id="nCredit"></span></button>
-      <button data-div="deposit">수신업무<span class="n" id="nDeposit"></span></button>
+      <button data-div="deposit">수신/기타<span class="n" id="nDeposit"></span></button>
       <button data-div="personal">🔒 개인업무<span class="n" id="nPersonal"></span></button>
     </div>
     <span class="spacer"></span>
@@ -359,7 +359,7 @@
     <div class="row" style="margin-top:8px"><input id="aPw" type="text" placeholder="초기 비밀번호 (8자 이상)" autocomplete="off" /></div>
     <div class="checks" style="margin-top:10px">
       <label><input type="checkbox" id="aCredit" checked /> 여신업무</label>
-      <label><input type="checkbox" id="aDeposit" /> 수신업무</label>
+      <label><input type="checkbox" id="aDeposit" /> 수신/기타</label>
       <label><input type="checkbox" id="aAdmin" /> 관리자</label>
     </div>
     <button class="btn primary" id="aAdd" style="margin-top:14px;min-height:44px;padding:8px 26px">등록</button>
@@ -419,7 +419,7 @@
   const REQUESTERS = ['상무', '과장'];   // 요청자 선택 목록 (추가하려면 여기에 이름을 넣으세요)
   const PALETTE = ['#e2483d', '#d97706', '#1f845a', '#0c66e4', '#8250df', '#c9348c', '#0f7a8a', '#5e6c84'];
 
-  const DIVS = { credit: '여신업무', deposit: '수신업무' };
+  const DIVS = { credit: '여신업무', deposit: '수신/기타' };
   let me = '', meRow = null, members = [], tasks = [], openId = null, formMode = 'new', editId = null;
   let divn = 'credit', foldOther = false;
   let fType = 'all', fGrp = null, fScope = 'all';     // 구분 필터 / 타일로 고른 그룹
@@ -854,7 +854,7 @@
     if (mode === 'new' && !canWrite(divn)) return alert(`${DIVS[divn]}에 등록할 권한이 없어요. 관리자에게 문의해주세요.`);
     const fdiv = t ? taskDiv(t) : divn;
     $('fHead').textContent = mode === 'edit' ? '업무 수정' : `새 업무 등록 · ${DIVS[fdiv]}`;
-    $('fTypeRow').style.display = mode === 'edit' || fdiv === 'deposit' ? 'none' : 'block';     // 수신업무는 일반업무만
+    $('fTypeRow').style.display = mode === 'edit' || fdiv === 'deposit' ? 'none' : 'block';     // 수신/기타는 일반업무만
     if (mode === 'new'){ $('fType').value = fdiv === 'deposit' || fType === 'general' ? 'general' : 'loan'; $('fStage').value = '0'; syncType(); }
     else $('fTitleLabel').textContent = t.task_type === 'loan' ? '고객명 / 대출 건명' : '업무 내용';
     $('fScope').value = t ? (t.scope || '') : '';
@@ -1213,7 +1213,7 @@
       return `<div class="arow" data-email="${esc(m.email)}">
         <div class="nm" style="display:flex;align-items:center;gap:12px">${avHtml(m.email, '', 'margin:0;width:38px;height:38px;font-size:15px;border-width:0')}<div style="min-width:0">${esc(m.name)}${self ? ' <span class="muted">(나)</span>' : ''}<div class="muted">${esc(m.email)}</div></div></div>
         <label class="chk"><input type="checkbox" data-p="perm_credit" ${m.perm_credit ? 'checked' : ''}/> 여신</label>
-        <label class="chk"><input type="checkbox" data-p="perm_deposit" ${m.perm_deposit ? 'checked' : ''}/> 수신</label>
+        <label class="chk"><input type="checkbox" data-p="perm_deposit" ${m.perm_deposit ? 'checked' : ''}/> 수신/기타</label>
         <label class="chk"><input type="checkbox" data-p="is_admin" ${m.is_admin ? 'checked' : ''} ${self ? 'disabled title="본인의 관리자 권한은 해제할 수 없어요"' : ''}/> 관리자</label>
         <div class="btns"><button class="btn small" data-act="name">이름 수정</button><button class="btn small" data-act="photo">사진</button>${m.avatar_v ? '<button class="btn small" data-act="rmphoto">사진 삭제</button>' : ''}<button class="btn small" data-act="pw">비밀번호</button>${self ? '' : '<button class="btn small danger" data-act="del">삭제</button>'}</div></div>`;
     }).join('') || '<div class="blk-empty">등록된 담당자가 없어요.</div>';
