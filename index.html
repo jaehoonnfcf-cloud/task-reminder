@@ -136,6 +136,7 @@
   .rrow{ display:grid; grid-template-columns:minmax(0,1fr) 150px auto; gap:12px; align-items:center; padding:12px 18px; border-bottom:1px solid var(--line); }
   .rrow.off{ opacity:.55; }
   .rrow .rnext{ font-size:13px; color:#44546f; }
+  .chip.sc-본점{ background:#dbeafe; color:#1e40af; } .chip.sc-지점{ background:#dcfce7; color:#166534; } .chip.sc-통합{ background:#ede9fe; color:#5b21b6; }
   .chip.rc{ background:#ede9fe; color:#5b21b6; }
   .pfold{ cursor:pointer; user-select:none; }
 
@@ -272,6 +273,7 @@
         <div class="seg" id="typeSeg">
           <button data-type="all">전체</button><button data-type="loan">대출진행</button><button data-type="general">일반업무</button>
         </div>
+        <select id="scopeSel"><option value="all">본점·지점·통합</option><option value="본점">본점</option><option value="지점">지점</option><option value="통합">통합</option></select>
         <select id="status"><option value="open">미완료</option><option value="done">완료</option><option value="drop">미진행</option><option value="all">전체 상태</option></select>
         <label class="chk"><input type="checkbox" id="mine" /> 내 업무만</label>
         <input id="q" class="search" type="search" placeholder="🔍 업무·고객명·요청자 검색" />
@@ -383,6 +385,8 @@
 <!-- 등록/수정 폼 -->
 <div class="ov" id="formOv"><div class="panel">
   <div class="ph"><h2 id="fHead">새 업무 등록</h2><button class="x" id="fClose">✕</button></div>
+  <label>본점 / 지점 / 통합 <span style="color:var(--danger)">*</span></label>
+  <select id="fScope"><option value="">선택하세요 (필수)</option><option value="본점">본점</option><option value="지점">지점</option><option value="통합">통합</option></select>
   <div id="fTypeRow">
     <label>업무 구분</label>
     <select id="fType"><option value="loan">대출진행 (단계별)</option><option value="general">일반업무 (단건)</option></select>
@@ -418,7 +422,7 @@
   const DIVS = { credit: '여신업무', deposit: '수신업무' };
   let me = '', meRow = null, members = [], tasks = [], openId = null, formMode = 'new', editId = null;
   let divn = 'credit', foldOther = false;
-  let fType = 'all', fGrp = null;     // 구분 필터 / 타일로 고른 그룹
+  let fType = 'all', fGrp = null, fScope = 'all';     // 구분 필터 / 타일로 고른 그룹
   let storedDiv = null;
   try { fType = localStorage.getItem('fType') || 'all'; storedDiv = localStorage.getItem('div'); } catch (e) {}
 
@@ -580,6 +584,7 @@
     // 필터
     const shown = divTasks.filter(t =>
       (effType === 'all' || (effType === 'loan') === (t.task_type === 'loan'))
+      && (fScope === 'all' || t.scope === fScope)
       && (!mine || isMine(t))
       && statusOk(t, status)
       && (!fGrp || dueGrp(t, today) === fGrp)
@@ -621,7 +626,7 @@
     const avs = `<div class="avs">${asg.map(a => avHtml(a.email, !loan && a.done_at ? 'done' : '')).join('')}</div>`;
     return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}" data-id="${t.id}">
       <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span></div>
-      <div class="c-title"><div class="tt">${esc(t.title)}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
+      <div class="c-title"><div class="tt">${t.scope ? `<span class="chip sc-${esc(t.scope)}">${esc(t.scope)}</span> ` : ''}${esc(t.title)}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
       <div class="c-prog prog">${prog}</div><div class="c-who">${avs}</div><div class="c-due">${due}</div><div class="c-act">${act}</div></div>`;
   }
 
@@ -711,6 +716,7 @@
   }
 
   // ---------- 이벤트 ----------
+  $('scopeSel').onchange = () => { fScope = $('scopeSel').value; fGrp = null; render(); };
   $('typeSeg').onclick = (e) => { const b = e.target.closest('[data-type]'); if (!b) return; fType = b.dataset.type; fGrp = null; try { localStorage.setItem('fType', fType); } catch (x) {} render(); };
   $('status').onchange = () => { fGrp = null; render(); };
   $('mine').onchange = render;
@@ -774,7 +780,7 @@
         <input type="checkbox" ${a.done_at ? 'checked' : ''} ${a.email === me && canAct(t) ? '' : 'disabled'} data-d="chk:${esc(a.email)}" />
         ${avHtml(a.email, '', 'margin:0')}${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}</div>`;
     }
-    const lbl = `<span class="chip" style="background:#e9f2ff;color:#0b5cc4;margin-right:4px">${DIVS[taskDiv(t)]}</span><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출진행' : '일반업무'}</span> `
+    const lbl = `<span class="chip" style="background:#e9f2ff;color:#0b5cc4;margin-right:4px">${DIVS[taskDiv(t)]}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}" style="margin-right:4px">${esc(t.scope)}</span>` : ''}<span class="tp ${loan ? 'loan' : ''}">${loan ? '대출진행' : '일반업무'}</span> `
       + (g === 'drop' ? '<span class="chip" style="background:#f1e9e9;color:#7a3b3b">미진행</span>' : g === 'over' ? '<span class="chip over">기한초과</span>' : g === 'today' ? '<span class="chip today">오늘마감</span>' : g === 'done' ? '<span class="chip ok">완료</span>' : '');
     $('detailPanel').innerHTML = `<div class="ph"><div><div style="margin-bottom:8px">${lbl}</div><h2>${esc(t.title)}</h2></div><button class="x" data-d="close">✕</button></div>${body}
       ${canAct(t) ? `<div class="foot"><button class="btn" data-d="edit">✏ 수정</button>${ownerOrAdmin(t) ? '<button class="btn danger" data-d="del">삭제</button>' : ''}</div>` : `<div class="foot"><span class="muted">👀 이 업무구분에 대한 권한이 없어 보기만 할 수 있어요.</span></div>`}`;
@@ -851,6 +857,7 @@
     $('fTypeRow').style.display = mode === 'edit' || fdiv === 'deposit' ? 'none' : 'block';     // 수신업무는 일반업무만
     if (mode === 'new'){ $('fType').value = fdiv === 'deposit' || fType === 'general' ? 'general' : 'loan'; $('fStage').value = '0'; syncType(); }
     else $('fTitleLabel').textContent = t.task_type === 'loan' ? '고객명 / 대출 건명' : '업무 내용';
+    $('fScope').value = t ? (t.scope || '') : '';
     $('fTitle').value = t ? t.title : ''; $('fDetail').value = t ? (t.detail || '') : ''; fillRequesters(t ? t.directed_by : ''); $('fDue').value = t ? (t.due_date || '') : '';
     const cur = new Set(t ? t.work_task_assignees.map(a => a.email) : [me]);
     // 담당자 후보: 해당 업무구분 권한이 있는 사람 (이미 배정된 사람은 유지)
@@ -868,13 +875,15 @@
   $('fSave').onclick = async () => {
     const title = $('fTitle').value.trim();
     const emails = [...document.querySelectorAll('#fAsg input:checked')].map(i => i.value);
+    const scope = $('fScope').value;
+    if (!scope) return alert('본점 / 지점 / 통합 중 하나를 선택해주세요.');
     if (!title || !emails.length) return alert('내용과 담당자를 입력해주세요.');
-    const patch = { title, detail: $('fDetail').value.trim() || null, directed_by: $('fBy').value || null, due_date: $('fDue').value || null };
+    const patch = { title, detail: $('fDetail').value.trim() || null, scope, directed_by: $('fBy').value || null, due_date: $('fDue').value || null };
     $('fSave').disabled = true;
     try {
       if (formMode === 'edit'){
         const t = byId(editId); if (!t) return;
-        const changed = ['title', 'detail', 'directed_by', 'due_date'].some(k => (t[k] || null) !== patch[k]);
+        const changed = ['title', 'detail', 'scope', 'directed_by', 'due_date'].some(k => (t[k] || null) !== patch[k]);
         const before = t.work_task_assignees.map(a => a.email);
         const isOwner = ownerOrAdmin(t);
         const added = isOwner ? emails.filter(e => !before.includes(e)) : [], removed = isOwner ? before.filter(e => !emails.includes(e)) : [];

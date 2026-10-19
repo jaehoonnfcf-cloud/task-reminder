@@ -197,3 +197,8 @@ create policy tasks_update on public.work_tasks for update to authenticated
 -- 함수 task_active(p_task): 미진행 업무는 단계 변경 불가 (steps_update 정책에 반영)
 -- 미진행 업무는 기본 목록(미완료)과 정기 알림에서 제외, 상태 필터 '미진행'에서 조회, '진행 재개'로 되돌림
 -- 처리/재개 시 담당자 전원에게 텔레그램 알림
+
+-- 본점/지점/통합 구분 (필수). 기존 업무는 모두 '본점'으로 처리
+alter table public.work_tasks add column if not exists scope text not null default '본점';
+alter table public.work_tasks add constraint work_tasks_scope_chk check (scope in ('본점','지점','통합'));
+alter table public.work_tasks alter column scope drop default;
