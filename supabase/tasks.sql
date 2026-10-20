@@ -225,3 +225,6 @@ alter table public.appraisal_cases add column if not exists handling_note text;
 
 -- 감정평가: 대출신청금액(원). 회신 예정일은 사용하지 않음(due_date 컬럼은 남아 있지만 화면에서 안 씀)
 alter table public.appraisal_cases add column if not exists loan_amount bigint check (loan_amount is null or loan_amount >= 0);
+
+-- 감정평가 물건: 건물일 때 대지면적(land_area) 함께 입력 (area = 건물면적)
+alter table public.appraisal_properties add column if not exists land_area numeric(14,2) check (land_area is null or land_area > 0);

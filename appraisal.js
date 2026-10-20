@@ -4,7 +4,7 @@
 const VWORLD_KEY = '77A8D989-2D72-4900-A553-C5CF92742E9C';   // 브이월드 인증키 (NFCF_CRM 과 동일, 도메인 등록 필요)
 const AP_KINDS = {
   '토지':   { area: '토지면적 (㎡)', detail: '비고' },
-  '건물':   { area: '연면적 (㎡)',   detail: '건물명 · 비고' },
+  '건물':   { area: '건물면적 (㎡)', detail: '건물명 · 비고', land: true },
   '집합건물': { area: '전용면적 (㎡)', detail: '동 · 호수' },
 };
 const AP_JIMOK = ['대', '전', '답', '임야', '잡종지', '공장용지', '도로', '구거', '하천', '과수원', '목장용지', '학교용지', '주차장', '주유소용지', '창고용지', '체육용지', '종교용지', '철도용지', '제방', '유지', '수도용지', '공원', '묘지', '양어장', '염전', '광천지', '사적지', '유원지'];
@@ -66,7 +66,7 @@ const apComma = (s) => { const n = apNum(s); return n === null ? '' : n.toLocale
   .apblock{ border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; background:#fbfbfc; }
   .apblock .bh{ display:flex; align-items:center; justify-content:space-between; font-weight:800; font-size:14px; margin-bottom:6px; }
   .apblock .grid{ display:grid; grid-template-columns:130px 1fr; gap:0 10px; }
-  .apblock .grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:0 10px; }
+  .apblock .grid3{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0 10px; }
   .apres{ border:1px solid var(--line); border-radius:8px; background:#fff; max-height:240px; overflow:auto; margin-top:6px; display:none; }
   .apres .it{ padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--line); font-size:14px; } .apres .it:hover{ background:var(--accent-soft); }
   .apres .it small{ display:block; color:var(--muted); font-size:12px; }
@@ -176,13 +176,13 @@ function renderApDetail(){
   // 다시 그리기 전에, 아직 저장하지 않고 입력 중인 금액(다른 기관 칸)을 보존한다
   const draft = [...$('apDetailPanel').querySelectorAll('[data-k]')].filter(i => i.value !== i.dataset.orig).map(i => [i.dataset.k, i.value]);
   const unit = (p) => p.kind === '토지' ? '토지' : p.kind === '건물' ? '연면적' : '전용';
-  const propRows = props.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? `<div class="muted">${esc(p.detail)}</div>` : ''}</td><td>${esc(p.jimok || '-')}</td><td style="text-align:right">${p.area !== null ? `${Number(p.area).toLocaleString('ko-KR')}㎡` : '-'}<div class="muted">${unit(p)}</div></td></tr>`).join('');
+  const propRows = props.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? `<div class="muted">${esc(p.detail)}</div>` : ''}</td><td>${esc(p.jimok || '-')}</td><td style="text-align:right">${p.kind === '건물' ? `대지 ${p.land_area !== null && p.land_area !== undefined ? Number(p.land_area).toLocaleString('ko-KR') + '㎡' : '-'}<div>건물 ${p.area !== null ? Number(p.area).toLocaleString('ko-KR') + '㎡' : '-'}</div>` : `${p.area !== null ? `${Number(p.area).toLocaleString('ko-KR')}㎡` : '-'}<div class="muted">${unit(p)}</div>`}</td></tr>`).join('');
   const head = reqs.map(r => {
     const sel = c.chosen_firm_id === r.firm_id;
     return `<th class="f ${sel ? 'chosen' : ''}"><div class="fh"><b>${esc(apFirmName(r.firm_id))}</b>${can ? `<label><input type="radio" name="apChosen" value="${r.firm_id}" ${sel ? 'checked' : ''} data-act="choose"/> 채택</label>` : sel ? '<label>✔ 채택</label>' : ''}</div>
       <input type="date" class="rcv" data-r="${r.id}" value="${esc(r.received_at || '')}" ${can ? '' : 'disabled'} title="가격 수령일"/></th>`;
   }).join('');
-  const body = props.map((p, i) => `<tr><td>${i + 1}. ${esc(p.address)}<div class="muted">${esc(p.kind)}${p.area !== null ? ` · ${Number(p.area).toLocaleString('ko-KR')}㎡` : ''}</div></td>${reqs.map(r => {
+  const body = props.map((p, i) => `<tr><td>${i + 1}. ${esc(p.address)}<div class="muted">${esc(p.kind)}${p.kind === '건물' && p.land_area ? ` · 대지 ${Number(p.land_area).toLocaleString('ko-KR')}㎡` : ''}${p.area !== null ? ` · ${p.kind === '건물' ? '건물 ' : ''}${Number(p.area).toLocaleString('ko-KR')}㎡` : ''}</div></td>${reqs.map(r => {
     const v = apReqSum(r, props).map.get(p.id);
     return `<td class="c ${c.chosen_firm_id === r.firm_id ? 'chosen' : ''}"><input class="amt" inputmode="numeric" data-r="${r.id}" data-p="${p.id}" data-k="a:${r.id}:${p.id}" placeholder="${can ? '원 단위' : ''}" value="${v === undefined ? '' : v.toLocaleString('ko-KR')}" data-orig="${v === undefined ? '' : v.toLocaleString('ko-KR')}" ${can ? '' : 'disabled'}/><div class="hint">${v === undefined ? '' : apWon(v)}</div></td>`;
   }).join('')}</tr>`).join('');
@@ -380,6 +380,7 @@ function apCloseForm(){ $('apFormOv').style.display = 'none'; apFormId = null; d
 function apRenumber(){ document.querySelectorAll('#apfProps .apblock').forEach((b, i) => { b.querySelector('.bn').textContent = `물건 ${i + 1}`; }); }
 function apKindSync(blk){
   const k = AP_KINDS[blk.querySelector('.pk').value];
+  blk.querySelector('.lwc').style.display = k.land ? '' : 'none';
   blk.querySelector('.la').textContent = k.area; blk.querySelector('.ld').textContent = k.detail;
   blk.querySelector('.pj').placeholder = blk.querySelector('.pk').value === '토지' ? '필수' : '선택';
 }
@@ -393,12 +394,12 @@ function apAddPropBlock(p){
         <div class="apres"></div></div></div>
     <input class="pa apaddr" placeholder="↑ 검색해서 주소를 선택하세요" readonly style="margin-top:8px" />
     <div class="apst"></div>
-    <div class="grid3"><div><label>지목</label><input class="pj" list="apJimokDl" /></div><div><label class="la">면적</label><input class="pr" inputmode="decimal" /></div><div><label class="ld">비고</label><input class="pd" maxlength="80" /></div></div>`;
+    <div class="grid3"><div><label>지목</label><input class="pj" list="apJimokDl" /></div><div class="lwc"><label>대지면적 (㎡)</label><input class="pl" inputmode="decimal" /></div><div><label class="la">면적</label><input class="pr" inputmode="decimal" /></div><div><label class="ld">비고</label><input class="pd" maxlength="80" /></div></div>`;
   $('apfProps').appendChild(blk);
   if (!$('apJimokDl')){ const dl = document.createElement('datalist'); dl.id = 'apJimokDl'; dl.innerHTML = AP_JIMOK.map(j => `<option value="${j}">`).join(''); document.body.appendChild(dl); }
   if (p){
     blk.querySelector('.pk').value = p.kind; blk.querySelector('.pa').value = p.address; blk.dataset.verified = '1'; blk.dataset.pnu = p.pnu || '';
-    blk.querySelector('.pj').value = p.jimok || ''; blk.querySelector('.pr').value = p.area === null ? '' : p.area; blk.querySelector('.pd').value = p.detail || '';
+    blk.querySelector('.pj').value = p.jimok || ''; blk.querySelector('.pl').value = p.land_area === null || p.land_area === undefined ? '' : p.land_area; blk.querySelector('.pr').value = p.area === null ? '' : p.area; blk.querySelector('.pd').value = p.detail || '';
   }
   apKindSync(blk); apRenumber();
 }
@@ -427,6 +428,9 @@ $('apFormPanel').addEventListener('click', async (e) => {
     if (kind === '토지'){
       if (land.jimok && !blk.querySelector('.pj').value){ blk.querySelector('.pj').value = land.jimok; filled.push('지목'); }
       if (land.area !== null && !blk.querySelector('.pr').value){ blk.querySelector('.pr').value = land.area; filled.push('면적'); }
+    } else if (kind === '건물'){
+      if (land.jimok && !blk.querySelector('.pj').value){ blk.querySelector('.pj').value = land.jimok; filled.push('지목'); }
+      if (land.area !== null && !blk.querySelector('.pl').value){ blk.querySelector('.pl').value = land.area; filled.push('대지면적'); }
     } else if (land.jimok && !blk.querySelector('.pj').value){ blk.querySelector('.pj').value = land.jimok; filled.push('지목'); }
     st.className = 'apst ok';
     st.textContent = filled.length ? `✔ 확인된 주소 · ${filled.join('·')} 자동 입력됨 (다르면 직접 고쳐주세요)` : `✔ 확인된 주소 · 지목·면적은 자동조회가 되지 않아 직접 입력해주세요${land.note ? ` (${land.note})` : ''}`;
@@ -458,8 +462,13 @@ async function apSaveForm(){
     if (!addr || b.dataset.verified !== '1') return alert(`물건 ${i + 1}: 소재지를 검색해서 확인된 주소를 선택해주세요.`);
     if (kind === '토지' && !jimok) return alert(`물건 ${i + 1}: 지목을 입력해주세요.`);
     const area = areaS === '' ? null : Number(areaS.replace(/,/g, ''));
-    if (area === null || isNaN(area) || area <= 0) return alert(`물건 ${i + 1}: 면적(㎡)을 숫자로 입력해주세요.`);
-    props.push({ id: b.dataset.id ? +b.dataset.id : null, seq: i + 1, kind, address: addr, pnu: b.dataset.pnu || null, jimok: jimok || null, area, detail: b.querySelector('.pd').value.trim() || null });
+    if (area === null || isNaN(area) || area <= 0) return alert(`물건 ${i + 1}: ${kind === '건물' ? '건물면적' : '면적'}(㎡)을 숫자로 입력해주세요.`);
+    let landArea = null;
+    if (kind === '건물'){
+      landArea = Number(b.querySelector('.pl').value.trim().replace(/,/g, ''));
+      if (!landArea || isNaN(landArea) || landArea <= 0) return alert(`물건 ${i + 1}: 대지면적(㎡)을 숫자로 입력해주세요.`);
+    }
+    props.push({ id: b.dataset.id ? +b.dataset.id : null, seq: i + 1, kind, address: addr, pnu: b.dataset.pnu || null, jimok: jimok || null, area, land_area: landArea, detail: b.querySelector('.pd').value.trim() || null });
   }
   const firms = [...document.querySelectorAll('#apFirmList input:checked')].map(i => +i.value);
   const notify = [...document.querySelectorAll('#apNotifyList input:checked')].map(i => i.value);
