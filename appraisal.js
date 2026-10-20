@@ -602,7 +602,7 @@ function apReportHtml(c){
   .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}.top .ttl{flex:1;text-align:center;padding-top:6px}.top .sp{width:190px}
   h1{font-size:22px;margin:0 0 4px;letter-spacing:2px}.sub{color:#555;font-size:12px}
   .sign{border-collapse:collapse;width:190px;table-layout:fixed}.sign td,.sign th{border:1px solid #333;text-align:center;font-size:11px;padding:0}.sign th{height:20px;background:#f3f3f3}.sign td{height:46px}
-  h2{font-size:14px;margin:18px 0 6px;padding-left:8px;border-left:4px solid #333}
+  h2{font-size:14px;margin:18px 0 6px;padding-left:8px;border-left:4px solid #333}.h2u{display:flex;justify-content:space-between;align-items:baseline}.h2u .unit{font-size:12px;font-weight:400;color:#444}
   table.t{width:100%;border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:5px 8px;vertical-align:middle;word-break:keep-all}
   table.t th{background:#eee;font-weight:700;text-align:center}table.t td.k{background:#f3f3f3;font-weight:700;text-align:center;white-space:nowrap;width:1%}
   .nw{white-space:nowrap}.r{text-align:right}.c{text-align:center}.b{font-weight:700}.m{color:#666;font-size:11px;font-weight:400}.sel{background:#fff6d6 !important}
@@ -618,10 +618,10 @@ function apReportHtml(c){
   ${c.memo ? `<tr><td class="k">메모</td><td colspan="3" style="white-space:pre-wrap">${esc(c.memo)}</td></tr>` : ''}</table>
   <h2>1. 물건 내역 (${props.length}건)</h2>
   <table class="t"><thead><tr><th class="nw">번호</th><th class="nw">구분</th><th>소재지</th><th class="nw">지목</th><th class="nw">대지·토지(㎡)</th><th class="nw">건물·전용(㎡)</th></tr></thead><tbody>${propRows}</tbody></table>
-  <h2>2. 평가기관별 평가금액 (단위: 원)</h2>
+  <h2 class="h2u"><span>2. 평가기관별 평가금액</span><span class="unit">(단위: 원)</span></h2>
   ${reqs.length ? `<table class="t price"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td class="b">합계</td>${total}</tr><tr><td class="b nw">가격 수령일</td>${recv}</tr>${hasNote ? `<tr><td class="b nw">특이사항</td>${notes}</tr>` : ''}</tbody></table>${foot ? `<div class="note">${foot}</div>` : ''}` : '<div>의뢰한 평가기관이 없습니다.</div>'}
   <div class="box">${summary}</div>
-  <div class="foot">출력일 ${esc(kstToday())} · ${esc(nameOf(me))} · 할일요정</div></body></html>`;
+  </body></html>`;
 }
 function apPrint(c){ apPreview(apReportHtml(c), '결과 보고서', `보고서_${apCaseNo(c)}`); }
 
