@@ -110,7 +110,8 @@ async function loadAppraisal(){
     sb.from('appraisal_firms').select('*').order('sort'),
   ]);
   if (c.error || f.error){ console.warn('감정평가 불러오기 실패', c.error || f.error); return; }
-  apCases = c.data || []; apFirms = f.data || [];
+  apCases = (c.data || []).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || b.id - a.id);   // 최근 등록이 맨 위
+  apFirms = f.data || [];
   apBadge();
   if (divn === 'appraisal') renderAppraisal();
   if (apOpenId && !(document.activeElement && $('apDetailOv').contains(document.activeElement) && /INPUT/.test(document.activeElement.tagName))) renderApDetail();
@@ -215,7 +216,7 @@ function renderApDetail(){
       ${reqs.length && props.length ? `<div class="apm"><table class="apt"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td><b>전체금액만 입력</b><div class="muted">물건별 금액 없이 총액만 받은 경우</div></td>${tinp}</tr><tr class="tot"><td>합계</td>${tot}</tr><tr><td><b>특이사항</b><div class="muted">기관별 코멘트</div></td>${notes}</tr><tr><td></td>${save}</tr></tbody></table></div>` : '<div class="blk-empty">의뢰한 평가기관이나 물건이 없어요. 수정에서 추가해주세요.</div>'}
       ${can && c.chosen_firm_id ? '<div style="margin-top:8px"><button class="btn small" data-act="unchoose">채택 해제 (가격만 조회)</button></div>' : ''}
     </div>
-    <div class="foot" style="margin-top:22px">${can ? `<button class="btn" data-act="edit">✏ 수정</button><button class="btn" data-act="${c.archived_at ? 'unarchive' : 'archive'}">${c.archived_at ? '↩ 보관함에서 꺼내기' : '📦 보관함으로 이동'}</button>${(c.created_by === me || isAdmin()) ? '<button class="btn danger" data-act="del">삭제</button>' : ''}` : '<span class="muted">👀 감정평가 권한이 없어 보기만 할 수 있어요.</span>'}</div>`;
+    <div class="foot" style="margin-top:22px"><button class="btn" data-act="print">🖨 보고서 인쇄</button>${can ? `<button class="btn" data-act="edit">✏ 수정</button><button class="btn" data-act="${c.archived_at ? 'unarchive' : 'archive'}">${c.archived_at ? '↩ 보관함에서 꺼내기' : '📦 보관함으로 이동'}</button>${(c.created_by === me || isAdmin()) ? '<button class="btn danger" data-act="del">삭제</button>' : ''}` : '<span class="muted">👀 감정평가 권한이 없어 보기만 할 수 있어요.</span>'}</div>`;
   draft.sort((a, b) => (a[0][0] === 't') - (b[0][0] === 't')).forEach(([k, val]) => {
     const inp = $('apDetailPanel').querySelector(`[data-k="${k}"]`);
     if (inp && !inp.disabled && inp.value !== val){ inp.value = val; inp.dispatchEvent(new Event('input', { bubbles: true })); }
@@ -250,6 +251,7 @@ $('apDetailPanel').addEventListener('click', async (e) => {
   const act = b.dataset.act;
   if (act === 'close') return apCloseDetail();
   if (act === 'edit') return apOpenForm(c.id);
+  if (act === 'print') return apPrint(c);
   if (act === 'archive' || act === 'unarchive'){
     if (act === 'archive'){
       const wait = apReqs(c).filter(r => !apReqSum(r, apProps(c)).done).length;
@@ -556,3 +558,53 @@ document.addEventListener('click', async (e) => {
   }
   loadAppraisal();
 });
+
+
+// ---------- 보고서 인쇄 ----------
+function apReportHtml(c){
+  const props = apProps(c), reqs = apReqs(c), n = (v) => Number(v).toLocaleString('ko-KR');
+  const sums = reqs.map(r => apReqSum(r, props));
+  const chosenIdx = reqs.findIndex(r => r.firm_id === c.chosen_firm_id);
+  const num = (v) => (v === null || v === undefined || v === '') ? '-' : n(v);
+  const propRows = props.map((p, i) => `<tr><td class="c">${i + 1}</td><td class="c">${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? `<br><span class="m">${esc(p.detail)}</span>` : ''}</td><td class="c">${esc(p.jimok || '-')}</td>
+    <td class="r">${p.kind === '건물' ? num(p.land_area) : (p.kind === '토지' ? num(p.area) : '-')}</td><td class="r">${p.kind === '토지' ? '-' : num(p.area)}</td></tr>`).join('');
+  const head = reqs.map((r, i) => `<th class="${i === chosenIdx ? 'sel' : ''}">${esc(apFirmName(r.firm_id))}${i === chosenIdx ? '<br><span class="m">★ 채택</span>' : ''}</th>`).join('');
+  const body = props.map((p, i) => `<tr><td>${i + 1}. ${esc(p.address)}</td>${reqs.map((r, k) => { const v = sums[k].map.get(p.id); return `<td class="r ${k === chosenIdx ? 'sel' : ''}">${v === undefined ? '-' : n(v)}</td>`; }).join('')}</tr>`).join('');
+  const total = reqs.map((r, k) => `<td class="r b ${k === chosenIdx ? 'sel' : ''}">${sums[k].mode === 'none' ? '-' : n(sums[k].total)}${sums[k].mode === 'total' ? '<br><span class="m">(총액만 접수)</span>' : ''}${sums[k].mode !== 'none' ? `<br><span class="m">${esc(apWon(sums[k].total))}</span>` : ''}</td>`).join('');
+  const recv = reqs.map((r, k) => `<td class="c ${k === chosenIdx ? 'sel' : ''}">${esc(r.received_at || '-')}</td>`).join('');
+  const notes = reqs.map((r, k) => `<td class="${k === chosenIdx ? 'sel' : ''}" style="white-space:pre-wrap">${esc(r.note || '')}</td>`).join('');
+  const ch = chosenIdx >= 0 ? sums[chosenIdx] : null;
+  const priced = sums.filter(s => s.mode !== 'none').map(s => s.total);
+  const summary = ch && ch.mode !== 'none'
+    ? `채택: <b>${esc(apFirmName(reqs[chosenIdx].firm_id))}</b> — 평가금액 합계 <b>${n(ch.total)}원</b> (${esc(apWon(ch.total))})`
+    : priced.length ? `채택 없음 (가격 조회용) — 평가금액 ${n(Math.min(...priced))}원 ~ ${n(Math.max(...priced))}원` : '평가금액 미접수';
+  const css = `@page{size:A4;margin:16mm 14mm}*{box-sizing:border-box}body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#111;font-size:12px;line-height:1.5;margin:0}
+  h1{font-size:22px;text-align:center;margin:0 0 4px;letter-spacing:2px}.sub{text-align:center;color:#555;margin-bottom:14px;font-size:12px}
+  .sign{float:right;border-collapse:collapse;margin:0 0 10px 10px}.sign td,.sign th{border:1px solid #333;width:58px;height:22px;text-align:center;font-size:11px;padding:0}.sign td{height:44px}
+  h2{font-size:14px;margin:18px 0 6px;padding-left:8px;border-left:4px solid #333}
+  table.t{width:100%;border-collapse:collapse;table-layout:auto}table.t th,table.t td{border:1px solid #444;padding:5px 7px;vertical-align:middle}
+  table.t th{background:#eee;font-weight:700;text-align:center}table.t td.k{background:#f3f3f3;font-weight:700;width:15%;text-align:center}
+  .r{text-align:right}.c{text-align:center}.b{font-weight:700}.m{color:#666;font-size:10.5px;font-weight:400}.sel{background:#fff6d6 !important}
+  .box{border:2px solid #333;padding:9px 12px;margin-top:14px;font-size:13px}.clear{clear:both}tr{page-break-inside:avoid}
+  .foot{margin-top:18px;color:#666;font-size:10.5px;text-align:right}`;
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>감정평가 결과 보고서 - ${esc(c.debtor_name)}</title><style>${css}</style></head><body>
+  <table class="sign"><tr><th>담당</th><th>검토</th><th>결재</th></tr><tr><td></td><td></td><td></td></tr></table>
+  <h1>감정평가 결과 보고서</h1><div class="sub">${esc(c.scope)} · ${esc(c.handling_type ? (c.handling_type === '기타' && c.handling_note ? `기타(${c.handling_note})` : c.handling_type) : '')}</div><div class="clear"></div>
+  <table class="t"><tr><td class="k">채무자(예정자)</td><td>${esc(c.debtor_name)}</td><td class="k">구분</td><td>${esc(c.scope)}</td></tr>
+  <tr><td class="k">취급구분</td><td>${esc(apTypeText(c))}</td><td class="k">대출신청금액</td><td>${c.loan_amount === null || c.loan_amount === undefined ? '-' : `${n(c.loan_amount)}원 (${esc(apWon(c.loan_amount))})`}</td></tr>
+  <tr><td class="k">의뢰자</td><td>${esc(nameOf(c.requester_email))}</td><td class="k">의뢰일</td><td>${esc(c.request_date)}</td></tr>
+  ${c.memo ? `<tr><td class="k">메모</td><td colspan="3" style="white-space:pre-wrap">${esc(c.memo)}</td></tr>` : ''}</table>
+  <h2>1. 물건 내역 (${props.length}건)</h2>
+  <table class="t"><thead><tr><th style="width:5%">번호</th><th style="width:11%">구분</th><th>소재지</th><th style="width:10%">지목</th><th style="width:13%">대지·토지면적(㎡)</th><th style="width:13%">건물·전용면적(㎡)</th></tr></thead><tbody>${propRows}</tbody></table>
+  <h2>2. 평가기관별 평가금액 (단위: 원)</h2>
+  ${reqs.length ? `<table class="t"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td class="b">합계</td>${total}</tr><tr><td class="b">가격 수령일</td>${recv}</tr><tr><td class="b">특이사항</td>${notes}</tr></tbody></table>` : '<div>의뢰한 평가기관이 없습니다.</div>'}
+  <div class="box">${summary}</div>
+  <div class="foot">출력일 ${esc(kstToday())} · ${esc(nameOf(me))} · 할일요정</div></body></html>`;
+}
+function apPrint(c){
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  f.srcdoc = apReportHtml(c);
+  f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { alert('인쇄 창을 열지 못했어요: ' + e.message); } setTimeout(() => f.remove(), 60000); };
+  document.body.appendChild(f);
+}
