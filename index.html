@@ -391,6 +391,17 @@
   .trow .av.done::after{ width:16px; height:16px; line-height:16px; font-size:10px; right:-4px; bottom:-4px; }
   @media (max-width:900px){ .trow{ grid-template-columns:auto minmax(0,1fr) auto; } }
   @media (max-width:760px){ .trow .av{ width:34px; height:34px; font-size:13px; margin-left:-8px; } .trow .avs{ padding-left:8px; } }
+
+  /* 상단 내 프로필 / 상세 창 담당자 사진 확대 */
+  .whoBtn{ gap:10px; padding:3px 12px 3px 3px; font-size:14.5px; font-weight:700; }
+  .whoBtn .av{ width:44px; height:44px; font-size:17px; margin:0; border-width:2px; }
+  .asg .av{ width:44px; height:44px; font-size:16px; margin:0; }
+  .asg{ min-height:54px; gap:12px; }
+  .asgs{ display:flex; flex-wrap:wrap; gap:10px 18px; }
+  .asgc{ display:inline-flex; align-items:center; gap:10px; font-size:15px; font-weight:600; }
+  .asgc .av{ width:44px; height:44px; font-size:16px; margin:0; }
+  .asg .av.done::after{ width:17px; height:17px; line-height:17px; font-size:11px; }
+  @media (max-width:760px){ .whoBtn .av{ width:40px; height:40px; font-size:15px; } .asg .av,.asgc .av{ width:40px; height:40px; font-size:15px; } }
 </style>
 </head>
 <body>
@@ -654,7 +665,7 @@
   }
 
   function renderWho(){
-    $('who').innerHTML = avHtml(me, '', 'margin:0;width:30px;height:30px;font-size:13px;border-color:rgba(255,255,255,.75)') + `<span class="wn">${esc(nameOf(me))}</span>`;
+    $('who').innerHTML = avHtml(me, '', 'margin:0') + `<span class="wn">${esc(nameOf(me))}</span>`;
   }
 
   // ---------- 텔레그램 ----------
@@ -950,7 +961,7 @@
         ${canAct(t) && !dropped ? `<div class="acts">${cur ? `<button class="btn primary" data-d="step:${cur.seq}">✔ ${esc(cur.name)} 완료</button>` : ''}
         ${lastDone && canUndoStep(t, lastDone) ? `<button class="btn" data-d="undo:${lastDone.seq}">↩ ${esc(lastDone.name)} 되돌리기</button>` : ''}
         ${cur ? `<button class="btn danger" data-d="drop">⛔ 미진행 처리</button>` : ''}</div>` : ''}</div>`;
-      body += `<div class="kv"><div class="k">담당자</div><div class="v">${esc(t.work_task_assignees.map(a => nameOf(a.email)).join(', '))}</div></div>`;
+      body += `<div class="kv"><div class="k">담당자</div><div class="v asgs">${t.work_task_assignees.map(a => `<span class="asgc">${avHtml(a.email, '', 'margin:0')}${esc(nameOf(a.email))}</span>`).join('')}</div></div>`;
     } else {
       body += `<div class="kv"><div class="k">담당자별 진행</div>${t.work_task_assignees.map(a => `<div class="asg ${a.done_at ? 'ok' : ''}">
         <input type="checkbox" ${a.done_at ? 'checked' : ''} ${a.email === me && canAct(t) ? '' : 'disabled'} data-d="chk:${esc(a.email)}" />
@@ -1453,6 +1464,6 @@
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
-<script src="appraisal.js?v=32"></script>
+<script src="appraisal.js?v=33"></script>
 </body>
 </html>
