@@ -203,3 +203,11 @@ alter table public.work_tasks add column if not exists scope text not null defau
 alter table public.work_tasks add constraint work_tasks_scope_chk check (scope in ('본점','지점','통합'));
 alter table public.work_tasks alter column scope drop default;
 grant update (scope) on public.work_tasks to authenticated;
+
+-- 감정평가 관리 (적용 완료). 상태 구분 없음: 의뢰 등록 → 평가기관별 가격 입력 → (선택) 채택
+alter table public.team_members add column if not exists perm_appraisal boolean not null default false;
+grant update (perm_appraisal) on public.team_members to authenticated;
+-- has_appraisal(): 관리자 또는 perm_appraisal. appraisal_firms(관리자만 수정) / appraisal_cases / appraisal_properties /
+-- appraisal_requests(건×평가기관) / appraisal_prices(의뢰×물건, 원 단위) — 조회는 팀원 전체, 쓰기는 has_appraisal(), 건 삭제는 등록자·관리자.
+-- 평가기관 초기값: 대화, 통일, 나라, 삼창, 하나, 경일, 가온, 태평양, 중앙 (관리자 화면에서 추가·숨김)
+-- 알림: task-notify 이벤트 appraisal_created / appraisal_priced / appraisal_chosen → 건의 notify_emails(체크한 사람)에게만

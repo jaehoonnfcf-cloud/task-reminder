@@ -96,6 +96,7 @@
   .divs button.on{ background:#fff; color:var(--ink); }
   .divs .n{ font-size:11.5px; font-weight:800; margin-left:6px; padding:1px 7px; border-radius:99px; background:rgba(255,255,255,.28); }
   .divs button.on .n{ background:var(--accent-soft); color:var(--accent); }
+  @media (max-width:520px){ .divs{ margin-left:0; max-width:100%; } .divs button{ padding:7px 8px; font-size:13px; } .divs .n{ margin-left:3px; padding:1px 5px; } }
   #app[data-div=deposit]{ background:linear-gradient(135deg,#0f766e 0%,#2563eb 55%,#6d28d9 100%); }
   .pill.ro{ background:#fff3d6; color:#7a4b00; }
 
@@ -106,11 +107,11 @@
   .blk-empty{ padding:16px 18px; color:var(--muted); font-size:13.5px; border-bottom:1px solid var(--line); }
 
   /* 관리자 화면 */
-  .arow{ display:grid; grid-template-columns:minmax(0,1.6fr) repeat(3, auto) auto; gap:10px 16px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
+  .arow{ display:grid; grid-template-columns:minmax(0,1.6fr) repeat(4, auto) auto; gap:10px 16px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
   .arow .nm{ font-weight:700; } .arow .nm .muted{ font-weight:400; word-break:break-all; }
   .arow .chk{ font-size:13.5px; }
   .arow .btns{ display:flex; gap:6px; }
-  .ahead{ display:grid; grid-template-columns:minmax(0,1.6fr) repeat(3, auto) auto; gap:10px 16px; font-size:12px; font-weight:700; color:var(--muted); padding-bottom:6px; border-bottom:1px solid var(--line); }
+  .ahead{ display:grid; grid-template-columns:minmax(0,1.6fr) repeat(4, auto) auto; gap:10px 16px; font-size:12px; font-weight:700; color:var(--muted); padding-bottom:6px; border-bottom:1px solid var(--line); }
   .ahead span:nth-child(n+2):nth-child(-n+4){ min-width:48px; }
 
   /* 사진 아바타 */
@@ -123,7 +124,7 @@
   .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#172b4d; color:#fff; padding:12px 18px; border-radius:12px; font-size:14px; font-weight:600; z-index:60; box-shadow:0 8px 24px rgba(9,30,66,.4); max-width:90vw; text-align:center; cursor:pointer; }
 
   /* 개인업무 (나만 보기) */
-  #shared,#personal{ display:flex; flex-direction:column; gap:14px; min-width:0; }
+  #shared,#personal,#appraisal{ display:flex; flex-direction:column; gap:14px; min-width:0; }
   #app[data-div=personal]{ background:linear-gradient(135deg,#9d174d 0%,#7c3aed 55%,#2563eb 100%); }
   .quick{ display:flex; gap:8px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
   .quick input[type=text]{ flex:1; min-width:170px; }
@@ -229,7 +230,7 @@
   @media (max-width:760px){
     .bar{ padding:8px 12px; padding-top:max(8px, env(safe-area-inset-top)); gap:8px; flex-wrap:wrap; }
     .divs{ order:5; flex-basis:100%; margin-left:0; } .divs button{ flex:1; }
-    .arow,.ahead{ grid-template-columns:1fr 1fr 1fr; } .arow .nm{ grid-column:1 / -1; } .arow .btns{ grid-column:1 / -1; } .ahead{ display:none; }
+    .arow,.ahead{ grid-template-columns:1fr 1fr 1fr 1fr; } .arow .nm{ grid-column:1 / -1; } .arow .btns{ grid-column:1 / -1; } .ahead{ display:none; }
     .whoBtn .wn{ display:none; } .whoBtn{ padding:3px; }
     .logo{ font-size:17px; }
     .pill{ font-size:12px; padding:5px 9px; }
@@ -253,6 +254,7 @@
     <div class="divs" id="divBtns">
       <button data-div="credit">여신업무<span class="n" id="nCredit"></span></button>
       <button data-div="deposit">수신/기타<span class="n" id="nDeposit"></span></button>
+      <button data-div="appraisal">🏛 감정평가<span class="n" id="nAppraisal"></span></button>
       <button data-div="personal">🔒 개인업무<span class="n" id="nPersonal"></span></button>
     </div>
     <span class="spacer"></span>
@@ -282,6 +284,7 @@
       <div id="list"></div>
     </div>
     </div>
+    <div id="appraisal"></div>
     <div id="personal" style="display:none">
       <div id="ptiles"></div>
       <div class="list-panel">
@@ -354,6 +357,7 @@
   <div class="ph"><h2>⚙ 관리자 · 담당자 관리</h2><button class="x" id="aClose">✕</button></div>
   <div class="kv"><div class="k">담당자 목록 · 체크하면 바로 저장됩니다 (권한이 없는 구분은 보기만 가능)</div>
     <div id="aList"></div></div>
+  <div class="kv" style="margin-top:24px"><div class="k">감정평가기관 목록 · 숨김으로 하면 새 의뢰에서 선택되지 않습니다</div><div id="aFirms"></div></div>
   <div class="kv" style="margin-top:24px"><div class="k">＋ 담당자 등록</div>
     <div class="row"><input id="aName" placeholder="이름 (예: 홍길동)" maxlength="30" /><input id="aEmail" type="email" placeholder="로그인 이메일" /></div>
     <div class="row" style="margin-top:8px"><input id="aPw" type="text" placeholder="초기 비밀번호 (8자 이상)" autocomplete="off" /></div>
@@ -419,7 +423,7 @@
   const REQUESTERS = ['상무', '과장'];   // 요청자 선택 목록 (추가하려면 여기에 이름을 넣으세요)
   const PALETTE = ['#e2483d', '#d97706', '#1f845a', '#0c66e4', '#8250df', '#c9348c', '#0f7a8a', '#5e6c84'];
 
-  const DIVS = { credit: '여신업무', deposit: '수신/기타' };
+  const DIVS = { credit: '여신업무', deposit: '수신/기타', appraisal: '감정평가' };
   let me = '', meRow = null, members = [], tasks = [], openId = null, formMode = 'new', editId = null;
   let divn = 'credit', foldOther = false;
   let fType = 'all', fGrp = null, fScope = 'all';     // 구분 필터 / 타일로 고른 그룹
@@ -427,7 +431,7 @@
   try { fType = localStorage.getItem('fType') || 'all'; storedDiv = localStorage.getItem('div'); } catch (e) {}
 
   // 권한: 해당 업무구분의 등록·수정·단계수정 가능 여부 (DB 에서도 같은 규칙으로 막음)
-  const permOf = (d, m) => !!m && (d === 'credit' ? m.perm_credit : m.perm_deposit);
+  const permOf = (d, m) => !!m && (d === 'credit' ? m.perm_credit : d === 'appraisal' ? (m.perm_appraisal || m.is_admin) : m.perm_deposit);
   const canWrite = (d) => permOf(d, meRow);
   const isAdmin = () => !!(meRow && meRow.is_admin);
   const taskDiv = (t) => t.division === 'deposit' ? 'deposit' : 'credit';
@@ -479,12 +483,12 @@
     await reloadMembers();
     renderWho();
     setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
-    divn = storedDiv === 'credit' || storedDiv === 'deposit' || storedDiv === 'personal' ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
-    await loadTelegram(); await loadTasks(); await loadPersonal(); ensureSide(); startRealtime();
+    divn = storedDiv === 'credit' || storedDiv === 'deposit' || storedDiv === 'personal' || storedDiv === 'appraisal' ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
+    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); ensureSide(); startRealtime();
   }
 
   async function reloadMembers(){
-    const { data } = await sb.from('team_members').select('email,name,perm_credit,perm_deposit,is_admin,avatar_v').order('name');
+    const { data } = await sb.from('team_members').select('email,name,perm_credit,perm_deposit,perm_appraisal,is_admin,avatar_v').order('name');
     members = data || [];
     meRow = members.find(m => m.email === me) || meRow;
     await loadAvatars();
@@ -544,9 +548,9 @@
 
   // ---------- 목록 렌더 ----------
   function applyDivUI(){
-    const personal = divn === 'personal';
+    const personal = divn === 'personal', appr = divn === 'appraisal';
     $('app').dataset.div = divn;
-    $('shared').style.display = personal ? 'none' : 'flex'; $('personal').style.display = personal ? 'flex' : 'none';
+    $('shared').style.display = personal || appr ? 'none' : 'flex'; $('personal').style.display = personal ? 'flex' : 'none'; $('appraisal').style.display = appr ? 'flex' : 'none';
     document.querySelectorAll('#divBtns button').forEach(b => b.classList.toggle('on', b.dataset.div === divn));
     const pToday = kstToday(), pDue = ptasks.filter(t => !t.done_at && t.due_date && t.due_date <= pToday).length;
     $('nPersonal').textContent = pDue || ''; $('nPersonal').style.display = pDue ? '' : 'none';
@@ -555,7 +559,7 @@
     $('nCredit').style.display = myOpen('credit') ? '' : 'none'; $('nDeposit').style.display = myOpen('deposit') ? '' : 'none';
     const w = personal || canWrite(divn);
     $('newBtn').style.display = w ? '' : 'none';
-    $('newBtn').textContent = personal ? '＋ 개인 할 일' : '＋ 새 업무';
+    $('newBtn').textContent = personal ? '＋ 개인 할 일' : appr ? '＋ 새 감정평가 의뢰' : '＋ 새 업무';
     $('roPill').style.display = w ? 'none' : '';
     $('adminBtn').style.display = isAdmin() ? '' : 'none';
     $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
@@ -564,6 +568,7 @@
   function render(){
     applyDivUI();
     if (divn === 'personal') return renderPersonal();
+    if (divn === 'appraisal') return renderAppraisal();
     const today = kstToday(), q = $('q').value.trim().toLowerCase(), status = $('status').value, mine = $('mine').checked;
     const effType = divn === 'credit' ? fType : 'all';
     const divTasks = tasks.filter(t => taskDiv(t) === divn);
@@ -688,13 +693,17 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_assignees' }, scheduleReload)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_steps' }, scheduleReload)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, scheduleMembers)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_cases' }, scheduleAp)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_properties' }, scheduleAp)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_requests' }, scheduleAp)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_prices' }, scheduleAp)
         .subscribe();
     } catch (e) { rtChan = null; }
   }
   function stopRealtime(){ try { if (rtChan) sb.removeChannel(rtChan); } catch (e) {} rtChan = null; }
   // 실시간 연결이 끊겨도 놓치지 않도록: 화면에 다시 돌아오면 갱신 + 1분마다 갱신
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && me){ loadTasks(); loadPersonal(); } });
-  setInterval(() => { if (!document.hidden && me) loadTasks(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && me){ loadTasks(); loadPersonal(); loadAppraisal(); } });
+  setInterval(() => { if (!document.hidden && me){ loadTasks(); loadAppraisal(); } }, 60000);
 
   // ---------- 동작 (공통) ----------
   async function completeStep(tid, seq){
@@ -735,6 +744,7 @@
     try { localStorage.setItem('div', divn); } catch (x) {}
     render();
     if (divn === 'personal') loadPersonal();
+    if (divn === 'appraisal') loadAppraisal();
   };
   $('list').addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]');
@@ -870,7 +880,7 @@
   function closeForm(){ $('formOv').style.display = 'none'; editId = null; document.body.style.overflow = $('detailOv').style.display === 'block' ? 'hidden' : ''; }
   $('fClose').onclick = closeForm; $('fCancel').onclick = closeForm;
   $('formOv').addEventListener('click', (e) => { if (e.target === $('formOv')) closeForm(); });
-  $('newBtn').onclick = () => divn === 'personal' ? openPf(null) : openForm('new', null);
+  $('newBtn').onclick = () => divn === 'personal' ? openPf(null) : divn === 'appraisal' ? apOpenForm(null) : openForm('new', null);
 
   $('fSave').onclick = async () => {
     const title = $('fTitle').value.trim();
@@ -1214,6 +1224,7 @@
         <div class="nm" style="display:flex;align-items:center;gap:12px">${avHtml(m.email, '', 'margin:0;width:38px;height:38px;font-size:15px;border-width:0')}<div style="min-width:0">${esc(m.name)}${self ? ' <span class="muted">(나)</span>' : ''}<div class="muted">${esc(m.email)}</div></div></div>
         <label class="chk"><input type="checkbox" data-p="perm_credit" ${m.perm_credit ? 'checked' : ''}/> 여신</label>
         <label class="chk"><input type="checkbox" data-p="perm_deposit" ${m.perm_deposit ? 'checked' : ''}/> 수신/기타</label>
+        <label class="chk"><input type="checkbox" data-p="perm_appraisal" ${m.perm_appraisal ? 'checked' : ''}/> 감정평가</label>
         <label class="chk"><input type="checkbox" data-p="is_admin" ${m.is_admin ? 'checked' : ''} ${self ? 'disabled title="본인의 관리자 권한은 해제할 수 없어요"' : ''}/> 관리자</label>
         <div class="btns"><button class="btn small" data-act="name">이름 수정</button><button class="btn small" data-act="photo">사진</button>${m.avatar_v ? '<button class="btn small" data-act="rmphoto">사진 삭제</button>' : ''}<button class="btn small" data-act="pw">비밀번호</button>${self ? '' : '<button class="btn small danger" data-act="del">삭제</button>'}</div></div>`;
     }).join('') || '<div class="blk-empty">등록된 담당자가 없어요.</div>';
@@ -1274,7 +1285,8 @@
     alert(r.created ? '담당자를 등록했어요. 이메일과 비밀번호를 전달해주세요.' : '이미 있는 계정이라 권한을 갱신했어요.');
   };
 
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
+<script src="appraisal.js?v=2"></script>
 </body>
 </html>

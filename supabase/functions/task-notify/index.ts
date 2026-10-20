@@ -6,6 +6,12 @@ const BOT = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const kstToday = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 
+const won = (n?: number) => {
+  if (n === undefined || n === null) return "-";
+  if (!n) return "0원";
+  const e = Math.floor(n / 1e8), m = Math.floor((n % 1e8) / 1e4), r = n % 1e4;
+  return [e && `${e}억`, m && `${m.toLocaleString("ko-KR")}만`, r && `${r.toLocaleString("ko-KR")}`].filter(Boolean).join(" ") + "원";
+};
 const sc = (v?: string | null) => (v ? `[${v}]` : "");
 async function tg(chatId: number, text: string) {
   await fetch(`https://api.telegram.org/bot${BOT}/sendMessage`, {
@@ -101,6 +107,35 @@ async function handle(req: Request): Promise<Response> {
   if (!me) return new Response("unauthorized", { status: 401 });
   const body = await req.json();
   const { event, task_id, seq } = body;
+
+  // 감정평가 알림: 의뢰 등록 / 가격 입력 / 채택 → 해당 건에서 체크한 사람에게만
+  if (typeof event === "string" && event.startsWith("appraisal_")) {
+    const { data: pm } = await db.from("team_members").select("perm_appraisal, is_admin").eq("email", me).maybeSingle();
+    if (!pm || !(pm.is_admin || pm.perm_appraisal)) return new Response("forbidden", { status: 403 });
+    const { data: c } = await db.from("appraisal_cases")
+      .select("*, appraisal_properties(*), appraisal_requests(*, appraisal_prices(*))").eq("id", body.case_id).single();
+    if (!c) return new Response("not found", { status: 404 });
+    const { data: firms } = await db.from("appraisal_firms").select("id, name");
+    const fname = (id: number) => (firms ?? []).find((f) => f.id === id)?.name ?? "?";
+    const names = await nameMap();
+    const who = (e: string) => names.get(e) ?? e;
+    const props = [...c.appraisal_properties].sort((a: any, b: any) => a.seq - b.seq);
+    const tag = `[감정평가]${sc(c.scope)}`;
+    const to: string[] = c.notify_emails ?? [];
+    if (event === "appraisal_created") {
+      const first = props[0];
+      await notify(to, `📌 ${tag} 새 감정평가 의뢰가 등록됐어요\n채무자: ${c.debtor_name}\n물건 ${props.length}건${first ? ` (${first.address}${props.length > 1 ? ` 외 ${props.length - 1}` : ""})` : ""}\n의뢰기관: ${c.appraisal_requests.map((r: any) => fname(r.firm_id)).join(", ") || "-"}\n의뢰자: ${who(c.requester_email)}님${c.due_date ? `\n회신 예정: ${c.due_date}` : ""}`);
+    } else if (event === "appraisal_priced" || event === "appraisal_chosen") {
+      const req2 = c.appraisal_requests.find((r: any) => r.firm_id === body.firm_id);
+      if (!req2) return new Response("bad request", { status: 400 });
+      const amt = new Map<number, number>(req2.appraisal_prices.map((p: any) => [p.property_id, Number(p.amount)] as [number, number]));
+      const total = props.reduce((s: number, p: any) => s + (amt.get(p.id) ?? 0), 0);
+      const lines = props.map((p: any, i: number) => `  ${i + 1}. ${won(amt.get(p.id))}`).join("\n");
+      if (event === "appraisal_priced") await notify(to, `💰 ${tag} ${c.debtor_name}\n${fname(body.firm_id)} 평가가격이 입력됐어요\n${lines}\n합계 ${won(total)}\n입력: ${who(me)}님`);
+      else await notify(to, `✅ ${tag} ${c.debtor_name}\n${fname(body.firm_id)}을(를) 채택했어요 (합계 ${won(total)})\n처리: ${who(me)}님`);
+    } else return new Response("bad request", { status: 400 });
+    return ok();
+  }
   const { data: task } = await db.from("work_tasks").select("*").eq("id", task_id).single();
   const { data: asg } = await db.from("work_task_assignees").select("email, done_at").eq("task_id", task_id);
   const { data: stepRows } = await db.from("work_task_steps").select("seq, name, done_at").eq("task_id", task_id).order("seq");
