@@ -2,6 +2,8 @@
 // 상태 구분 없이: 의뢰 등록 → 담당자가 평가기관별 가격을 받아 입력 → (선택) 채택
 
 const VWORLD_KEY = '77A8D989-2D72-4900-A553-C5CF92742E9C';   // 브이월드 인증키 (NFCF_CRM 과 동일, 도메인 등록 필요)
+const AP_FONT = "'Pretendard Variable',Pretendard,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif";
+const AP_FONT_LINK = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">';
 const AP_KINDS = {
   '토지':   { area: '토지면적 (㎡)', detail: '비고' },
   '건물':   { area: '건물면적 (㎡)', detail: '건물명 · 비고', land: true },
@@ -596,7 +598,7 @@ function apReportHtml(c){
   const summary = ch && ch.mode !== 'none'
     ? `채택: <b>${esc(nameOfFirm(reqs[chosenIdx]))}</b> — 평가금액 합계 <b>${n(ch.total)}원</b> (${esc(apWon(ch.total))})`
     : priced.length ? `채택 없음 (가격 조회용) — 평가금액 ${n(Math.min(...priced))}원 ~ ${n(Math.max(...priced))}원` : '평가금액 미접수';
-  const css = `@page{size:A4;margin:15mm 13mm}*{box-sizing:border-box}body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#111;font-size:12px;line-height:1.45;margin:0}
+  const css = `@page{size:A4;margin:15mm 13mm}*{box-sizing:border-box}body{font-family:${AP_FONT};color:#111;font-size:12px;line-height:1.45;margin:0}
   .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}.top .ttl{flex:1;text-align:center;padding-top:6px}.top .sp{width:190px}
   h1{font-size:22px;margin:0 0 4px;letter-spacing:2px}.sub{color:#555;font-size:12px}
   .sign{border-collapse:collapse;width:190px;table-layout:fixed}.sign td,.sign th{border:1px solid #333;text-align:center;font-size:11px;padding:0}.sign th{height:20px;background:#f3f3f3}.sign td{height:46px}
@@ -607,7 +609,7 @@ function apReportHtml(c){
   .box{border:2px solid #333;padding:9px 12px;margin-top:14px;font-size:13px}tr{page-break-inside:avoid}
   .note{margin-top:5px;color:#555;font-size:11px}.foot{margin-top:18px;color:#666;font-size:10.5px;text-align:right}
   ${many ? 'table.price th,table.price td{font-size:11px;padding:4px 5px}' : ''}`;
-  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>감정평가 결과 보고서 - ${esc(c.debtor_name)}</title><style>${css}</style></head><body>
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>감정평가 결과 보고서 - ${esc(c.debtor_name)}</title>${AP_FONT_LINK}<style>${css}</style></head><body>
   <div class="top"><div class="sp"></div><div class="ttl"><h1>감정평가 결과 보고서</h1><div class="sub">${esc(c.scope)}${c.handling_type ? ` · ${esc(c.handling_type === '기타' && c.handling_note ? `기타(${c.handling_note})` : c.handling_type)}` : ''}</div></div>
   <table class="sign"><tr><th>담당</th><th>과장</th><th>상무</th></tr><tr><td></td><td></td><td></td></tr></table></div>
   <table class="t"><tr><td class="k">채무자(예정자)</td><td>${esc(c.debtor_name)}</td><td class="k">구분</td><td>${esc(c.scope)}</td></tr>
@@ -690,8 +692,8 @@ $('apFaxPanel').addEventListener('click', (e) => {
   if (!noTo && !ids.length) return alert('수신처를 하나 이상 체크하거나, "수신처 없이 인쇄"를 체크해주세요.');
   const purpose = $('apFaxPurpose').value.trim();
   const pages = ids.length ? ids.map(id => apFaxPage(c, apFirms.find(f => f.id === id) || { name: apFirmName(id), fax: '' }, purpose)) : [apFaxPage(c, null, purpose)];
-  apPreview(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>탁상감정의뢰서 - ${esc(c.debtor_name)}</title><style>
-  @page{size:A4;margin:16mm 14mm}*{box-sizing:border-box}body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#000;font-size:14px;margin:0}
+  apPreview(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>탁상감정의뢰서 - ${esc(c.debtor_name)}</title>${AP_FONT_LINK}<style>
+  @page{size:A4;margin:16mm 14mm}*{box-sizing:border-box}body{font-family:${AP_FONT};color:#000;font-size:14px;margin:0}
   .page{page-break-after:always}.page:last-child{page-break-after:auto}
   .hd{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}h1{font-size:30px;margin:0;display:inline-block;border-bottom:3px solid #000;padding-bottom:2px;letter-spacing:1px}.logo{height:46px;width:auto}
   .to{font-size:15px;margin:2px 0 10px}
@@ -730,7 +732,7 @@ function apPreview(html, title, name){
   $('apPvShare').className = sa ? 'btn primary small' : 'btn glass small';
   $('apPvMsg').textContent = sa ? '홈 화면 앱에서는 바로 인쇄가 안 돼요. "이미지로 공유"를 누른 뒤 공유 창에서 프린트(인쇄) 또는 카카오톡을 선택하세요.' : '';
   $('apPvMsg').style.display = sa ? 'block' : 'none';
-  fr.onload = apPvFit;
+  fr.onload = () => { apPvFit(); try { fr.contentDocument.fonts.ready.then(apPvFit); } catch (e) {} };
   fr.srcdoc = html.replace('</head>', inject + '</head>');
   $('apPvOv').style.display = 'block'; document.body.style.overflow = 'hidden';
   $('apPvOv').scrollTop = 0;
@@ -742,14 +744,15 @@ function apPvFit(){
   const box = $('apPvBox'); box.style.width = Math.round(794 * k) + 'px'; box.style.height = Math.round(h * k) + 'px';
 }
 function apClosePv(){ $('apPvOv').style.display = 'none'; $('apPvFrame').srcdoc = ''; document.body.style.overflow = ($('apDetailOv').style.display === 'block' || $('apFormOv').style.display === 'block') ? 'hidden' : ''; }
-function apPvPrint(){
+async function apPvPrint(){
   const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
-  if (!mobile){ try { $('apPvFrame').contentWindow.focus(); $('apPvFrame').contentWindow.print(); return; } catch (e) {} }
+  if (!mobile){ try { await $('apPvFrame').contentDocument.fonts.ready; $('apPvFrame').contentWindow.focus(); $('apPvFrame').contentWindow.print(); return; } catch (e) {} }
   // 휴대폰: 화면 안의 iframe 은 인쇄가 안 되는 경우가 많아, 새 창에 열어서 인쇄한다
   const w = window.open('', '_blank');
   if (!w){ $('apPvMsg').textContent = '팝업이 차단돼서 인쇄 창을 열 수 없어요. 팝업을 허용하거나, "이미지로 공유"를 이용해주세요.'; $('apPvMsg').style.display = 'block'; return; }
   w.document.open(); w.document.write(apPvHtml); w.document.close();
-  setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 600);
+  const go = () => { try { w.focus(); w.print(); } catch (e) {} };
+  setTimeout(() => { try { w.document.fonts.ready.then(go); } catch (e) { go(); } }, 400);
 }
 function apLoadH2C(){
   if (window.html2canvas) return Promise.resolve();
@@ -761,6 +764,7 @@ async function apPvShare(){
   try {
     await apLoadH2C();
     const fr = $('apPvFrame'), doc = fr.contentDocument;
+    try { await doc.fonts.ready; } catch (e) {}
     let els = [...doc.querySelectorAll('.page')]; if (!els.length) els = [doc.body];
     const files = [];
     for (const [i, el] of els.entries()){
