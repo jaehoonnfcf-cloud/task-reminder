@@ -621,13 +621,7 @@ function apReportHtml(c){
   <div class="box">${summary}</div>
   <div class="foot">출력일 ${esc(kstToday())} · ${esc(nameOf(me))} · 할일요정</div></body></html>`;
 }
-function apPrint(c){
-  const f = document.createElement('iframe');
-  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-  f.srcdoc = apReportHtml(c);
-  f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { alert('인쇄 창을 열지 못했어요: ' + e.message); } setTimeout(() => f.remove(), 60000); };
-  document.body.appendChild(f);
-}
+function apPrint(c){ apPreview(apReportHtml(c), '결과 보고서', `보고서_${apCaseNo(c)}`); }
 
 
 // ---------- 감정평가 의뢰서 (팩스용) ----------
@@ -696,7 +690,7 @@ $('apFaxPanel').addEventListener('click', (e) => {
   if (!noTo && !ids.length) return alert('수신처를 하나 이상 체크하거나, "수신처 없이 인쇄"를 체크해주세요.');
   const purpose = $('apFaxPurpose').value.trim();
   const pages = ids.length ? ids.map(id => apFaxPage(c, apFirms.find(f => f.id === id) || { name: apFirmName(id), fax: '' }, purpose)) : [apFaxPage(c, null, purpose)];
-  apPrintHtml(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>탁상감정의뢰서 - ${esc(c.debtor_name)}</title><style>
+  apPreview(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>탁상감정의뢰서 - ${esc(c.debtor_name)}</title><style>
   @page{size:A4;margin:16mm 14mm}*{box-sizing:border-box}body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#000;font-size:14px;margin:0}
   .page{page-break-after:always}.page:last-child{page-break-after:auto}
   .hd{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}h1{font-size:30px;margin:0;display:inline-block;border-bottom:3px solid #000;padding-bottom:2px;letter-spacing:1px}.logo{height:46px;width:auto}
@@ -705,15 +699,77 @@ $('apFaxPanel').addEventListener('click', (e) => {
   table.items{width:100%;border-collapse:collapse}table.items th,table.items td{border:1px solid #000;padding:4px 8px;white-space:nowrap}table.items td:nth-child(2){white-space:normal}
   table.items th{background:#fff;font-weight:700;text-align:center;border-bottom:2px solid #000}.c{text-align:center}.r{text-align:right}tr{page-break-inside:avoid}
   table.items tr.sum td{font-weight:700;border-top:2px solid #000}.to .fx{font-size:13px;color:#333}.pg{text-align:center;color:#444;font-size:12px;margin-top:16px}.cont{margin-top:8px;color:#444;font-size:12px;text-align:right}.purpose{margin-top:22px;font-size:15px;font-weight:700;white-space:pre-wrap}
-  </style></head><body>${pages.join('')}</body></html>`);
+  </style></head><body>${pages.join('')}</body></html>`, '탁상감정의뢰서', `의뢰서_${apCaseNo(c)}`);
   apCloseFax();
 });
-function apPrintHtml(html){
-  const f = document.createElement('iframe');
-  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-  f.srcdoc = html;
-  f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { alert('인쇄 창을 열지 못했어요: ' + e.message); } setTimeout(() => f.remove(), 60000); };
-  document.body.appendChild(f);
+// ---------- 미리보기 / 인쇄 / 이미지 공유 (PC·휴대폰 공통) ----------
+let apPvHtml = '', apPvName = '', apPvTitle = '';
+(function(){
+  const d = document.createElement('div');
+  d.innerHTML = `<div class="ov" id="apPvOv" style="z-index:40;background:#6b7280;padding:0 0 30px">
+    <div id="apPvBar" style="position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;padding-top:max(10px, env(safe-area-inset-top));background:#1f2937;color:#fff">
+      <b id="apPvT" style="margin-right:auto;font-size:15px"></b>
+      <button class="btn primary small" id="apPvPrint">🖨 인쇄</button>
+      <button class="btn glass small" id="apPvShare">📤 이미지로 공유 (카톡 등)</button>
+      <button class="btn glass small" id="apPvClose">✕ 닫기</button></div>
+    <div id="apPvMsg" style="display:none;padding:8px 14px;background:#fff7d6;color:#7a4b00;font-size:13px"></div>
+    <div id="apPvBox" style="overflow:hidden;margin:12px auto 0"><iframe id="apPvFrame" style="width:794px;border:0;background:#fff;transform-origin:0 0;display:block"></iframe></div></div>`;
+  document.body.appendChild(d);
+  $('apPvClose').onclick = apClosePv;
+  $('apPvPrint').onclick = apPvPrint;
+  $('apPvShare').onclick = apPvShare;
+  window.addEventListener('resize', apPvFit);
+})();
+function apPreview(html, title, name){
+  apPvHtml = html; apPvTitle = title; apPvName = name; $('apPvT').textContent = `📄 ${title} 미리보기`;
+  const inject = '<style>@media screen{html{background:#fff}body{width:794px;margin:0;padding:22px 42px;box-sizing:border-box}.page{padding-bottom:18px;margin-bottom:22px;border-bottom:1px dashed #aaa}.page:last-child{border-bottom:0}}</style>';
+  const fr = $('apPvFrame'); $('apPvMsg').style.display = 'none';
+  fr.onload = apPvFit;
+  fr.srcdoc = html.replace('</head>', inject + '</head>');
+  $('apPvOv').style.display = 'block'; document.body.style.overflow = 'hidden';
+  $('apPvOv').scrollTop = 0;
+}
+function apPvFit(){
+  const fr = $('apPvFrame'); if (!fr.contentDocument || !fr.contentDocument.body) return;
+  const k = Math.min(1, (window.innerWidth - 16) / 794), h = fr.contentDocument.documentElement.scrollHeight;
+  fr.style.height = h + 'px'; fr.style.transform = `scale(${k})`;
+  const box = $('apPvBox'); box.style.width = Math.round(794 * k) + 'px'; box.style.height = Math.round(h * k) + 'px';
+}
+function apClosePv(){ $('apPvOv').style.display = 'none'; $('apPvFrame').srcdoc = ''; document.body.style.overflow = ($('apDetailOv').style.display === 'block' || $('apFormOv').style.display === 'block') ? 'hidden' : ''; }
+function apPvPrint(){
+  const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+  if (!mobile){ try { $('apPvFrame').contentWindow.focus(); $('apPvFrame').contentWindow.print(); return; } catch (e) {} }
+  // 휴대폰: 화면 안의 iframe 은 인쇄가 안 되는 경우가 많아, 새 창에 열어서 인쇄한다
+  const w = window.open('', '_blank');
+  if (!w){ $('apPvMsg').textContent = '팝업이 차단돼서 인쇄 창을 열 수 없어요. 팝업을 허용하거나, "이미지로 공유"를 이용해주세요.'; $('apPvMsg').style.display = 'block'; return; }
+  w.document.open(); w.document.write(apPvHtml); w.document.close();
+  setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 600);
+}
+function apLoadH2C(){
+  if (window.html2canvas) return Promise.resolve();
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'html2canvas.min.js?v=1'; s.onload = res; s.onerror = () => rej(new Error('이미지 도구를 불러오지 못했어요')); document.head.appendChild(s); });
+}
+async function apPvShare(){
+  const btn = $('apPvShare'), msg = $('apPvMsg'), old = btn.textContent;
+  btn.disabled = true; btn.textContent = '이미지 만드는 중…';
+  try {
+    await apLoadH2C();
+    const fr = $('apPvFrame'), doc = fr.contentDocument;
+    let els = [...doc.querySelectorAll('.page')]; if (!els.length) els = [doc.body];
+    const files = [];
+    for (const [i, el] of els.entries()){
+      const cv = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+      const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+      files.push(new File([blob], `${apPvName}${els.length > 1 ? `_${i + 1}` : ''}.png`, { type: 'image/png' }));
+    }
+    if (navigator.canShare && navigator.canShare({ files })){
+      try { await navigator.share({ files, title: apPvTitle }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    files.forEach(f => { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); });
+    msg.textContent = `이미지 ${files.length}장을 저장했어요. 사진/파일 앱에서 카카오톡으로 보내세요.`; msg.style.display = 'block';
+  } catch (e) {
+    msg.textContent = '이미지를 만들지 못했어요: ' + (e.message || e); msg.style.display = 'block';
+  } finally { btn.disabled = false; btn.textContent = old; }
 }
 
 // ---------- 관리자: 회신 연락처 ----------
