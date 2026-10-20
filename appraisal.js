@@ -624,11 +624,6 @@ function apPrint(c){
 
 // ---------- 감정평가 의뢰서 (팩스용) ----------
 const apFmt2 = (v) => Number(v).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-function apPurposeDefault(c){
-  const t = c.handling_type;
-  if (t === '기타') return c.handling_note ? `${c.handling_note} 관련 감정평가의뢰` : '감정평가의뢰';
-  return t ? `${t}${t === '채권관리' ? '를' : '을'} 위한 감정평가의뢰` : '감정평가의뢰';
-}
 function apFaxPage(c, firmName, purpose){
   const props = apProps(c), st = apSettings[c.scope] || { org_name: '', staff_text: '', contact_text: '' };
   const org = st.org_name || '', rows = [];
@@ -642,7 +637,7 @@ function apFaxPage(c, firmName, purpose){
   const bldSum = rows.filter(r => !r.land && r.area).reduce((s, r) => s + Number(r.area), 0);
   const body = rows.map((r, i) => `<tr><td class="c">${i + 1}</td><td>${esc(r.addr)}</td><td class="c">${esc(r.jimok)}</td><td class="r">${r.area === null || r.area === undefined ? '' : apFmt2(r.area)}</td><td class="c">${esc(r.note)}</td></tr>`).join('');
   return `<div class="page">
-    <div class="hd"><h1>탁상감정의뢰서</h1><div class="org">${esc(org)}</div></div>
+    <div class="hd"><h1>탁상감정의뢰서</h1><img class="logo" src="${new URL('logo-sj.png', location.href).href}" alt="${esc(org)}"></div>
     ${firmName ? `<div class="to">수 신 : <b>${esc(firmName)}</b> 귀중</div>` : ''}
     <table class="info">
       <tr><th>발신자</th><td>${esc(org)}(${esc(c.scope)})</td></tr>
@@ -653,40 +648,44 @@ function apFaxPage(c, firmName, purpose){
     <table class="items"><thead><tr><th style="width:8%">기호</th><th>소재지</th><th style="width:13%">지목</th><th style="width:17%">면적(㎡)</th><th style="width:20%">비고</th></tr></thead><tbody>${body}
       <tr class="sum"><td></td><td class="c">${bldSum ? '합 계 (토지)' : '합  계'}</td><td></td><td class="r">${apFmt2(landSum)}</td><td></td></tr>
       ${bldSum ? `<tr class="sum"><td></td><td class="c">합 계 (건물·전용)</td><td></td><td class="r">${apFmt2(bldSum)}</td><td></td></tr>` : ''}</tbody></table>
-    <div class="purpose">${esc(purpose)}</div></div>`;
+    ${purpose ? `<div class="purpose">${esc(purpose)}</div>` : ''}</div>`;
 }
 function apOpenFax(c){
   const reqs = apReqs(c), st = apSettings[c.scope] || {};
   const miss = !st.staff_text && !st.contact_text;
   $('apFaxPanel').innerHTML = `<div class="ph"><h2>📠 감정평가 의뢰서 (팩스)</h2><button class="x" data-fx="close">✕</button></div>
     <div class="apsec" style="margin-top:6px"><div class="k">수신처 (체크한 기관마다 의뢰서가 한 장씩 인쇄됩니다)</div>
-      ${reqs.length ? `<div class="checks" id="apFaxFirms">${reqs.map(r => `<label><input type="checkbox" value="${r.firm_id}" checked/> ${esc(apFirmName(r.firm_id))}</label>`).join('')}</div>` : '<div class="muted">의뢰한 평가기관이 없어 수신처 없이 인쇄돼요.</div>'}</div>
-    <label>하단 문구</label><input id="apFaxPurpose" maxlength="100" value="${esc(apPurposeDefault(c))}" />
+      ${reqs.length ? `<div class="checks" id="apFaxFirms">${reqs.map(r => `<label><input type="checkbox" value="${r.firm_id}" checked/> ${esc(apFirmName(r.firm_id))}</label>`).join('')}</div>` : ''}
+      <div class="checks" style="margin-top:6px"><label><input type="checkbox" id="apFaxNoTo" ${reqs.length ? '' : 'checked'}/> 수신처 없이 인쇄 (수신 표시 없이 1장)</label></div></div>
+    <label>특이사항 (선택)</label><textarea id="apFaxPurpose" rows="3" maxlength="300" placeholder="평가의뢰서에 입력할 내용을 기재하세요"></textarea>
     <div class="apsec"><div class="k">${esc(c.scope)} 회신 연락처</div>
       <div style="font-size:14px">${esc(st.org_name || '')}(${esc(c.scope)})<br>담당자: ${esc(st.staff_text || nameOf(c.requester_email))}<br>연락처: ${esc(st.contact_text || '-')}</div>
       ${miss ? `<div class="apst bad" style="margin-top:6px">${esc(c.scope)} 회신 연락처가 아직 등록되지 않았어요. 관리자 화면 → "의뢰서 회신 연락처"에서 입력해주세요.</div>` : '<div class="muted" style="margin-top:4px">바꾸려면 관리자 화면 → "의뢰서 회신 연락처"</div>'}</div>
     <div class="acts" style="margin-top:18px"><button class="btn primary" data-fx="print" style="min-height:44px;padding:8px 26px">🖨 인쇄</button><button class="btn" data-fx="close" style="min-height:44px">취소</button></div>`;
   $('apFaxPanel').dataset.cid = c.id;
+  document.querySelectorAll('#apFaxFirms input').forEach(i => { i.disabled = $('apFaxNoTo').checked; });
   $('apFaxOv').style.display = 'block';
 }
+$('apFaxPanel').addEventListener('change', (e) => { if (e.target.id === 'apFaxNoTo') document.querySelectorAll('#apFaxFirms input').forEach(i => { i.disabled = e.target.checked; }); });
 function apCloseFax(){ $('apFaxOv').style.display = 'none'; }
 $('apFaxPanel').addEventListener('click', (e) => {
   const b = e.target.closest('[data-fx]'); if (!b) return;
   if (b.dataset.fx === 'close') return apCloseFax();
   const c = apCases.find(x => x.id === +$('apFaxPanel').dataset.cid); if (!c) return;
-  const ids = [...document.querySelectorAll('#apFaxFirms input:checked')].map(i => +i.value);
-  if (apReqs(c).length && !ids.length) return alert('수신처를 하나 이상 체크해주세요.');
-  const purpose = $('apFaxPurpose').value.trim() || apPurposeDefault(c);
+  const noTo = $('apFaxNoTo').checked;
+  const ids = noTo ? [] : [...document.querySelectorAll('#apFaxFirms input:checked')].map(i => +i.value);
+  if (!noTo && !ids.length) return alert('수신처를 하나 이상 체크하거나, "수신처 없이 인쇄"를 체크해주세요.');
+  const purpose = $('apFaxPurpose').value.trim();
   const pages = ids.length ? ids.map(id => apFaxPage(c, apFirmName(id), purpose)) : [apFaxPage(c, '', purpose)];
   apPrintHtml(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>탁상감정의뢰서 - ${esc(c.debtor_name)}</title><style>
   @page{size:A4;margin:16mm 14mm}*{box-sizing:border-box}body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#000;font-size:14px;margin:0}
   .page{page-break-after:always}.page:last-child{page-break-after:auto}
-  .hd{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}h1{font-size:30px;margin:0;display:inline-block;border-bottom:3px solid #000;padding-bottom:2px;letter-spacing:1px}.org{font-size:19px;font-weight:700;color:#1f6f4a}
+  .hd{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}h1{font-size:30px;margin:0;display:inline-block;border-bottom:3px solid #000;padding-bottom:2px;letter-spacing:1px}.logo{height:46px;width:auto}
   .to{font-size:15px;margin:2px 0 10px}
   table.info{border-collapse:collapse;margin-bottom:16px}table.info th{text-align:left;font-weight:700;padding:3px 26px 3px 0;white-space:nowrap;font-size:15px}table.info td{padding:3px 0;font-size:15px}
   table.items{width:100%;border-collapse:collapse}table.items th,table.items td{border:1px solid #000;padding:4px 8px;white-space:nowrap}table.items td:nth-child(2){white-space:normal}
   table.items th{background:#fff;font-weight:700;text-align:center;border-bottom:2px solid #000}.c{text-align:center}.r{text-align:right}tr{page-break-inside:avoid}
-  table.items tr.sum td{font-weight:700;border-top:2px solid #000}.purpose{margin-top:22px;font-size:16px;font-weight:700}
+  table.items tr.sum td{font-weight:700;border-top:2px solid #000}.purpose{margin-top:22px;font-size:15px;font-weight:700;white-space:pre-wrap}
   </style></head><body>${pages.join('')}</body></html>`);
   apCloseFax();
 });
