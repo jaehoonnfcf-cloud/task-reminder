@@ -722,7 +722,9 @@ let apPvHtml = '', apPvName = '', apPvTitle = '';
   $('apPvShare').onclick = apPvShare;
   window.addEventListener('resize', apPvFit);
 })();
-const apStandalone = () => navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+// 인쇄가 막히는 곳은 'iPhone/iPad 의 홈 화면 앱' 뿐이다. PC 에 설치한 앱(크롬·엣지)과 안드로이드는 인쇄가 된다
+const apIos = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+const apStandalone = () => apIos() && (navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
 function apPreview(html, title, name){
   apPvHtml = html; apPvTitle = title; apPvName = name; $('apPvT').textContent = `📄 ${title} 미리보기`;
   const inject = '<style>@media screen{html{background:#fff}body{width:794px;margin:0;padding:22px 42px;box-sizing:border-box}.page{padding-bottom:18px;margin-bottom:22px;border-bottom:1px dashed #aaa}.page:last-child{border-bottom:0}}</style>';
