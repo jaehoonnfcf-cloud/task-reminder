@@ -640,10 +640,10 @@ function apFaxPage(c, firmName, purpose){
     <div class="hd"><h1>탁상감정의뢰서</h1><img class="logo" src="${new URL('logo-sj.png', location.href).href}" alt="${esc(org)}"></div>
     ${firmName ? `<div class="to">수 신 : <b>${esc(firmName)}</b> 귀중</div>` : ''}
     <table class="info">
-      <tr><th>발신자</th><td>${esc(org)}(${esc(c.scope)})</td></tr>
-      <tr><th>의뢰일자</th><td>${esc(c.request_date)}</td></tr>
-      <tr><th>담 당 자</th><td>${esc(st.staff_text || nameOf(c.requester_email))}</td></tr>
-      <tr><th>연락처</th><td>${esc(st.contact_text || '')}</td></tr>
+      <tr><th><span class="l3">발신자</span></th><td>${esc(org)}(${esc(c.scope)})</td></tr>
+      <tr><th><span>의뢰일자</span></th><td>${esc(c.request_date)}</td></tr>
+      <tr><th><span class="l3">담당자</span></th><td>${esc(st.staff_text || nameOf(c.requester_email))}</td></tr>
+      <tr><th><span class="l3">연락처</span></th><td>${esc(st.contact_text || '')}</td></tr>
     </table>
     <table class="items"><thead><tr><th style="width:8%">기호</th><th>소재지</th><th style="width:13%">지목</th><th style="width:17%">면적(㎡)</th><th style="width:20%">비고</th></tr></thead><tbody>${body}
       <tr class="sum"><td></td><td class="c">${bldSum ? '합 계 (토지)' : '합  계'}</td><td></td><td class="r">${apFmt2(landSum)}</td><td></td></tr>
@@ -682,7 +682,7 @@ $('apFaxPanel').addEventListener('click', (e) => {
   .page{page-break-after:always}.page:last-child{page-break-after:auto}
   .hd{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}h1{font-size:30px;margin:0;display:inline-block;border-bottom:3px solid #000;padding-bottom:2px;letter-spacing:1px}.logo{height:46px;width:auto}
   .to{font-size:15px;margin:2px 0 10px}
-  table.info{border-collapse:collapse;margin-bottom:16px}table.info th{text-align:left;font-weight:700;padding:3px 26px 3px 0;white-space:nowrap;font-size:15px}table.info td{padding:3px 0;font-size:15px}
+  table.info{border-collapse:collapse;margin-bottom:16px}table.info th{text-align:left;font-weight:700;padding:3px 22px 3px 0;white-space:nowrap;font-size:15px}table.info th span{display:block;width:4em;white-space:nowrap}table.info th span.l3{letter-spacing:.3334em}table.info td{padding:3px 0;font-size:15px}
   table.items{width:100%;border-collapse:collapse}table.items th,table.items td{border:1px solid #000;padding:4px 8px;white-space:nowrap}table.items td:nth-child(2){white-space:normal}
   table.items th{background:#fff;font-weight:700;text-align:center;border-bottom:2px solid #000}.c{text-align:center}.r{text-align:right}tr{page-break-inside:avoid}
   table.items tr.sum td{font-weight:700;border-top:2px solid #000}.purpose{margin-top:22px;font-size:15px;font-weight:700;white-space:pre-wrap}
