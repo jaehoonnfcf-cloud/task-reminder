@@ -239,3 +239,6 @@ create table if not exists public.appraisal_settings (
   org_name text not null default '', staff_text text not null default '', contact_text text not null default '',
   updated_at timestamptz not null default now());
 -- RLS: appraisal_settings select = is_member(), insert/update = is_admin()
+
+-- 감정평가기관 팩스번호 (의뢰서 수신처에 표시). 의뢰번호는 DB 컬럼 없이 '요청연도-건번호(4자리)'로 계산
+alter table public.appraisal_firms add column if not exists fax text not null default '';

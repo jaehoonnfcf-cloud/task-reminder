@@ -15,6 +15,7 @@ let apQ = '', apMine = false, apScope = 'all', apType = 'all', apView = 'active'
 
 const AP_TYPES = ['신규대출', '기한연장', '채권관리', '기타'];
 const apTypeText = (c) => c.handling_type ? (c.handling_type === '기타' && c.handling_note ? `기타 · ${c.handling_note}` : c.handling_type) : '-';
+const apCaseNo = (c) => `${String(c.request_date || '').slice(0, 4)}-${String(c.id).padStart(4, '0')}`;
 const apCan = () => !!(meRow && (meRow.is_admin || meRow.perm_appraisal));
 
 // ---------- 금액 ----------
@@ -209,6 +210,7 @@ function renderApDetail(){
     <div class="ph"><div><div style="margin-bottom:8px"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> <span class="chip" style="background:#fdf2f8;color:#9d174d">감정평가</span></div><h2>${esc(c.debtor_name)}</h2></div><button class="x" data-act="close">✕</button></div>
     ${c.archived_at ? `<div style="margin-top:12px;padding:9px 12px;border-radius:8px;background:#f1f2f4;font-size:13.5px">📦 보관함 · ${esc(c.archived_at.slice(0, 10))} ${esc(nameOf(c.archived_by))}님이 보관했어요</div>` : ''}
     <div class="apinfo">
+      <div><div class="k">의뢰번호</div><div class="v">${esc(apCaseNo(c))}</div></div>
       <div><div class="k">취급구분</div><div class="v">${esc(apTypeText(c))}</div></div>
       <div><div class="k">의뢰자</div><div class="v">${esc(nameOf(c.requester_email))}</div></div>
       <div><div class="k">의뢰일</div><div class="v">${esc(c.request_date)}</div></div>
@@ -538,7 +540,8 @@ async function apSaveForm(){
 // ---------- 관리자: 평가기관 목록 ----------
 function apRenderFirms(){
   const box = $('aFirms'); if (!box) return;
-  box.innerHTML = `<div class="checks" style="gap:8px">${apFirms.map(f => `<span class="afc ${f.active ? 'ok' : ''}" style="padding:5px 10px" data-f="${f.id}">${esc(f.name)}
+  box.innerHTML = `<div class="checks" style="gap:8px">${apFirms.map(f => `<span class="afc ${f.active ? 'ok' : ''}" style="padding:5px 10px" data-f="${f.id}">${esc(f.name)}${f.fax ? ` <span style="font-weight:500">· 📠 ${esc(f.fax)}</span>` : ''}
+      <a href="#" data-fa="fax" style="margin-left:6px;font-weight:600;color:inherit">${f.fax ? '팩스 수정' : '팩스 입력'}</a>
       <a href="#" data-fa="toggle" style="margin-left:6px;font-weight:600;color:inherit">${f.active ? '숨김' : '사용'}</a>
       <a href="#" data-fa="del" style="margin-left:4px;font-weight:600;color:var(--danger)">삭제</a></span>`).join('')}</div>
     <div class="row" style="margin-top:10px"><input id="aFirmName" placeholder="평가기관 이름 (예: 대화)" maxlength="30" /><button class="btn primary" id="aFirmAdd" style="flex:0 0 auto">＋ 추가</button></div>`;
@@ -554,7 +557,12 @@ document.addEventListener('click', async (e) => {
   const a = e.target.closest('[data-fa]'); if (!a) return;
   e.preventDefault();
   const id = +a.closest('[data-f]').dataset.f, f = apFirms.find(x => x.id === id);
-  if (a.dataset.fa === 'toggle'){
+  if (a.dataset.fa === 'fax'){
+    const v = prompt(`${f.name}의 팩스번호를 입력하세요 (비우면 삭제)`, f.fax || '');
+    if (v === null) return;
+    const { error } = await sb.from('appraisal_firms').update({ fax: v.trim().slice(0, 30) }).eq('id', id);
+    if (error) return alert(error.message);
+  } else if (a.dataset.fa === 'toggle'){
     const { error } = await sb.from('appraisal_firms').update({ active: !f.active }).eq('id', id);
     if (error) return alert(error.message);
   } else {
@@ -624,7 +632,8 @@ function apPrint(c){
 
 // ---------- 감정평가 의뢰서 (팩스용) ----------
 const apFmt2 = (v) => Number(v).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-function apFaxPage(c, firmName, purpose){
+const AP_FAX_ROWS = 20;   // 한 장에 들어가는 물건 줄 수 (넘으면 다음 장으로, 장마다 머리글 반복)
+function apFaxPage(c, firm, purpose){
   const props = apProps(c), st = apSettings[c.scope] || { org_name: '', staff_text: '', contact_text: '' };
   const org = st.org_name || '', rows = [];
   props.forEach(p => {
@@ -635,26 +644,36 @@ function apFaxPage(c, firmName, purpose){
   });
   const landSum = rows.filter(r => r.land && r.area).reduce((s, r) => s + Number(r.area), 0);
   const bldSum = rows.filter(r => !r.land && r.area).reduce((s, r) => s + Number(r.area), 0);
-  const body = rows.map((r, i) => `<tr><td class="c">${i + 1}</td><td>${esc(r.addr)}</td><td class="c">${esc(r.jimok)}</td><td class="r">${r.area === null || r.area === undefined ? '' : apFmt2(r.area)}</td><td class="c">${esc(r.note)}</td></tr>`).join('');
-  return `<div class="page">
-    <div class="hd"><h1>탁상감정의뢰서</h1><img class="logo" src="${new URL('logo-sj.png', location.href).href}" alt="${esc(org)}"></div>
-    ${firmName ? `<div class="to">수 신 : <b>${esc(firmName)}</b> 귀중</div>` : ''}
+  const chunks = []; for (let k = 0; k < rows.length; k += AP_FAX_ROWS) chunks.push(rows.slice(k, k + AP_FAX_ROWS));
+  if (!chunks.length) chunks.push([]);
+  const total = chunks.length, logo = new URL('logo-sj.png', location.href).href;
+  const to = firm ? `<div class="to">수 신 : <b>${esc(firm.name)}</b> 귀중${firm.fax ? ` <span class="fx">(팩스 ${esc(firm.fax)})</span>` : ''}</div>` : '';
+  return chunks.map((chunk, pi) => {
+    const last = pi === total - 1;
+    const body = chunk.map((r, i) => `<tr><td class="c">${pi * AP_FAX_ROWS + i + 1}</td><td>${esc(r.addr)}</td><td class="c">${esc(r.jimok)}</td><td class="r">${r.area === null || r.area === undefined ? '' : apFmt2(r.area)}</td><td class="c">${esc(r.note)}</td></tr>`).join('');
+    return `<div class="page">
+    <div class="hd"><h1>탁상감정의뢰서</h1><img class="logo" src="${logo}" alt="${esc(org)}"></div>
+    ${to}
     <table class="info">
+      <tr><th><span>의뢰번호</span></th><td>${esc(apCaseNo(c))}</td></tr>
       <tr><th><span class="l3">발신자</span></th><td>${esc(org)}(${esc(c.scope)})</td></tr>
       <tr><th><span>의뢰일자</span></th><td>${esc(c.request_date)}</td></tr>
       <tr><th><span class="l3">담당자</span></th><td>${esc(st.staff_text || nameOf(c.requester_email))}</td></tr>
       <tr><th><span class="l3">연락처</span></th><td>${esc(st.contact_text || '')}</td></tr>
     </table>
-    <table class="items"><thead><tr><th style="width:8%">기호</th><th>소재지</th><th style="width:13%">지목</th><th style="width:17%">면적(㎡)</th><th style="width:20%">비고</th></tr></thead><tbody>${body}
+    <table class="items"><thead><tr><th style="width:8%">기호</th><th>소재지</th><th style="width:13%">지목</th><th style="width:17%">면적(㎡)</th><th style="width:20%">비고</th></tr></thead><tbody>${body}${last ? `
       <tr class="sum"><td></td><td class="c">${bldSum ? '합 계 (토지)' : '합  계'}</td><td></td><td class="r">${apFmt2(landSum)}</td><td></td></tr>
-      ${bldSum ? `<tr class="sum"><td></td><td class="c">합 계 (건물·전용)</td><td></td><td class="r">${apFmt2(bldSum)}</td><td></td></tr>` : ''}</tbody></table>
-    ${purpose ? `<div class="purpose">${esc(purpose)}</div>` : ''}</div>`;
+      ${bldSum ? `<tr class="sum"><td></td><td class="c">합 계 (건물·전용)</td><td></td><td class="r">${apFmt2(bldSum)}</td><td></td></tr>` : ''}` : ''}</tbody></table>
+    ${last && purpose ? `<div class="purpose">${esc(purpose)}</div>` : ''}
+    ${!last ? '<div class="cont">※ 다음 장에 계속됩니다.</div>' : ''}
+    <div class="pg">- ${pi + 1} / ${total} -</div></div>`;
+  }).join('');
 }
 function apOpenFax(c){
   const reqs = apReqs(c), st = apSettings[c.scope] || {};
   const miss = !st.staff_text && !st.contact_text;
   $('apFaxPanel').innerHTML = `<div class="ph"><h2>📠 감정평가 의뢰서 (팩스)</h2><button class="x" data-fx="close">✕</button></div>
-    <div class="apsec" style="margin-top:6px"><div class="k">수신처 (체크한 기관마다 의뢰서가 한 장씩 인쇄됩니다)</div>
+    <div class="apsec" style="margin-top:6px"><div class="k">수신처 (체크한 기관마다 의뢰서가 기관마다 따로 인쇄되고, 물건이 많으면 여러 장으로 나뉩니다)</div>
       ${reqs.length ? `<div class="checks" id="apFaxFirms">${reqs.map(r => `<label><input type="checkbox" value="${r.firm_id}" checked/> ${esc(apFirmName(r.firm_id))}</label>`).join('')}</div>` : ''}
       <div class="checks" style="margin-top:6px"><label><input type="checkbox" id="apFaxNoTo" ${reqs.length ? '' : 'checked'}/> 수신처 없이 인쇄 (수신 표시 없이 1장)</label></div></div>
     <label>특이사항 (선택)</label><textarea id="apFaxPurpose" rows="3" maxlength="300" placeholder="평가의뢰서에 입력할 내용을 기재하세요"></textarea>
@@ -676,7 +695,7 @@ $('apFaxPanel').addEventListener('click', (e) => {
   const ids = noTo ? [] : [...document.querySelectorAll('#apFaxFirms input:checked')].map(i => +i.value);
   if (!noTo && !ids.length) return alert('수신처를 하나 이상 체크하거나, "수신처 없이 인쇄"를 체크해주세요.');
   const purpose = $('apFaxPurpose').value.trim();
-  const pages = ids.length ? ids.map(id => apFaxPage(c, apFirmName(id), purpose)) : [apFaxPage(c, '', purpose)];
+  const pages = ids.length ? ids.map(id => apFaxPage(c, apFirms.find(f => f.id === id) || { name: apFirmName(id), fax: '' }, purpose)) : [apFaxPage(c, null, purpose)];
   apPrintHtml(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>탁상감정의뢰서 - ${esc(c.debtor_name)}</title><style>
   @page{size:A4;margin:16mm 14mm}*{box-sizing:border-box}body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#000;font-size:14px;margin:0}
   .page{page-break-after:always}.page:last-child{page-break-after:auto}
@@ -685,7 +704,7 @@ $('apFaxPanel').addEventListener('click', (e) => {
   table.info{border-collapse:collapse;margin-bottom:16px}table.info th{text-align:left;font-weight:700;padding:3px 22px 3px 0;white-space:nowrap;font-size:15px}table.info th span{display:block;width:4em;white-space:nowrap}table.info th span.l3{letter-spacing:.3334em}table.info td{padding:3px 0;font-size:15px}
   table.items{width:100%;border-collapse:collapse}table.items th,table.items td{border:1px solid #000;padding:4px 8px;white-space:nowrap}table.items td:nth-child(2){white-space:normal}
   table.items th{background:#fff;font-weight:700;text-align:center;border-bottom:2px solid #000}.c{text-align:center}.r{text-align:right}tr{page-break-inside:avoid}
-  table.items tr.sum td{font-weight:700;border-top:2px solid #000}.purpose{margin-top:22px;font-size:15px;font-weight:700;white-space:pre-wrap}
+  table.items tr.sum td{font-weight:700;border-top:2px solid #000}.to .fx{font-size:13px;color:#333}.pg{text-align:center;color:#444;font-size:12px;margin-top:16px}.cont{margin-top:8px;color:#444;font-size:12px;text-align:right}.purpose{margin-top:22px;font-size:15px;font-weight:700;white-space:pre-wrap}
   </style></head><body>${pages.join('')}</body></html>`);
   apCloseFax();
 });
