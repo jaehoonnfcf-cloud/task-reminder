@@ -232,3 +232,10 @@ alter table public.appraisal_properties add column if not exists land_area numer
 -- 감정평가 보관함: archived_at 이 있으면 보관함 (진행중 목록·배지에서 제외, 검색은 그대로)
 alter table public.appraisal_cases add column if not exists archived_at timestamptz;
 alter table public.appraisal_cases add column if not exists archived_by text;
+
+-- 감정평가 의뢰서(팩스) 회신 연락처: 본점/지점별 (관리자만 수정, 팀원은 조회)
+create table if not exists public.appraisal_settings (
+  scope text primary key check (scope in ('본점','지점')),
+  org_name text not null default '', staff_text text not null default '', contact_text text not null default '',
+  updated_at timestamptz not null default now());
+-- RLS: appraisal_settings select = is_member(), insert/update = is_admin()

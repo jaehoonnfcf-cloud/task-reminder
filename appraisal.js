@@ -10,7 +10,7 @@ const AP_KINDS = {
 const AP_JIMOK = ['대', '전', '답', '임야', '잡종지', '공장용지', '도로', '구거', '하천', '과수원', '목장용지', '학교용지', '주차장', '주유소용지', '창고용지', '체육용지', '종교용지', '철도용지', '제방', '유지', '수도용지', '공원', '묘지', '양어장', '염전', '광천지', '사적지', '유원지'];
 const AP_JIMOK_ABBR = { '대': '대', '전': '전', '답': '답', '임': '임야', '잡': '잡종지', '공': '공장용지', '도': '도로', '구': '구거', '천': '하천', '과': '과수원', '목': '목장용지', '학': '학교용지', '차': '주차장', '주': '주유소용지', '창': '창고용지', '체': '체육용지', '종': '종교용지', '철': '철도용지', '제': '제방', '수': '수도용지', '원': '공원', '묘': '묘지' };
 
-let apCases = [], apFirms = [], apOpenId = null, apFormId = null, apTimer = null;
+let apCases = [], apFirms = [], apSettings = {}, apOpenId = null, apFormId = null, apTimer = null;
 let apQ = '', apMine = false, apScope = 'all', apType = 'all', apView = 'active';
 
 const AP_TYPES = ['신규대출', '기한연장', '채권관리', '기타'];
@@ -87,10 +87,12 @@ const apComma = (s) => { const n = apNum(s); return n === null ? '' : n.toLocale
   const d = document.createElement('div');
   d.innerHTML = `
   <div class="ov" id="apDetailOv"><div class="panel apPanel" id="apDetailPanel"></div></div>
-  <div class="ov" id="apFormOv"><div class="panel apPanel" id="apFormPanel"></div></div>`;
+  <div class="ov" id="apFormOv"><div class="panel apPanel" id="apFormPanel"></div></div>
+  <div class="ov" id="apFaxOv" style="z-index:30"><div class="panel" id="apFaxPanel" style="max-width:540px"></div></div>`;
   document.body.appendChild(d);
   $('apDetailOv').addEventListener('click', (e) => { if (e.target === $('apDetailOv')) apCloseDetail(); });
   $('apFormOv').addEventListener('click', (e) => { if (e.target === $('apFormOv')) apCloseForm(); });
+  $('apFaxOv').addEventListener('click', (e) => { if (e.target === $('apFaxOv')) apCloseFax(); });
 })();
 
 // ---------- 데이터 ----------
@@ -105,10 +107,12 @@ function apReqSum(r, props){
 }
 
 async function loadAppraisal(){
-  const [c, f] = await Promise.all([
+  const [c, f, st] = await Promise.all([
     sb.from('appraisal_cases').select('*, appraisal_properties(*), appraisal_requests(*, appraisal_prices(*))').order('id', { ascending: false }),
     sb.from('appraisal_firms').select('*').order('sort'),
+    sb.from('appraisal_settings').select('*'),
   ]);
+  if (!st.error) apSettings = Object.fromEntries((st.data || []).map(x => [x.scope, x]));
   if (c.error || f.error){ console.warn('감정평가 불러오기 실패', c.error || f.error); return; }
   apCases = (c.data || []).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || b.id - a.id);   // 최근 등록이 맨 위
   apFirms = f.data || [];
@@ -116,6 +120,7 @@ async function loadAppraisal(){
   if (divn === 'appraisal') renderAppraisal();
   if (apOpenId && !(document.activeElement && $('apDetailOv').contains(document.activeElement) && /INPUT/.test(document.activeElement.tagName))) renderApDetail();
   if (typeof apRenderFirms === 'function' && $('aFirms')) apRenderFirms();
+  if ($('aContacts') && !$('aContacts').contains(document.activeElement)) apRenderContacts();
 }
 function scheduleAp(){ clearTimeout(apTimer); apTimer = setTimeout(() => { if (me) loadAppraisal(); }, 400); }
 function apBadge(){
@@ -216,7 +221,7 @@ function renderApDetail(){
       ${reqs.length && props.length ? `<div class="apm"><table class="apt"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td><b>전체금액만 입력</b><div class="muted">물건별 금액 없이 총액만 받은 경우</div></td>${tinp}</tr><tr class="tot"><td>합계</td>${tot}</tr><tr><td><b>특이사항</b><div class="muted">기관별 코멘트</div></td>${notes}</tr><tr><td></td>${save}</tr></tbody></table></div>` : '<div class="blk-empty">의뢰한 평가기관이나 물건이 없어요. 수정에서 추가해주세요.</div>'}
       ${can && c.chosen_firm_id ? '<div style="margin-top:8px"><button class="btn small" data-act="unchoose">채택 해제 (가격만 조회)</button></div>' : ''}
     </div>
-    <div class="foot" style="margin-top:22px"><button class="btn" data-act="print">🖨 보고서 인쇄</button>${can ? `<button class="btn" data-act="edit">✏ 수정</button><button class="btn" data-act="${c.archived_at ? 'unarchive' : 'archive'}">${c.archived_at ? '↩ 보관함에서 꺼내기' : '📦 보관함으로 이동'}</button>${(c.created_by === me || isAdmin()) ? '<button class="btn danger" data-act="del">삭제</button>' : ''}` : '<span class="muted">👀 감정평가 권한이 없어 보기만 할 수 있어요.</span>'}</div>`;
+    <div class="foot" style="margin-top:22px"><button class="btn" data-act="print">🖨 보고서 인쇄</button><button class="btn" data-act="fax">📠 감정평가 의뢰서 (팩스)</button>${can ? `<button class="btn" data-act="edit">✏ 수정</button><button class="btn" data-act="${c.archived_at ? 'unarchive' : 'archive'}">${c.archived_at ? '↩ 보관함에서 꺼내기' : '📦 보관함으로 이동'}</button>${(c.created_by === me || isAdmin()) ? '<button class="btn danger" data-act="del">삭제</button>' : ''}` : '<span class="muted">👀 감정평가 권한이 없어 보기만 할 수 있어요.</span>'}</div>`;
   draft.sort((a, b) => (a[0][0] === 't') - (b[0][0] === 't')).forEach(([k, val]) => {
     const inp = $('apDetailPanel').querySelector(`[data-k="${k}"]`);
     if (inp && !inp.disabled && inp.value !== val){ inp.value = val; inp.dispatchEvent(new Event('input', { bubbles: true })); }
@@ -252,6 +257,7 @@ $('apDetailPanel').addEventListener('click', async (e) => {
   if (act === 'close') return apCloseDetail();
   if (act === 'edit') return apOpenForm(c.id);
   if (act === 'print') return apPrint(c);
+  if (act === 'fax') return apOpenFax(c);
   if (act === 'archive' || act === 'unarchive'){
     if (act === 'archive'){
       const wait = apReqs(c).filter(r => !apReqSum(r, apProps(c)).done).length;
@@ -614,3 +620,100 @@ function apPrint(c){
   f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { alert('인쇄 창을 열지 못했어요: ' + e.message); } setTimeout(() => f.remove(), 60000); };
   document.body.appendChild(f);
 }
+
+
+// ---------- 감정평가 의뢰서 (팩스용) ----------
+const apFmt2 = (v) => Number(v).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function apPurposeDefault(c){
+  const t = c.handling_type;
+  if (t === '기타') return c.handling_note ? `${c.handling_note} 관련 감정평가의뢰` : '감정평가의뢰';
+  return t ? `${t}${t === '채권관리' ? '를' : '을'} 위한 감정평가의뢰` : '감정평가의뢰';
+}
+function apFaxPage(c, firmName, purpose){
+  const props = apProps(c), st = apSettings[c.scope] || { org_name: '', staff_text: '', contact_text: '' };
+  const org = st.org_name || '', rows = [];
+  props.forEach(p => {
+    if (p.kind === '건물'){
+      rows.push({ addr: p.address, jimok: p.jimok || '', area: p.land_area, land: true, note: '' });
+      rows.push({ addr: p.address, jimok: '건물', area: p.area, land: false, note: p.detail || '' });
+    } else rows.push({ addr: p.address, jimok: p.kind === '집합건물' ? '집합건물' : (p.jimok || ''), area: p.area, land: p.kind === '토지', note: p.detail || '' });
+  });
+  const landSum = rows.filter(r => r.land && r.area).reduce((s, r) => s + Number(r.area), 0);
+  const bldSum = rows.filter(r => !r.land && r.area).reduce((s, r) => s + Number(r.area), 0);
+  const body = rows.map((r, i) => `<tr><td class="c">${i + 1}</td><td>${esc(r.addr)}</td><td class="c">${esc(r.jimok)}</td><td class="r">${r.area === null || r.area === undefined ? '' : apFmt2(r.area)}</td><td class="c">${esc(r.note)}</td></tr>`).join('');
+  return `<div class="page">
+    <div class="hd"><h1>탁상감정의뢰서</h1><div class="org">${esc(org)}</div></div>
+    ${firmName ? `<div class="to">수 신 : <b>${esc(firmName)}</b> 귀중</div>` : ''}
+    <table class="info">
+      <tr><th>발신자</th><td>${esc(org)}(${esc(c.scope)})</td></tr>
+      <tr><th>의뢰일자</th><td>${esc(c.request_date)}</td></tr>
+      <tr><th>담 당 자</th><td>${esc(st.staff_text || nameOf(c.requester_email))}</td></tr>
+      <tr><th>연락처</th><td>${esc(st.contact_text || '')}</td></tr>
+    </table>
+    <table class="items"><thead><tr><th style="width:8%">기호</th><th>소재지</th><th style="width:13%">지목</th><th style="width:17%">면적(㎡)</th><th style="width:20%">비고</th></tr></thead><tbody>${body}
+      <tr class="sum"><td></td><td class="c">${bldSum ? '합 계 (토지)' : '합  계'}</td><td></td><td class="r">${apFmt2(landSum)}</td><td></td></tr>
+      ${bldSum ? `<tr class="sum"><td></td><td class="c">합 계 (건물·전용)</td><td></td><td class="r">${apFmt2(bldSum)}</td><td></td></tr>` : ''}</tbody></table>
+    <div class="purpose">${esc(purpose)}</div></div>`;
+}
+function apOpenFax(c){
+  const reqs = apReqs(c), st = apSettings[c.scope] || {};
+  const miss = !st.staff_text && !st.contact_text;
+  $('apFaxPanel').innerHTML = `<div class="ph"><h2>📠 감정평가 의뢰서 (팩스)</h2><button class="x" data-fx="close">✕</button></div>
+    <div class="apsec" style="margin-top:6px"><div class="k">수신처 (체크한 기관마다 의뢰서가 한 장씩 인쇄됩니다)</div>
+      ${reqs.length ? `<div class="checks" id="apFaxFirms">${reqs.map(r => `<label><input type="checkbox" value="${r.firm_id}" checked/> ${esc(apFirmName(r.firm_id))}</label>`).join('')}</div>` : '<div class="muted">의뢰한 평가기관이 없어 수신처 없이 인쇄돼요.</div>'}</div>
+    <label>하단 문구</label><input id="apFaxPurpose" maxlength="100" value="${esc(apPurposeDefault(c))}" />
+    <div class="apsec"><div class="k">${esc(c.scope)} 회신 연락처</div>
+      <div style="font-size:14px">${esc(st.org_name || '')}(${esc(c.scope)})<br>담당자: ${esc(st.staff_text || nameOf(c.requester_email))}<br>연락처: ${esc(st.contact_text || '-')}</div>
+      ${miss ? `<div class="apst bad" style="margin-top:6px">${esc(c.scope)} 회신 연락처가 아직 등록되지 않았어요. 관리자 화면 → "의뢰서 회신 연락처"에서 입력해주세요.</div>` : '<div class="muted" style="margin-top:4px">바꾸려면 관리자 화면 → "의뢰서 회신 연락처"</div>'}</div>
+    <div class="acts" style="margin-top:18px"><button class="btn primary" data-fx="print" style="min-height:44px;padding:8px 26px">🖨 인쇄</button><button class="btn" data-fx="close" style="min-height:44px">취소</button></div>`;
+  $('apFaxPanel').dataset.cid = c.id;
+  $('apFaxOv').style.display = 'block';
+}
+function apCloseFax(){ $('apFaxOv').style.display = 'none'; }
+$('apFaxPanel').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-fx]'); if (!b) return;
+  if (b.dataset.fx === 'close') return apCloseFax();
+  const c = apCases.find(x => x.id === +$('apFaxPanel').dataset.cid); if (!c) return;
+  const ids = [...document.querySelectorAll('#apFaxFirms input:checked')].map(i => +i.value);
+  if (apReqs(c).length && !ids.length) return alert('수신처를 하나 이상 체크해주세요.');
+  const purpose = $('apFaxPurpose').value.trim() || apPurposeDefault(c);
+  const pages = ids.length ? ids.map(id => apFaxPage(c, apFirmName(id), purpose)) : [apFaxPage(c, '', purpose)];
+  apPrintHtml(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>탁상감정의뢰서 - ${esc(c.debtor_name)}</title><style>
+  @page{size:A4;margin:16mm 14mm}*{box-sizing:border-box}body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#000;font-size:14px;margin:0}
+  .page{page-break-after:always}.page:last-child{page-break-after:auto}
+  .hd{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}h1{font-size:30px;margin:0;display:inline-block;border-bottom:3px solid #000;padding-bottom:2px;letter-spacing:1px}.org{font-size:19px;font-weight:700;color:#1f6f4a}
+  .to{font-size:15px;margin:2px 0 10px}
+  table.info{border-collapse:collapse;margin-bottom:16px}table.info th{text-align:left;font-weight:700;padding:3px 26px 3px 0;white-space:nowrap;font-size:15px}table.info td{padding:3px 0;font-size:15px}
+  table.items{width:100%;border-collapse:collapse}table.items th,table.items td{border:1px solid #000;padding:4px 8px;white-space:nowrap}table.items td:nth-child(2){white-space:normal}
+  table.items th{background:#fff;font-weight:700;text-align:center;border-bottom:2px solid #000}.c{text-align:center}.r{text-align:right}tr{page-break-inside:avoid}
+  table.items tr.sum td{font-weight:700;border-top:2px solid #000}.purpose{margin-top:22px;font-size:16px;font-weight:700}
+  </style></head><body>${pages.join('')}</body></html>`);
+  apCloseFax();
+});
+function apPrintHtml(html){
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  f.srcdoc = html;
+  f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { alert('인쇄 창을 열지 못했어요: ' + e.message); } setTimeout(() => f.remove(), 60000); };
+  document.body.appendChild(f);
+}
+
+// ---------- 관리자: 회신 연락처 ----------
+function apRenderContacts(){
+  const box = $('aContacts'); if (!box) return;
+  box.innerHTML = ['본점', '지점'].map(sc => { const v = apSettings[sc] || {}; return `<div class="apblock" data-sc="${sc}"><div class="bh"><span>${sc}</span><button class="btn small primary" data-ac="save">저장</button></div>
+    <div class="grid3" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+      <div><label>조합명</label><input class="ao" maxlength="40" value="${esc(v.org_name || '')}" placeholder="예: 춘천시산림조합" /></div>
+      <div><label>담당자 표기</label><input class="as" maxlength="80" value="${esc(v.staff_text || '')}" placeholder="예: 정재훈 과장, 정다정 사원" /></div>
+      <div><label>회신 연락처</label><input class="ac" maxlength="80" value="${esc(v.contact_text || '')}" placeholder="예: 사무실 033-252-1800 (내선2)" /></div></div></div>`; }).join('');
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-ac=save]'); if (!b) return;
+  const blk = b.closest('[data-sc]'), sc = blk.dataset.sc;
+  const row = { scope: sc, org_name: blk.querySelector('.ao').value.trim(), staff_text: blk.querySelector('.as').value.trim(), contact_text: blk.querySelector('.ac').value.trim(), updated_at: new Date().toISOString() };
+  b.disabled = true;
+  const { error } = await sb.from('appraisal_settings').upsert(row, { onConflict: 'scope' });
+  b.disabled = false;
+  if (error) return alert('저장하지 못했어요: ' + error.message);
+  apSettings[sc] = row; toast(`${sc} 회신 연락처를 저장했어요`);
+});
