@@ -222,3 +222,6 @@ alter table public.appraisal_requests add column if not exists note text;
 -- 감정평가: 취급구분 (신규대출/기한연장/채권관리/기타+사유)
 alter table public.appraisal_cases add column if not exists handling_type text check (handling_type in ('신규대출','기한연장','채권관리','기타'));
 alter table public.appraisal_cases add column if not exists handling_note text;
+
+-- 감정평가: 대출신청금액(원). 회신 예정일은 사용하지 않음(due_date 컬럼은 남아 있지만 화면에서 안 씀)
+alter table public.appraisal_cases add column if not exists loan_amount bigint check (loan_amount is null or loan_amount >= 0);

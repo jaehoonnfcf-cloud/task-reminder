@@ -159,7 +159,7 @@ function apRowHtml(c){
   }
   const first = props[0];
   return `<div class="aprow" data-ap="${c.id}">
-    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}</div><div class="ts">${c.handling_type ? `<b>${esc(c.handling_type === '기타' && c.handling_note ? `기타·${c.handling_note}` : c.handling_type)}</b> · ` : ''}의뢰 ${esc(nameOf(c.requester_email))}${c.due_date ? ` · 회신예정 ${esc(c.due_date.slice(5).replace('-', '/'))}` : ''}</div></div>
+    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}</div><div class="ts">${c.handling_type ? `<b>${esc(c.handling_type === '기타' && c.handling_note ? `기타·${c.handling_note}` : c.handling_type)}</b> · ` : ''}의뢰 ${esc(nameOf(c.requester_email))}${c.loan_amount !== null && c.loan_amount !== undefined ? ` · 신청 ${esc(apWon(c.loan_amount))}` : ''}</div></div>
     <div><b>${props.length}건</b>${first ? ` · ${esc(first.address)}${props.length > 1 ? ` 외 ${props.length - 1}` : ''}` : ''}</div>
     <div>${reqs.map(r => `<span class="afc ${apReqSum(r, props).done ? 'ok' : ''}">${esc(apFirmName(r.firm_id))}${apReqSum(r, props).done ? ' ✓' : ''}</span>`).join('') || '<span class="muted">의뢰기관 없음</span>'}</div>
     <div>${money}</div>
@@ -199,7 +199,7 @@ function renderApDetail(){
       <div><div class="k">취급구분</div><div class="v">${esc(apTypeText(c))}</div></div>
       <div><div class="k">의뢰자</div><div class="v">${esc(nameOf(c.requester_email))}</div></div>
       <div><div class="k">의뢰일</div><div class="v">${esc(c.request_date)}</div></div>
-      <div><div class="k">회신 예정일</div><div class="v">${esc(c.due_date || '-')}</div></div>
+      <div><div class="k">대출신청금액</div><div class="v">${c.loan_amount === null || c.loan_amount === undefined ? '-' : `${esc(apWon(c.loan_amount))}<div class="muted" style="font-weight:500">${Number(c.loan_amount).toLocaleString('ko-KR')}원</div>`}</div></div>
       <div><div class="k">알림 받는 사람</div><div class="v">${esc((c.notify_emails || []).map(nameOf).join(', ') || '없음')}</div></div>
     </div>
     ${c.memo ? `<div class="apsec"><div class="k">메모</div><div style="white-space:pre-wrap">${esc(c.memo)}</div></div>` : ''}
@@ -355,7 +355,7 @@ function apOpenForm(id){
     </div>
     <div class="row">
       <div><label>의뢰일</label><input id="apfDate" type="date" /></div>
-      <div><label>회신 예정일 (선택)</label><input id="apfDue" type="date" /></div>
+      <div><label>대출신청금액 (원)</label><input id="apfLoan" inputmode="numeric" placeholder="원 단위" /><div class="apst" id="apfLoanHint"></div></div>
     </div>
     <div class="apsec"><div class="k">물건 <span style="color:var(--danger)">*</span> <span class="muted" style="font-weight:500">· 소재지는 검색 결과에서 선택한 주소만 입력됩니다</span></div>
       <div id="apfProps"></div>
@@ -366,11 +366,12 @@ function apOpenForm(id){
     <div class="acts" style="margin-top:20px"><button class="btn primary" id="apfSave" style="min-height:44px;padding:8px 28px">저장</button><button class="btn" data-act="close" style="min-height:44px">취소</button></div>`;
   $('apfTypeNote').value = c ? (c.handling_note || '') : ''; apTypeSync();
   $('apfDebtor').value = c ? c.debtor_name : '';
-  $('apfReq').value = nameOf(c ? c.requester_email : me); $('apfDate').value = c ? c.request_date : kstToday(); $('apfDue').value = c ? (c.due_date || '') : ''; $('apfMemo').value = c ? (c.memo || '') : '';
+  $('apfReq').value = nameOf(c ? c.requester_email : me); $('apfDate').value = c ? c.request_date : kstToday(); $('apfLoan').value = c && c.loan_amount !== null && c.loan_amount !== undefined ? Number(c.loan_amount).toLocaleString('ko-KR') : ''; apLoanHint(); $('apfMemo').value = c ? (c.memo || '') : '';
   (props.length ? props : [null]).forEach(p => apAddPropBlock(p));
   $('apFormOv').style.display = 'block'; document.body.style.overflow = 'hidden';
   setTimeout(() => { try { $('apfDebtor').focus(); } catch (e) {} }, 50);
 }
+function apLoanHint(){ const n = apNum($('apfLoan').value); $('apfLoanHint').textContent = n === null ? '' : apWon(n); }
 function apTypeSync(){
   const t = document.querySelector('input[name=apfTypeR]:checked');
   $('apfTypeNote').style.display = t && t.value === '기타' ? 'block' : 'none';
@@ -401,6 +402,7 @@ function apAddPropBlock(p){
   }
   apKindSync(blk); apRenumber();
 }
+$('apFormPanel').addEventListener('input', (e) => { if (e.target.id === 'apfLoan'){ e.target.value = apComma(e.target.value); apLoanHint(); } });
 $('apFormPanel').addEventListener('change', (e) => { if (e.target.matches('input[name=apfTypeR]')){ apTypeSync(); if (e.target.value === '기타') $('apfTypeNote').focus(); } if (e.target.matches('.pk')) apKindSync(e.target.closest('.apblock')); });
 $('apFormPanel').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('.pq')){ e.preventDefault(); apDoSearch(e.target.closest('.apblock')); } });
 $('apFormPanel').addEventListener('click', async (e) => {
@@ -461,7 +463,7 @@ async function apSaveForm(){
   }
   const firms = [...document.querySelectorAll('#apFirmList input:checked')].map(i => +i.value);
   const notify = [...document.querySelectorAll('#apNotifyList input:checked')].map(i => i.value);
-  const patch = { scope, handling_type: htype, handling_note: htype === '기타' ? hnote : null, debtor_name: debtor, request_date: $('apfDate').value || kstToday(), due_date: $('apfDue').value || null, memo: $('apfMemo').value.trim() || null, notify_emails: notify };
+  const patch = { scope, handling_type: htype, handling_note: htype === '기타' ? hnote : null, debtor_name: debtor, request_date: $('apfDate').value || kstToday(), loan_amount: apNum($('apfLoan').value), memo: $('apfMemo').value.trim() || null, notify_emails: notify };
   $('apfSave').disabled = true;
   try {
     let cid = apFormId;

@@ -124,7 +124,7 @@ async function handle(req: Request): Promise<Response> {
     const to: string[] = c.notify_emails ?? [];
     if (event === "appraisal_created") {
       const first = props[0];
-      await notify(to, `📌 ${tag} 새 감정평가 의뢰가 등록됐어요\n채무자: ${c.debtor_name}${c.handling_type ? `\n취급구분: ${c.handling_type === "기타" && c.handling_note ? `기타 (${c.handling_note})` : c.handling_type}` : ""}\n물건 ${props.length}건${first ? ` (${first.address}${props.length > 1 ? ` 외 ${props.length - 1}` : ""})` : ""}\n의뢰기관: ${c.appraisal_requests.map((r: any) => fname(r.firm_id)).join(", ") || "-"}\n의뢰자: ${who(c.requester_email)}님${c.due_date ? `\n회신 예정: ${c.due_date}` : ""}`);
+      await notify(to, `📌 ${tag} 새 감정평가 의뢰가 등록됐어요\n채무자: ${c.debtor_name}${c.handling_type ? `\n취급구분: ${c.handling_type === "기타" && c.handling_note ? `기타 (${c.handling_note})` : c.handling_type}` : ""}${c.loan_amount !== null && c.loan_amount !== undefined ? `\n대출신청금액: ${won(Number(c.loan_amount))}` : ""}\n물건 ${props.length}건${first ? ` (${first.address}${props.length > 1 ? ` 외 ${props.length - 1}` : ""})` : ""}\n의뢰기관: ${c.appraisal_requests.map((r: any) => fname(r.firm_id)).join(", ") || "-"}\n의뢰자: ${who(c.requester_email)}님`);
     } else if (event === "appraisal_priced" || event === "appraisal_chosen") {
       const req2 = c.appraisal_requests.find((r: any) => r.firm_id === body.firm_id);
       if (!req2) return new Response("bad request", { status: 400 });
