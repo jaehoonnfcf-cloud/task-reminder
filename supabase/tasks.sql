@@ -214,3 +214,7 @@ grant update (perm_appraisal) on public.team_members to authenticated;
 -- 감정평가는 본점/지점만 (통합 없음)
 alter table public.appraisal_cases drop constraint appraisal_cases_scope_check;
 alter table public.appraisal_cases add constraint appraisal_cases_scope_check check (scope in ('본점','지점'));
+
+-- 감정평가: 기관별 총액만 입력(total_amount) + 특이사항(note)
+alter table public.appraisal_requests add column if not exists total_amount bigint check (total_amount is null or total_amount >= 0);
+alter table public.appraisal_requests add column if not exists note text;
