@@ -314,6 +314,8 @@
   .trow{ background:#fff; border:0; border-radius:22px; box-shadow:var(--sh); margin-bottom:12px; padding:16px 26px; min-height:64px; transition:box-shadow .15s, transform .15s; }
   .trow:hover{ background:#fff; box-shadow:var(--sh-hover); transform:translateY(-1px); }
   .tt{ font-size:16.5px; letter-spacing:-.02em; }
+  .c-type{ display:flex; flex-direction:column; align-items:flex-start; gap:5px; }
+  .c-type .tp,.c-type .chip{ min-width:46px; text-align:center; justify-content:center; }
   .tp{ border-radius:99px; background:var(--chipbg); color:#5a6172; padding:4px 10px; } .tp.loan{ background:var(--accent-soft); color:var(--accent); }
   .chip{ border-radius:99px; background:var(--chipbg); color:#5a6172; padding:4px 11px; }
   .chip.over{ background:var(--danger-soft); color:var(--danger); } .chip.today{ background:var(--warn-soft); color:var(--warn); } .chip.ok{ background:var(--green-soft); color:var(--green); }
@@ -770,8 +772,8 @@
     const due = t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '<span class="muted">-</span>';
     const avs = `<div class="avs">${asg.map(a => avHtml(a.email, !loan && a.done_at ? 'done' : '')).join('')}</div>`;
     return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}" data-id="${t.id}">
-      <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span></div>
-      <div class="c-title"><div class="tt">${t.scope ? `<span class="chip sc-${esc(t.scope)}">${esc(t.scope)}</span> ` : ''}${esc(t.title)}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
+      <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}">${esc(t.scope)}</span>` : ''}</div>
+      <div class="c-title"><div class="tt">${esc(t.title)}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
       <div class="c-prog prog">${prog}</div><div class="c-who">${avs}</div><div class="c-due">${due}</div><div class="c-act">${act}</div></div>`;
   }
 
@@ -1427,6 +1429,6 @@
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
-<script src="appraisal.js?v=28"></script>
+<script src="appraisal.js?v=29"></script>
 </body>
 </html>
