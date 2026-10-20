@@ -720,10 +720,16 @@ let apPvHtml = '', apPvName = '', apPvTitle = '';
   $('apPvShare').onclick = apPvShare;
   window.addEventListener('resize', apPvFit);
 })();
+const apStandalone = () => navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
 function apPreview(html, title, name){
   apPvHtml = html; apPvTitle = title; apPvName = name; $('apPvT').textContent = `📄 ${title} 미리보기`;
   const inject = '<style>@media screen{html{background:#fff}body{width:794px;margin:0;padding:22px 42px;box-sizing:border-box}.page{padding-bottom:18px;margin-bottom:22px;border-bottom:1px dashed #aaa}.page:last-child{border-bottom:0}}</style>';
-  const fr = $('apPvFrame'); $('apPvMsg').style.display = 'none';
+  const fr = $('apPvFrame'), sa = apStandalone();
+  // 홈 화면에 추가한 웹앱(스탠드얼론)에서는 브라우저 인쇄가 막혀 있어서, 이미지 공유(공유창의 프린트·카카오톡)로 안내한다
+  $('apPvPrint').style.display = sa ? 'none' : '';
+  $('apPvShare').className = sa ? 'btn primary small' : 'btn glass small';
+  $('apPvMsg').textContent = sa ? '홈 화면 앱에서는 바로 인쇄가 안 돼요. "이미지로 공유"를 누른 뒤 공유 창에서 프린트(인쇄) 또는 카카오톡을 선택하세요.' : '';
+  $('apPvMsg').style.display = sa ? 'block' : 'none';
   fr.onload = apPvFit;
   fr.srcdoc = html.replace('</head>', inject + '</head>');
   $('apPvOv').style.display = 'block'; document.body.style.overflow = 'hidden';
