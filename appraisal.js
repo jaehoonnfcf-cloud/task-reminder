@@ -338,7 +338,7 @@ function apOpenForm(id){
       <div id="apfProps"></div>
       <button class="btn small" id="apfAddProp" type="button">＋ 물건 추가</button></div>
     <div class="apsec"><div class="k">평가기관 (의뢰할 곳 체크)</div><div class="checks" id="apFirmList">${apFirms.filter(f => f.active || have.has(f.id)).map(f => `<label><input type="checkbox" value="${f.id}" ${have.has(f.id) ? 'checked' : ''}/> ${esc(f.name)}</label>`).join('')}</div></div>
-    <div class="apsec"><div class="k">알림 받을 사람 (체크한 사람에게만 텔레그램)</div><div class="checks" id="apNotifyList">${members.map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${notify.has(m.email) ? 'checked' : ''}/> ${esc(m.name)}</label>`).join('')}</div></div>
+    <div class="apsec"><div class="k">알림 받을 사람 (체크한 사람에게만 텔레그램)</div><div class="checks" id="apNotifyList">${members.filter(m => m.is_admin || m.perm_appraisal || notify.has(m.email)).map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${notify.has(m.email) ? 'checked' : ''}/> ${esc(m.name)}</label>`).join('')}</div></div>
     <label>메모 (선택)</label><textarea id="apfMemo" rows="2"></textarea>
     <div class="acts" style="margin-top:20px"><button class="btn primary" id="apfSave" style="min-height:44px;padding:8px 28px">저장</button><button class="btn" data-act="close" style="min-height:44px">취소</button></div>`;
   $('apfScope').value = c ? c.scope : ''; $('apfDebtor').value = c ? c.debtor_name : '';
