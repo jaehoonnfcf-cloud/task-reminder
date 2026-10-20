@@ -228,3 +228,7 @@ alter table public.appraisal_cases add column if not exists loan_amount bigint c
 
 -- 감정평가 물건: 건물일 때 대지면적(land_area) 함께 입력 (area = 건물면적)
 alter table public.appraisal_properties add column if not exists land_area numeric(14,2) check (land_area is null or land_area > 0);
+
+-- 감정평가 보관함: archived_at 이 있으면 보관함 (진행중 목록·배지에서 제외, 검색은 그대로)
+alter table public.appraisal_cases add column if not exists archived_at timestamptz;
+alter table public.appraisal_cases add column if not exists archived_by text;

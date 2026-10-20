@@ -11,7 +11,7 @@ const AP_JIMOK = ['대', '전', '답', '임야', '잡종지', '공장용지', '�
 const AP_JIMOK_ABBR = { '대': '대', '전': '전', '답': '답', '임': '임야', '잡': '잡종지', '공': '공장용지', '도': '도로', '구': '구거', '천': '하천', '과': '과수원', '목': '목장용지', '학': '학교용지', '차': '주차장', '주': '주유소용지', '창': '창고용지', '체': '체육용지', '종': '종교용지', '철': '철도용지', '제': '제방', '수': '수도용지', '원': '공원', '묘': '묘지' };
 
 let apCases = [], apFirms = [], apOpenId = null, apFormId = null, apTimer = null;
-let apQ = '', apMine = false, apScope = 'all', apType = 'all';
+let apQ = '', apMine = false, apScope = 'all', apType = 'all', apView = 'active';
 
 const AP_TYPES = ['신규대출', '기한연장', '채권관리', '기타'];
 const apTypeText = (c) => c.handling_type ? (c.handling_type === '기타' && c.handling_note ? `기타 · ${c.handling_note}` : c.handling_type) : '-';
@@ -118,7 +118,7 @@ async function loadAppraisal(){
 }
 function scheduleAp(){ clearTimeout(apTimer); apTimer = setTimeout(() => { if (me) loadAppraisal(); }, 400); }
 function apBadge(){
-  const n = apCases.filter(c => apReqs(c).some(r => !apReqSum(r, apProps(c)).done)).length;
+  const n = apCases.filter(c => !c.archived_at && apReqs(c).some(r => !apReqSum(r, apProps(c)).done)).length;
   const el = $('nAppraisal'); if (!el) return;
   el.textContent = n || ''; el.style.display = n ? '' : 'none';
 }
@@ -130,6 +130,7 @@ function renderAppraisal(){
     el.dataset.ready = '1';
     el.innerHTML = `<div class="list-panel">
       <div class="toolbar">
+        <div class="seg" id="apView"><button data-v="active">진행중 <span id="apNA"></span></button><button data-v="archive">📦 보관함 <span id="apNB"></span></button></div>
         <select id="apScope"><option value="all">본점·지점</option><option value="본점">본점</option><option value="지점">지점</option></select>
         <select id="apType"><option value="all">취급구분 전체</option>${AP_TYPES.map(v => `<option>${v}</option>`).join('')}</select>
         <label class="chk"><input type="checkbox" id="apMine" /> 내 의뢰만</label>
@@ -137,16 +138,21 @@ function renderAppraisal(){
       </div>
       <div class="aphead"><span>채무자</span><span>물건</span><span>평가기관 (✓ 가격 입력 완료)</span><span>금액</span><span>의뢰일</span></div>
       <div id="apList"></div></div>`;
+    $('apView').onclick = (e) => { const b = e.target.closest('[data-v]'); if (!b) return; apView = b.dataset.v; renderAppraisal(); };
     $('apScope').onchange = () => { apScope = $('apScope').value; renderAppraisal(); };
     $('apType').onchange = () => { apType = $('apType').value; renderAppraisal(); };
     $('apMine').onchange = () => { apMine = $('apMine').checked; renderAppraisal(); };
     $('apQ').oninput = () => { apQ = $('apQ').value.trim().toLowerCase(); renderAppraisal(); };
     $('apList').addEventListener('click', (e) => { const r = e.target.closest('[data-ap]'); if (r) apOpenDetail(+r.dataset.ap); });
   }
-  const shown = apCases.filter(c => (apScope === 'all' || c.scope === apScope) && (apType === 'all' || c.handling_type === apType)
+  const nb = apCases.filter(c => c.archived_at).length;
+  $('apNA').textContent = apCases.length - nb; $('apNB').textContent = nb;
+  document.querySelectorAll('#apView button').forEach(b => b.classList.toggle('on', b.dataset.v === apView));
+  const shown = apCases.filter(c => (apView === 'archive' ? !!c.archived_at : !c.archived_at) && (apScope === 'all' || c.scope === apScope) && (apType === 'all' || c.handling_type === apType)
     && (!apMine || c.requester_email === me)
     && (!apQ || [c.debtor_name, c.memo, ...apProps(c).map(p => p.address)].some(v => (v || '').toLowerCase().includes(apQ))));
-  $('apList').innerHTML = shown.map(apRowHtml).join('') || `<div class="blk-empty">${apCases.length ? '조건에 맞는 의뢰가 없어요.' : '등록된 감정평가 의뢰가 없어요.'}</div>`;
+  if (apView === 'archive') shown.sort((a, b) => String(b.archived_at).localeCompare(String(a.archived_at)));
+  $('apList').innerHTML = shown.map(apRowHtml).join('') || `<div class="blk-empty">${apView === 'archive' ? '보관함이 비어 있어요. 가격이 모두 도착한 의뢰는 상세 창에서 📦 보관함으로 옮길 수 있어요.' : apCases.length ? '조건에 맞는 의뢰가 없어요.' : '등록된 감정평가 의뢰가 없어요.'}</div>`;
 }
 function apRowHtml(c){
   const props = apProps(c), reqs = apReqs(c);
@@ -159,7 +165,7 @@ function apRowHtml(c){
   }
   const first = props[0];
   return `<div class="aprow" data-ap="${c.id}">
-    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}</div><div class="ts">${c.handling_type ? `<b>${esc(c.handling_type === '기타' && c.handling_note ? `기타·${c.handling_note}` : c.handling_type)}</b> · ` : ''}의뢰 ${esc(nameOf(c.requester_email))}${c.loan_amount !== null && c.loan_amount !== undefined ? ` · 신청 ${esc(apWon(c.loan_amount))}` : ''}</div></div>
+    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}</div><div class="ts">${c.handling_type ? `<b>${esc(c.handling_type === '기타' && c.handling_note ? `기타·${c.handling_note}` : c.handling_type)}</b> · ` : ''}의뢰 ${esc(nameOf(c.requester_email))}${c.loan_amount !== null && c.loan_amount !== undefined ? ` · 신청 ${esc(apWon(c.loan_amount))}` : ''}${c.archived_at ? ` · 📦 보관 ${esc(c.archived_at.slice(5, 10).replace('-', '/'))}` : ''}</div></div>
     <div><b>${props.length}건</b>${first ? ` · ${esc(first.address)}${props.length > 1 ? ` 외 ${props.length - 1}` : ''}` : ''}</div>
     <div>${reqs.map(r => `<span class="afc ${apReqSum(r, props).done ? 'ok' : ''}">${esc(apFirmName(r.firm_id))}${apReqSum(r, props).done ? ' ✓' : ''}</span>`).join('') || '<span class="muted">의뢰기관 없음</span>'}</div>
     <div>${money}</div>
@@ -195,6 +201,7 @@ function renderApDetail(){
   const save = reqs.map(r => `<td>${can ? `<button class="btn primary small" data-act="save" data-r="${r.id}" style="width:100%">💾 ${esc(apFirmName(r.firm_id))} 저장</button>` : ''}</td>`).join('');
   $('apDetailPanel').innerHTML = `
     <div class="ph"><div><div style="margin-bottom:8px"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> <span class="chip" style="background:#fdf2f8;color:#9d174d">감정평가</span></div><h2>${esc(c.debtor_name)}</h2></div><button class="x" data-act="close">✕</button></div>
+    ${c.archived_at ? `<div style="margin-top:12px;padding:9px 12px;border-radius:8px;background:#f1f2f4;font-size:13.5px">📦 보관함 · ${esc(c.archived_at.slice(0, 10))} ${esc(nameOf(c.archived_by))}님이 보관했어요</div>` : ''}
     <div class="apinfo">
       <div><div class="k">취급구분</div><div class="v">${esc(apTypeText(c))}</div></div>
       <div><div class="k">의뢰자</div><div class="v">${esc(nameOf(c.requester_email))}</div></div>
@@ -208,7 +215,7 @@ function renderApDetail(){
       ${reqs.length && props.length ? `<div class="apm"><table class="apt"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td><b>전체금액만 입력</b><div class="muted">물건별 금액 없이 총액만 받은 경우</div></td>${tinp}</tr><tr class="tot"><td>합계</td>${tot}</tr><tr><td><b>특이사항</b><div class="muted">기관별 코멘트</div></td>${notes}</tr><tr><td></td>${save}</tr></tbody></table></div>` : '<div class="blk-empty">의뢰한 평가기관이나 물건이 없어요. 수정에서 추가해주세요.</div>'}
       ${can && c.chosen_firm_id ? '<div style="margin-top:8px"><button class="btn small" data-act="unchoose">채택 해제 (가격만 조회)</button></div>' : ''}
     </div>
-    <div class="foot" style="margin-top:22px">${can ? `<button class="btn" data-act="edit">✏ 수정</button>${(c.created_by === me || isAdmin()) ? '<button class="btn danger" data-act="del">삭제</button>' : ''}` : '<span class="muted">👀 감정평가 권한이 없어 보기만 할 수 있어요.</span>'}</div>`;
+    <div class="foot" style="margin-top:22px">${can ? `<button class="btn" data-act="edit">✏ 수정</button><button class="btn" data-act="${c.archived_at ? 'unarchive' : 'archive'}">${c.archived_at ? '↩ 보관함에서 꺼내기' : '📦 보관함으로 이동'}</button>${(c.created_by === me || isAdmin()) ? '<button class="btn danger" data-act="del">삭제</button>' : ''}` : '<span class="muted">👀 감정평가 권한이 없어 보기만 할 수 있어요.</span>'}</div>`;
   draft.sort((a, b) => (a[0][0] === 't') - (b[0][0] === 't')).forEach(([k, val]) => {
     const inp = $('apDetailPanel').querySelector(`[data-k="${k}"]`);
     if (inp && !inp.disabled && inp.value !== val){ inp.value = val; inp.dispatchEvent(new Event('input', { bubbles: true })); }
@@ -243,6 +250,16 @@ $('apDetailPanel').addEventListener('click', async (e) => {
   const act = b.dataset.act;
   if (act === 'close') return apCloseDetail();
   if (act === 'edit') return apOpenForm(c.id);
+  if (act === 'archive' || act === 'unarchive'){
+    if (act === 'archive'){
+      const wait = apReqs(c).filter(r => !apReqSum(r, apProps(c)).done).length;
+      if (!confirm(wait ? `아직 가격이 입력되지 않은 평가기관이 ${wait}곳 있어요.\n그래도 보관함으로 옮길까요?` : `"${c.debtor_name}" 의뢰를 보관함으로 옮길까요?\n진행중 목록에서는 빠지고, 보관함에서 언제든 찾아볼 수 있어요.`)) return;
+    }
+    const { error } = await sb.from('appraisal_cases').update(act === 'archive' ? { archived_at: new Date().toISOString(), archived_by: me } : { archived_at: null, archived_by: null }).eq('id', c.id);
+    if (error) return alert(error.message);
+    apCloseDetail(); toast(act === 'archive' ? '📦 보관함으로 옮겼어요' : '↩ 진행중으로 꺼냈어요');
+    return loadAppraisal();
+  }
   if (act === 'unchoose'){
     const { error } = await sb.from('appraisal_cases').update({ chosen_firm_id: null }).eq('id', c.id);
     if (error) return alert(error.message);
