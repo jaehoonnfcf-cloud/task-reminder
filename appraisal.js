@@ -769,7 +769,7 @@ async function apPvShare(){
       files.push(new File([blob], `${apPvName}${els.length > 1 ? `_${i + 1}` : ''}.png`, { type: 'image/png' }));
     }
     if (navigator.canShare && navigator.canShare({ files })){
-      try { await navigator.share({ files, title: apPvTitle }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+      try { await navigator.share({ files }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
     }
     files.forEach(f => { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); });
     msg.textContent = `이미지 ${files.length}장을 저장했어요. 사진/파일 앱에서 카카오톡으로 보내세요.`; msg.style.display = 'block';
