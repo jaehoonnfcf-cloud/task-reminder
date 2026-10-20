@@ -218,3 +218,7 @@ alter table public.appraisal_cases add constraint appraisal_cases_scope_check ch
 -- 감정평가: 기관별 총액만 입력(total_amount) + 특이사항(note)
 alter table public.appraisal_requests add column if not exists total_amount bigint check (total_amount is null or total_amount >= 0);
 alter table public.appraisal_requests add column if not exists note text;
+
+-- 감정평가: 취급구분 (신규대출/기한연장/채권관리/기타+사유)
+alter table public.appraisal_cases add column if not exists handling_type text check (handling_type in ('신규대출','기한연장','채권관리','기타'));
+alter table public.appraisal_cases add column if not exists handling_note text;

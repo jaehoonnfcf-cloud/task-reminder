@@ -11,8 +11,10 @@ const AP_JIMOK = ['대', '전', '답', '임야', '잡종지', '공장용지', '�
 const AP_JIMOK_ABBR = { '대': '대', '전': '전', '답': '답', '임': '임야', '잡': '잡종지', '공': '공장용지', '도': '도로', '구': '구거', '천': '하천', '과': '과수원', '목': '목장용지', '학': '학교용지', '차': '주차장', '주': '주유소용지', '창': '창고용지', '체': '체육용지', '종': '종교용지', '철': '철도용지', '제': '제방', '수': '수도용지', '원': '공원', '묘': '묘지' };
 
 let apCases = [], apFirms = [], apOpenId = null, apFormId = null, apTimer = null;
-let apQ = '', apMine = false, apScope = 'all';
+let apQ = '', apMine = false, apScope = 'all', apType = 'all';
 
+const AP_TYPES = ['신규대출', '기한연장', '채권관리', '기타'];
+const apTypeText = (c) => c.handling_type ? (c.handling_type === '기타' && c.handling_note ? `기타 · ${c.handling_note}` : c.handling_type) : '-';
 const apCan = () => !!(meRow && (meRow.is_admin || meRow.perm_appraisal));
 
 // ---------- 금액 ----------
@@ -129,17 +131,19 @@ function renderAppraisal(){
     el.innerHTML = `<div class="list-panel">
       <div class="toolbar">
         <select id="apScope"><option value="all">본점·지점</option><option value="본점">본점</option><option value="지점">지점</option></select>
+        <select id="apType"><option value="all">취급구분 전체</option>${AP_TYPES.map(v => `<option>${v}</option>`).join('')}</select>
         <label class="chk"><input type="checkbox" id="apMine" /> 내 의뢰만</label>
         <input id="apQ" class="search" type="search" placeholder="🔍 채무자·소재지 검색" />
       </div>
       <div class="aphead"><span>채무자</span><span>물건</span><span>평가기관 (✓ 가격 입력 완료)</span><span>금액</span><span>의뢰일</span></div>
       <div id="apList"></div></div>`;
     $('apScope').onchange = () => { apScope = $('apScope').value; renderAppraisal(); };
+    $('apType').onchange = () => { apType = $('apType').value; renderAppraisal(); };
     $('apMine').onchange = () => { apMine = $('apMine').checked; renderAppraisal(); };
     $('apQ').oninput = () => { apQ = $('apQ').value.trim().toLowerCase(); renderAppraisal(); };
     $('apList').addEventListener('click', (e) => { const r = e.target.closest('[data-ap]'); if (r) apOpenDetail(+r.dataset.ap); });
   }
-  const shown = apCases.filter(c => (apScope === 'all' || c.scope === apScope)
+  const shown = apCases.filter(c => (apScope === 'all' || c.scope === apScope) && (apType === 'all' || c.handling_type === apType)
     && (!apMine || c.requester_email === me)
     && (!apQ || [c.debtor_name, c.memo, ...apProps(c).map(p => p.address)].some(v => (v || '').toLowerCase().includes(apQ))));
   $('apList').innerHTML = shown.map(apRowHtml).join('') || `<div class="blk-empty">${apCases.length ? '조건에 맞는 의뢰가 없어요.' : '등록된 감정평가 의뢰가 없어요.'}</div>`;
@@ -155,7 +159,7 @@ function apRowHtml(c){
   }
   const first = props[0];
   return `<div class="aprow" data-ap="${c.id}">
-    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}</div><div class="ts">의뢰 ${esc(nameOf(c.requester_email))}${c.due_date ? ` · 회신예정 ${esc(c.due_date.slice(5).replace('-', '/'))}` : ''}</div></div>
+    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}</div><div class="ts">${c.handling_type ? `<b>${esc(c.handling_type === '기타' && c.handling_note ? `기타·${c.handling_note}` : c.handling_type)}</b> · ` : ''}의뢰 ${esc(nameOf(c.requester_email))}${c.due_date ? ` · 회신예정 ${esc(c.due_date.slice(5).replace('-', '/'))}` : ''}</div></div>
     <div><b>${props.length}건</b>${first ? ` · ${esc(first.address)}${props.length > 1 ? ` 외 ${props.length - 1}` : ''}` : ''}</div>
     <div>${reqs.map(r => `<span class="afc ${apReqSum(r, props).done ? 'ok' : ''}">${esc(apFirmName(r.firm_id))}${apReqSum(r, props).done ? ' ✓' : ''}</span>`).join('') || '<span class="muted">의뢰기관 없음</span>'}</div>
     <div>${money}</div>
@@ -192,6 +196,7 @@ function renderApDetail(){
   $('apDetailPanel').innerHTML = `
     <div class="ph"><div><div style="margin-bottom:8px"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> <span class="chip" style="background:#fdf2f8;color:#9d174d">감정평가</span></div><h2>${esc(c.debtor_name)}</h2></div><button class="x" data-act="close">✕</button></div>
     <div class="apinfo">
+      <div><div class="k">취급구분</div><div class="v">${esc(apTypeText(c))}</div></div>
       <div><div class="k">의뢰자</div><div class="v">${esc(nameOf(c.requester_email))}</div></div>
       <div><div class="k">의뢰일</div><div class="v">${esc(c.request_date)}</div></div>
       <div><div class="k">회신 예정일</div><div class="v">${esc(c.due_date || '-')}</div></div>
@@ -340,7 +345,10 @@ function apOpenForm(id){
   $('apFormPanel').innerHTML = `
     <div class="ph"><h2>${c ? '감정평가 의뢰 수정' : '새 감정평가 의뢰'}</h2><button class="x" data-act="close">✕</button></div>
     <label>본점 / 지점 <span style="color:var(--danger)">*</span></label>
-    <select id="apfScope"><option value="">선택하세요 (필수)</option><option>본점</option><option>지점</option></select>
+    <div class="checks" id="apfScope">${['본점', '지점'].map(v => `<label><input type="radio" name="apfScopeR" value="${v}" ${c && c.scope === v ? 'checked' : ''}/> ${v}</label>`).join('')}</div>
+    <label>취급구분 <span style="color:var(--danger)">*</span></label>
+    <div class="checks" id="apfType">${AP_TYPES.map(v => `<label><input type="radio" name="apfTypeR" value="${v}" ${c && c.handling_type === v ? 'checked' : ''}/> ${v}</label>`).join('')}</div>
+    <input id="apfTypeNote" maxlength="100" placeholder="기타 사유를 입력하세요 (필수)" style="margin-top:8px;display:none" />
     <div class="row">
       <div><label>채무자 (예정자) <span style="color:var(--danger)">*</span></label><input id="apfDebtor" maxlength="60" placeholder="이름" /></div>
       <div><label>의뢰자 (자동)</label><input id="apfReq" disabled /></div>
@@ -356,11 +364,16 @@ function apOpenForm(id){
     <div class="apsec"><div class="k">알림 받을 사람 (체크한 사람에게만 텔레그램)</div><div class="checks" id="apNotifyList">${members.filter(m => m.is_admin || m.perm_appraisal || notify.has(m.email)).map(m => `<label><input type="checkbox" value="${esc(m.email)}" ${notify.has(m.email) ? 'checked' : ''}/> ${esc(m.name)}</label>`).join('')}</div></div>
     <label>메모 (선택)</label><textarea id="apfMemo" rows="2"></textarea>
     <div class="acts" style="margin-top:20px"><button class="btn primary" id="apfSave" style="min-height:44px;padding:8px 28px">저장</button><button class="btn" data-act="close" style="min-height:44px">취소</button></div>`;
-  $('apfScope').value = c ? c.scope : ''; $('apfDebtor').value = c ? c.debtor_name : '';
+  $('apfTypeNote').value = c ? (c.handling_note || '') : ''; apTypeSync();
+  $('apfDebtor').value = c ? c.debtor_name : '';
   $('apfReq').value = nameOf(c ? c.requester_email : me); $('apfDate').value = c ? c.request_date : kstToday(); $('apfDue').value = c ? (c.due_date || '') : ''; $('apfMemo').value = c ? (c.memo || '') : '';
   (props.length ? props : [null]).forEach(p => apAddPropBlock(p));
   $('apFormOv').style.display = 'block'; document.body.style.overflow = 'hidden';
   setTimeout(() => { try { $('apfDebtor').focus(); } catch (e) {} }, 50);
+}
+function apTypeSync(){
+  const t = document.querySelector('input[name=apfTypeR]:checked');
+  $('apfTypeNote').style.display = t && t.value === '기타' ? 'block' : 'none';
 }
 function apCloseForm(){ $('apFormOv').style.display = 'none'; apFormId = null; document.body.style.overflow = $('apDetailOv').style.display === 'block' ? 'hidden' : ''; }
 function apRenumber(){ document.querySelectorAll('#apfProps .apblock').forEach((b, i) => { b.querySelector('.bn').textContent = `물건 ${i + 1}`; }); }
@@ -388,7 +401,7 @@ function apAddPropBlock(p){
   }
   apKindSync(blk); apRenumber();
 }
-$('apFormPanel').addEventListener('change', (e) => { if (e.target.matches('.pk')) apKindSync(e.target.closest('.apblock')); });
+$('apFormPanel').addEventListener('change', (e) => { if (e.target.matches('input[name=apfTypeR]')){ apTypeSync(); if (e.target.value === '기타') $('apfTypeNote').focus(); } if (e.target.matches('.pk')) apKindSync(e.target.closest('.apblock')); });
 $('apFormPanel').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('.pq')){ e.preventDefault(); apDoSearch(e.target.closest('.apblock')); } });
 $('apFormPanel').addEventListener('click', async (e) => {
   const el = e.target.closest('[data-act],[data-pa],.it,#apfAddProp,#apfSave'); if (!el) return;
@@ -430,8 +443,11 @@ async function apDoSearch(blk){
   res.innerHTML = items.map(it => `<div class="it" data-addr="${esc(it.addr)}" data-pnu="${esc(it.pnu)}">${esc(it.addr)}${it.road ? `<small>${esc(it.road)}</small>` : ''}</div>`).join('');
 }
 async function apSaveForm(){
-  const scope = $('apfScope').value, debtor = $('apfDebtor').value.trim();
+  const scope = (document.querySelector('input[name=apfScopeR]:checked') || {}).value, debtor = $('apfDebtor').value.trim();
+  const htype = (document.querySelector('input[name=apfTypeR]:checked') || {}).value, hnote = $('apfTypeNote').value.trim();
   if (!scope) return alert('본점 / 지점 중 하나를 선택해주세요.');
+  if (!htype) return alert('취급구분(신규대출 / 기한연장 / 채권관리 / 기타)을 선택해주세요.');
+  if (htype === '기타' && !hnote) return alert('기타를 선택했어요. 사유를 입력해주세요.');
   if (!debtor) return alert('채무자(예정자) 이름을 입력해주세요.');
   const blocks = [...document.querySelectorAll('#apfProps .apblock')];
   const props = [];
@@ -445,7 +461,7 @@ async function apSaveForm(){
   }
   const firms = [...document.querySelectorAll('#apFirmList input:checked')].map(i => +i.value);
   const notify = [...document.querySelectorAll('#apNotifyList input:checked')].map(i => i.value);
-  const patch = { scope, debtor_name: debtor, request_date: $('apfDate').value || kstToday(), due_date: $('apfDue').value || null, memo: $('apfMemo').value.trim() || null, notify_emails: notify };
+  const patch = { scope, handling_type: htype, handling_note: htype === '기타' ? hnote : null, debtor_name: debtor, request_date: $('apfDate').value || kstToday(), due_date: $('apfDue').value || null, memo: $('apfMemo').value.trim() || null, notify_emails: notify };
   $('apfSave').disabled = true;
   try {
     let cid = apFormId;
