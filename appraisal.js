@@ -93,6 +93,8 @@ const apComma = (s) => { const n = apNum(s); return n === null ? '' : n.toLocale
   .leaflet-popup-content{ font-family:inherit; font-size:13.5px; line-height:1.5; margin:12px 14px; } .leaflet-popup-content button{ margin-top:6px; }
   @media (max-width:900px){
     .apmapbox{ grid-template-columns:1fr; height:auto; } #apMapEl{ height:56vh; } #apMapPanel{ max-height:none; }
+    .aprow{ padding:12px 14px; border-radius:18px; margin-bottom:9px; } .aprow .tt{ font-size:14.5px; } .aprow .ts{ font-size:11.5px; } .afc{ font-size:11.5px; padding:3px 9px; } .apmoney{ font-size:13px; }
+    .aprec{ padding:10px 12px; border-radius:16px; } .aprec .h{ font-size:13.5px; } .aprec .m{ font-size:11.5px; } .aprec .w{ font-size:12.5px; } #apMapPanel{ padding:14px; border-radius:22px; } #apMapEl{ border-radius:22px; }
     .aphead{ display:none; }
     .aprow{ grid-template-columns:minmax(0,1fr) auto; gap:6px 10px; padding:12px 14px; }
     .aprow > :nth-child(2),.aprow > :nth-child(3){ grid-column:1 / -1; }

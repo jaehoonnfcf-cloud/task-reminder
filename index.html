@@ -351,6 +351,26 @@
     .toolbar{ border-radius:18px; }
   }
   @media (max-width:760px){ #wrap{ padding:4px 14px 36px; } .divs{ margin-left:0; } .divs button{ padding:8px 6px; } }
+  /* 휴대폰: 글자·카드를 한 단계 작게 */
+  @media (max-width:760px){
+    .bar{ gap:8px; } .logo{ font-size:16px; } .btn{ font-size:13px; min-height:36px; padding:7px 14px; } .btn.small{ min-height:32px; padding:5px 12px; font-size:12.5px; }
+    .pill{ font-size:11.5px; padding:5px 10px; } .whoBtn .av{ width:28px; height:28px; }
+    .divs button{ font-size:12.5px; } .divs .n{ font-size:10.5px; padding:1px 5px; }
+    #hello{ font-size:22px; line-height:1.25; margin:6px 0 2px; }
+    #tiles,#ptiles{ gap:10px; } .tile{ padding:12px 14px; border-radius:18px; } .tile::before{ width:30px; height:30px; border-radius:10px; font-size:14px; margin-bottom:6px; }
+    .tile .n{ font-size:22px; } .tile .l{ font-size:12px; margin-top:2px; }
+    .toolbar{ padding:10px 12px; gap:8px; } .seg button{ font-size:13px; padding:6px 13px; } .chk{ font-size:13px; }
+    .sec-h{ font-size:13.5px; padding:12px 4px 7px; } .blk-h{ font-size:14.5px; padding:4px 4px 8px; } .blk-empty{ font-size:13px; }
+    .trow{ padding:12px 14px; border-radius:18px; gap:5px 9px; margin-bottom:9px; min-height:0; }
+    .tt{ font-size:14.5px; line-height:1.3; word-break:keep-all; overflow-wrap:anywhere; } .ts{ font-size:11.5px; } .pl{ font-size:11.5px; }
+    .chip{ font-size:11.5px; padding:3px 9px; } .tp{ font-size:11px; padding:3px 9px; }
+    .segs i{ width:16px; height:5px; } .av{ width:26px; height:26px; font-size:11px; }
+    .go{ font-size:12.5px; padding:7px 13px; }
+    .prow,.rrow{ padding:10px 14px; border-radius:16px; } .quick{ border-radius:18px; }
+    .panel{ padding:20px 18px; border-radius:24px; } .panel h2{ font-size:18px; } label{ font-size:12.5px; }
+    .kv .v{ font-size:14px; } .step{ font-size:13px; padding:5px 10px; }
+  }
+
 </style>
 </head>
 <body>
@@ -1407,6 +1427,6 @@
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
-<script src="appraisal.js?v=26"></script>
+<script src="appraisal.js?v=28"></script>
 </body>
 </html>
