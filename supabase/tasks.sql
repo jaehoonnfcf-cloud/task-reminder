@@ -242,3 +242,7 @@ create table if not exists public.appraisal_settings (
 
 -- 감정평가기관 팩스번호 (의뢰서 수신처에 표시). 의뢰번호는 DB 컬럼 없이 '요청연도-건번호(4자리)'로 계산
 alter table public.appraisal_firms add column if not exists fax text not null default '';
+
+-- 감정평가 지도: 물건 좌표 (주소 검색 결과의 좌표를 등록 시 저장, 기존 물건은 관리자 화면에서 채우기)
+alter table public.appraisal_properties add column if not exists lat double precision;
+alter table public.appraisal_properties add column if not exists lng double precision;

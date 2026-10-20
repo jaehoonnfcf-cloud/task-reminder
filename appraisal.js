@@ -13,6 +13,7 @@ const AP_JIMOK = ['대', '전', '답', '임야', '잡종지', '공장용지', '�
 const AP_JIMOK_ABBR = { '대': '대', '전': '전', '답': '답', '임': '임야', '잡': '잡종지', '공': '공장용지', '도': '도로', '구': '구거', '천': '하천', '과': '과수원', '목': '목장용지', '학': '학교용지', '차': '주차장', '주': '주유소용지', '창': '창고용지', '체': '체육용지', '종': '종교용지', '철': '철도용지', '제': '제방', '수': '수도용지', '원': '공원', '묘': '묘지' };
 
 let apCases = [], apFirms = [], apSettings = {}, apOpenId = null, apFormId = null, apTimer = null;
+let apMainView = (() => { try { return localStorage.getItem('apMain') || 'map'; } catch (e) { return 'map'; } })();
 let apQ = '', apMine = false, apScope = 'all', apType = 'all', apView = 'active';
 
 const AP_TYPES = ['신규대출', '기한연장', '채권관리', '기타'];
@@ -76,7 +77,23 @@ const apComma = (s) => { const n = apNum(s); return n === null ? '' : n.toLocale
   .apst{ font-size:12.5px; margin-top:4px; color:var(--muted); } .apst.ok{ color:var(--green); } .apst.bad{ color:var(--danger); }
   .apaddr{ background:#f1f2f4 !important; font-weight:600; }
   #apFirmList,#apNotifyList{ display:flex; flex-wrap:wrap; gap:4px 16px; }
+  .apmapbox{ display:grid; grid-template-columns:minmax(0,1fr) 370px; height:calc(100vh - 230px); min-height:500px; border-top:1px solid var(--line); }
+  #apMapEl{ min-height:300px; background:#e8ecf1; z-index:0; } #apMapPanel{ overflow-y:auto; padding:14px 16px; border-left:1px solid var(--line); background:#fff; }
+  .aplegend{ display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; padding:9px 16px; font-size:12.5px; border-top:1px solid var(--line); }
+  .aplegend i.apin{ display:inline-block; width:12px; height:12px; margin-right:5px; vertical-align:-1px; }
+  .apin{ border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.45); }
+  .apin.s-wait{ background:#f59e0b; } .apin.s-done{ background:#2563eb; } .apin.s-sel{ background:#16a34a; } .apin.s-arc{ background:#9ca3af; }
+  .apin-wrap{ background:none !important; border:0 !important; } .apin-wrap .apin{ width:26px; height:26px; display:flex; align-items:center; justify-content:center; }
+  .apin-wrap .apin b{ transform:rotate(45deg); color:#fff; font-size:11px; font-weight:800; }
+  .apq{ width:18px; height:18px; border-radius:50%; background:#ef4444; border:3px solid #fff; box-shadow:0 0 0 4px rgba(239,68,68,.35); }
+  .aprec{ border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; cursor:pointer; background:#fff; } .aprec:hover{ background:#f7f8fa; }
+  .aprec .h{ font-weight:800; font-size:14.5px; } .aprec .m{ font-size:12.5px; color:var(--muted); margin-top:2px; } .aprec .w{ font-size:13.5px; font-weight:700; margin-top:4px; }
+  .aprec.same{ border-color:#16a34a; background:#f0fdf4; }
+  .apnew{ border:2px dashed #cbd2dc; border-radius:10px; padding:14px; text-align:center; margin-bottom:10px; }
+  .apdup{ margin-top:6px; padding:7px 10px; border-radius:8px; background:#fff3d6; color:#7a4b00; font-size:12.5px; font-weight:600; }
+  .leaflet-popup-content{ font-family:inherit; font-size:13.5px; line-height:1.5; margin:12px 14px; } .leaflet-popup-content button{ margin-top:6px; }
   @media (max-width:900px){
+    .apmapbox{ grid-template-columns:1fr; height:auto; } #apMapEl{ height:56vh; } #apMapPanel{ border-left:0; border-top:1px solid var(--line); max-height:none; }
     .aphead{ display:none; }
     .aprow{ grid-template-columns:minmax(0,1fr) auto; gap:6px 10px; padding:12px 14px; }
     .aprow > :nth-child(2),.aprow > :nth-child(3){ grid-column:1 / -1; }
@@ -124,6 +141,7 @@ async function loadAppraisal(){
   if (apOpenId && !(document.activeElement && $('apDetailOv').contains(document.activeElement) && /INPUT/.test(document.activeElement.tagName))) renderApDetail();
   if (typeof apRenderFirms === 'function' && $('aFirms')) apRenderFirms();
   if ($('aContacts') && !$('aContacts').contains(document.activeElement)) apRenderContacts();
+  if ($('aGeo')) apRenderGeo();
 }
 function scheduleAp(){ clearTimeout(apTimer); apTimer = setTimeout(() => { if (me) loadAppraisal(); }, 400); }
 function apBadge(){
@@ -137,7 +155,21 @@ function renderAppraisal(){
   const el = $('appraisal');
   if (!el.dataset.ready){
     el.dataset.ready = '1';
-    el.innerHTML = `<div class="list-panel">
+    el.innerHTML = `<div class="seg" id="apMain" style="align-self:flex-start;background:rgba(255,255,255,.92)"><button data-m="map">🗺 지도 (기록 찾기)</button><button data-m="list">📋 목록</button></div>
+    <div id="apMapWrap" class="list-panel" style="display:none">
+      <div class="toolbar" style="position:relative">
+        <input id="apMq" class="search" type="search" placeholder="🔍 지번 검색 (예: 동산면 원창리 99) — 기존 감정 기록 찾기" style="min-width:240px" />
+        <button class="btn primary small" id="apMgo">검색</button>
+        <select id="apMr" title="근처 기록 반경"><option value="200">반경 200m</option><option value="300" selected>반경 300m</option><option value="500">반경 500m</option><option value="1000">반경 1km</option></select>
+        <div class="seg" id="apMlayer"><button data-l="base" class="on">일반</button><button data-l="sat">항공</button></div>
+        <label class="chk"><input type="checkbox" id="apMcad" checked /> 지적도</label>
+        <label class="chk"><input type="checkbox" id="apMarch" checked /> 보관 기록 포함</label>
+        <div id="apMres" class="apres" style="position:absolute;left:12px;top:100%;z-index:500;width:min(520px,calc(100% - 24px));box-shadow:0 6px 20px rgba(9,30,66,.3)"></div>
+      </div>
+      <div class="apmapbox"><div id="apMapEl"></div><div id="apMapPanel"></div></div>
+      <div class="aplegend"><span><i class="apin s-wait"></i>가격 대기</span><span><i class="apin s-done"></i>가격 도착</span><span><i class="apin s-sel"></i>채택 완료</span><span><i class="apin s-arc"></i>보관</span><span id="apMnote" class="muted"></span></div>
+    </div>
+    <div id="apListWrap" class="list-panel" style="display:none">
       <div class="toolbar">
         <div class="seg" id="apView"><button data-v="active">진행중 <span id="apNA"></span></button><button data-v="archive">📦 보관함 <span id="apNB"></span></button></div>
         <select id="apScope"><option value="all">본점·지점</option><option value="본점">본점</option><option value="지점">지점</option></select>
@@ -147,6 +179,8 @@ function renderAppraisal(){
       </div>
       <div class="aphead"><span>채무자</span><span>물건</span><span>평가기관 (✓ 가격 입력 완료)</span><span>금액</span><span>의뢰일</span></div>
       <div id="apList"></div></div>`;
+    $('apMain').onclick = (e) => { const b = e.target.closest('[data-m]'); if (b) apSetMain(b.dataset.m); };
+    apMapWire();
     $('apView').onclick = (e) => { const b = e.target.closest('[data-v]'); if (!b) return; apView = b.dataset.v; renderAppraisal(); };
     $('apScope').onchange = () => { apScope = $('apScope').value; renderAppraisal(); };
     $('apType').onchange = () => { apType = $('apType').value; renderAppraisal(); };
@@ -154,6 +188,7 @@ function renderAppraisal(){
     $('apQ').oninput = () => { apQ = $('apQ').value.trim().toLowerCase(); renderAppraisal(); };
     $('apList').addEventListener('click', (e) => { const r = e.target.closest('[data-ap]'); if (r) apOpenDetail(+r.dataset.ap); });
   }
+  apSetMain(apMainView, true);
   const nb = apCases.filter(c => c.archived_at).length;
   $('apNA').textContent = apCases.length - nb; $('apNB').textContent = nb;
   document.querySelectorAll('#apView button').forEach(b => b.classList.toggle('on', b.dataset.v === apView));
@@ -225,7 +260,7 @@ function renderApDetail(){
       ${reqs.length && props.length ? `<div class="apm"><table class="apt"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td><b>전체금액만 입력</b><div class="muted">물건별 금액 없이 총액만 받은 경우</div></td>${tinp}</tr><tr class="tot"><td>합계</td>${tot}</tr><tr><td><b>특이사항</b><div class="muted">기관별 코멘트</div></td>${notes}</tr><tr><td></td>${save}</tr></tbody></table></div>` : '<div class="blk-empty">의뢰한 평가기관이나 물건이 없어요. 수정에서 추가해주세요.</div>'}
       ${can && c.chosen_firm_id ? '<div style="margin-top:8px"><button class="btn small" data-act="unchoose">채택 해제 (가격만 조회)</button></div>' : ''}
     </div>
-    <div class="foot" style="margin-top:22px"><button class="btn" data-act="print">🖨 보고서 인쇄</button><button class="btn" data-act="fax">📠 감정평가 의뢰서 (팩스)</button>${can ? `<button class="btn" data-act="edit">✏ 수정</button><button class="btn" data-act="${c.archived_at ? 'unarchive' : 'archive'}">${c.archived_at ? '↩ 보관함에서 꺼내기' : '📦 보관함으로 이동'}</button>${(c.created_by === me || isAdmin()) ? '<button class="btn danger" data-act="del">삭제</button>' : ''}` : '<span class="muted">👀 감정평가 권한이 없어 보기만 할 수 있어요.</span>'}</div>`;
+    <div class="foot" style="margin-top:22px"><button class="btn" data-act="map">🗺 지도에서 보기</button><button class="btn" data-act="print">🖨 보고서 인쇄</button><button class="btn" data-act="fax">📠 감정평가 의뢰서 (팩스)</button>${can ? `<button class="btn" data-act="edit">✏ 수정</button><button class="btn" data-act="${c.archived_at ? 'unarchive' : 'archive'}">${c.archived_at ? '↩ 보관함에서 꺼내기' : '📦 보관함으로 이동'}</button>${(c.created_by === me || isAdmin()) ? '<button class="btn danger" data-act="del">삭제</button>' : ''}` : '<span class="muted">👀 감정평가 권한이 없어 보기만 할 수 있어요.</span>'}</div>`;
   draft.sort((a, b) => (a[0][0] === 't') - (b[0][0] === 't')).forEach(([k, val]) => {
     const inp = $('apDetailPanel').querySelector(`[data-k="${k}"]`);
     if (inp && !inp.disabled && inp.value !== val){ inp.value = val; inp.dispatchEvent(new Event('input', { bubbles: true })); }
@@ -260,6 +295,7 @@ $('apDetailPanel').addEventListener('click', async (e) => {
   const act = b.dataset.act;
   if (act === 'close') return apCloseDetail();
   if (act === 'edit') return apOpenForm(c.id);
+  if (act === 'map') return apShowOnMap(c);
   if (act === 'print') return apPrint(c);
   if (act === 'fax') return apOpenFax(c);
   if (act === 'archive' || act === 'unarchive'){
@@ -324,13 +360,14 @@ function apJsonp(url, timeout = 12000){
     document.body.appendChild(s);
   });
 }
-// 반환: { items: [{addr, road, pnu}], raw }
+const apCoord = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
+// 반환: { items: [{addr, road, pnu, lat, lng}], raw }
 async function apSearchAddr(q){
   let raw = null;
   try {   // 1순위: 검색 API 2.0 (지번 주소 + 필지 고유번호)
     raw = await apJsonp(`https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:4326&size=10&page=1&type=address&category=parcel&format=json&errorformat=json&key=${VWORLD_KEY}&domain=${encodeURIComponent(location.hostname)}&query=${encodeURIComponent(q)}`);
     const arr = raw && raw.response && raw.response.result && raw.response.result.items;
-    if (arr && arr.length) return { raw, items: arr.map(it => ({ addr: (it.address && (it.address.parcel || it.address.road)) || '', road: (it.address && it.address.road) || '', pnu: it.id || '' })).filter(x => x.addr) };
+    if (arr && arr.length) return { raw, items: arr.map(it => ({ addr: (it.address && (it.address.parcel || it.address.road)) || '', road: (it.address && it.address.road) || '', pnu: it.id || '', lat: apCoord(it.point && it.point.y), lng: apCoord(it.point && it.point.x) })).filter(x => x.addr) };
   } catch (e) { raw = { error: String(e.message || e) }; }
   try {   // 2순위: NFCF_CRM 에서 쓰던 지번 검색
     const d = await apJsonp(`https://map.vworld.kr/search.do?category=jibun&q=${encodeURIComponent(q)}&pageunit=10&output=json&pageindex=1&apiKey=${VWORLD_KEY}`);
@@ -365,7 +402,7 @@ async function apLookupLand(pnu){
 }
 
 // ---------- 등록 / 수정 폼 ----------
-function apOpenForm(id){
+function apOpenForm(id, prefill){
   if (!apCan()) return alert('감정평가에 등록할 권한이 없어요. 관리자에게 문의해주세요.');
   apFormId = id || null;
   const c = id ? apCases.find(x => x.id === id) : null;
@@ -397,6 +434,7 @@ function apOpenForm(id){
   $('apfDebtor').value = c ? c.debtor_name : '';
   $('apfReq').value = nameOf(c ? c.requester_email : me); $('apfDate').value = c ? c.request_date : kstToday(); $('apfLoan').value = c && c.loan_amount !== null && c.loan_amount !== undefined ? Number(c.loan_amount).toLocaleString('ko-KR') : ''; apLoanHint(); $('apfMemo').value = c ? (c.memo || '') : '';
   (props.length ? props : [null]).forEach(p => apAddPropBlock(p));
+  if (prefill && !c){ const b0 = document.querySelector('#apfProps .apblock'); b0.querySelector('.pq').value = prefill.addr; apApplyAddress(b0, prefill); }
   $('apFormOv').style.display = 'block'; document.body.style.overflow = 'hidden';
   setTimeout(() => { try { $('apfDebtor').focus(); } catch (e) {} }, 50);
 }
@@ -427,7 +465,7 @@ function apAddPropBlock(p){
   $('apfProps').appendChild(blk);
   if (!$('apJimokDl')){ const dl = document.createElement('datalist'); dl.id = 'apJimokDl'; dl.innerHTML = AP_JIMOK.map(j => `<option value="${j}">`).join(''); document.body.appendChild(dl); }
   if (p){
-    blk.querySelector('.pk').value = p.kind; blk.querySelector('.pa').value = p.address; blk.dataset.verified = '1'; blk.dataset.pnu = p.pnu || '';
+    blk.querySelector('.pk').value = p.kind; blk.querySelector('.pa').value = p.address; blk.dataset.verified = '1'; blk.dataset.pnu = p.pnu || ''; blk.dataset.lat = p.lat ?? ''; blk.dataset.lng = p.lng ?? '';
     blk.querySelector('.pj').value = p.jimok || ''; blk.querySelector('.pl').value = p.land_area === null || p.land_area === undefined ? '' : p.land_area; blk.querySelector('.pr').value = p.area === null ? '' : p.area; blk.querySelector('.pd').value = p.detail || '';
   }
   apKindSync(blk); apRenumber();
@@ -447,24 +485,40 @@ $('apFormPanel').addEventListener('click', async (e) => {
   }
   if (el.dataset.pa === 'search') return apDoSearch(blk);
   if (el.classList.contains('it')){
-    const res = blk.querySelector('.apres'), st = blk.querySelector('.apst');
-    blk.querySelector('.pa').value = el.dataset.addr; blk.dataset.verified = '1'; blk.dataset.pnu = el.dataset.pnu || '';
-    res.style.display = 'none'; res.innerHTML = '';
-    st.className = 'apst ok'; st.textContent = '✔ 확인된 주소입니다. 지목·면적을 조회하는 중…';
-    const land = await apLookupLand(el.dataset.pnu);
-    const kind = blk.querySelector('.pk').value;
-    const filled = [];
-    if (kind === '토지'){
-      if (land.jimok && !blk.querySelector('.pj').value){ blk.querySelector('.pj').value = land.jimok; filled.push('지목'); }
-      if (land.area !== null && !blk.querySelector('.pr').value){ blk.querySelector('.pr').value = land.area; filled.push('면적'); }
-    } else if (kind === '건물'){
-      if (land.jimok && !blk.querySelector('.pj').value){ blk.querySelector('.pj').value = land.jimok; filled.push('지목'); }
-      if (land.area !== null && !blk.querySelector('.pl').value){ blk.querySelector('.pl').value = land.area; filled.push('대지면적'); }
-    } else if (land.jimok && !blk.querySelector('.pj').value){ blk.querySelector('.pj').value = land.jimok; filled.push('지목'); }
-    st.className = 'apst ok';
-    st.textContent = filled.length ? `✔ 확인된 주소 · ${filled.join('·')} 자동 입력됨 (다르면 직접 고쳐주세요)` : `✔ 확인된 주소 · 지목·면적은 자동조회가 되지 않아 직접 입력해주세요${land.note ? ` (${land.note})` : ''}`;
+    blk.querySelector('.apres').style.display = 'none'; blk.querySelector('.apres').innerHTML = '';
+    return apApplyAddress(blk, { addr: el.dataset.addr, pnu: el.dataset.pnu || '', lat: apCoord(el.dataset.lat), lng: apCoord(el.dataset.lng) });
   }
 });
+const apNorm = (t) => String(t || '').replace(/\s+/g, '');
+// 같은 필지(PNU 또는 주소 일치)의 기존 기록
+function apSameRecords(pnu, addr, excludeCid){
+  const out = [];
+  apCases.forEach(c => { if (c.id === excludeCid) return; const hit = apProps(c).find(p => (pnu && p.pnu && p.pnu === pnu) || (addr && apNorm(p.address) === apNorm(addr))); if (hit) out.push({ c, p: hit }); });
+  return out.sort((a, b) => String(b.c.request_date).localeCompare(String(a.c.request_date)));
+}
+function apCaseMoney(c){
+  const props = apProps(c), reqs = apReqs(c), ch = reqs.find(r => r.firm_id === c.chosen_firm_id);
+  if (ch && apReqSum(ch, props).mode !== 'none') return `채택 ${apFirmName(ch.firm_id)} ${apWon(apReqSum(ch, props).total)}`;
+  const t = reqs.map(r => apReqSum(r, props)).filter(x => x.done).map(x => x.total);
+  if (!t.length) return '가격 미접수';
+  const mn = Math.min(...t), mx = Math.max(...t);
+  return mn === mx ? apWon(mn) : `${apWon(mn)} ~ ${apWon(mx)}`;
+}
+async function apApplyAddress(blk, a){
+  const st = blk.querySelector('.apst');
+  blk.querySelector('.pa').value = a.addr; blk.dataset.verified = '1'; blk.dataset.pnu = a.pnu || '';
+  blk.dataset.lat = a.lat ?? ''; blk.dataset.lng = a.lng ?? '';
+  st.className = 'apst ok'; st.textContent = '✔ 확인된 주소입니다. 지목·면적을 조회하는 중…';
+  const dup = apSameRecords(a.pnu, a.addr, apFormId);
+  const dupHtml = dup.length ? `<div class="apdup">⚠ 이 필지에 기존 감정평가 기록이 ${dup.length}건 있어요 — ${dup.slice(0, 3).map(d => `${esc(d.c.request_date)} ${esc(d.c.scope)} ${esc(apTypeText(d.c))} · ${esc(apCaseMoney(d.c))}`).join(' / ')}${dup.length > 3 ? ' …' : ''}</div>` : '';
+  const land = await apLookupLand(a.pnu);
+  const kind = blk.querySelector('.pk').value, filled = [];
+  const setIf = (sel, v, label) => { if (v !== '' && v !== null && !blk.querySelector(sel).value){ blk.querySelector(sel).value = v; filled.push(label); } };
+  setIf('.pj', land.jimok, '지목');
+  if (kind === '토지') setIf('.pr', land.area ?? '', '면적'); else if (kind === '건물') setIf('.pl', land.area ?? '', '대지면적');
+  st.className = 'apst ok';
+  st.innerHTML = (filled.length ? `✔ 확인된 주소 · ${filled.join('·')} 자동 입력됨 (다르면 직접 고쳐주세요)` : `✔ 확인된 주소 · 지목·면적은 자동조회가 되지 않아 직접 입력해주세요${land.note ? ` (${esc(land.note)})` : ''}`) + dupHtml;
+}
 async function apDoSearch(blk){
   const q = blk.querySelector('.pq').value.trim(), res = blk.querySelector('.apres');
   if (q.length < 2) return alert('검색어를 두 글자 이상 입력해주세요.');
@@ -475,7 +529,7 @@ async function apDoSearch(blk){
       <details style="padding:6px 12px"><summary class="muted" style="cursor:pointer;font-size:12px">🔧 응답 원본 보기</summary><pre style="white-space:pre-wrap;font-size:11px;max-height:160px;overflow:auto">${esc(JSON.stringify(raw, null, 1)).slice(0, 2500)}</pre></details>`;
     return;
   }
-  res.innerHTML = items.map(it => `<div class="it" data-addr="${esc(it.addr)}" data-pnu="${esc(it.pnu)}">${esc(it.addr)}${it.road ? `<small>${esc(it.road)}</small>` : ''}</div>`).join('');
+  res.innerHTML = items.map(it => `<div class="it" data-addr="${esc(it.addr)}" data-pnu="${esc(it.pnu)}" data-lat="${it.lat ?? ''}" data-lng="${it.lng ?? ''}">${esc(it.addr)}${it.road ? `<small>${esc(it.road)}</small>` : ''}</div>`).join('');
 }
 async function apSaveForm(){
   const scope = (document.querySelector('input[name=apfScopeR]:checked') || {}).value, debtor = $('apfDebtor').value.trim();
@@ -497,7 +551,7 @@ async function apSaveForm(){
       landArea = Number(b.querySelector('.pl').value.trim().replace(/,/g, ''));
       if (!landArea || isNaN(landArea) || landArea <= 0) return alert(`물건 ${i + 1}: 대지면적(㎡)을 숫자로 입력해주세요.`);
     }
-    props.push({ id: b.dataset.id ? +b.dataset.id : null, seq: i + 1, kind, address: addr, pnu: b.dataset.pnu || null, jimok: jimok || null, area, land_area: landArea, detail: b.querySelector('.pd').value.trim() || null });
+    props.push({ id: b.dataset.id ? +b.dataset.id : null, seq: i + 1, kind, address: addr, pnu: b.dataset.pnu || null, lat: b.dataset.lat ? Number(b.dataset.lat) : null, lng: b.dataset.lng ? Number(b.dataset.lng) : null, jimok: jimok || null, area, land_area: landArea, detail: b.querySelector('.pd').value.trim() || null });
   }
   const firms = [...document.querySelectorAll('#apFirmList input:checked')].map(i => +i.value);
   const notify = [...document.querySelectorAll('#apNotifyList input:checked')].map(i => i.value);
@@ -758,7 +812,7 @@ async function apPvPrint(){
 }
 function apLoadH2C(){
   if (window.html2canvas) return Promise.resolve();
-  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'html2canvas.min.js?v=1'; s.onload = res; s.onerror = () => rej(new Error('이미지 도구를 불러오지 못했어요')); document.head.appendChild(s); });
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'vendor/html2canvas.min.js?v=1'; s.onload = res; s.onerror = () => rej(new Error('이미지 도구를 불러오지 못했어요')); document.head.appendChild(s); });
 }
 async function apPvShare(){
   const btn = $('apPvShare'), msg = $('apPvMsg'), old = btn.textContent;
@@ -802,4 +856,204 @@ document.addEventListener('click', async (e) => {
   b.disabled = false;
   if (error) return alert('저장하지 못했어요: ' + error.message);
   apSettings[sc] = row; toast(`${sc} 회신 연락처를 저장했어요`);
+});
+
+// ---------- 지도: 기존 감정 기록 찾기 (브이월드 타일 + Leaflet) ----------
+let apMap = null, apCluster = null, apTemp = null, apBase = null, apSat = null, apHyb = null, apCad = null, apFallback = null;
+let apMapInitP = null, apMapFirst = true, apMapLast = null, apMarkers = {}, apTileErr = 0, apTileOk = 0;
+const AP_CENTER = [37.8813, 127.7298];   // 춘천시청 부근 (기록이 없을 때)
+const AP_STATE = { wait: '가격 대기', done: '가격 도착', sel: '채택 완료', arc: '보관' };
+
+function apLoadScript(src){ return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('지도 도구를 불러오지 못했어요')); document.head.appendChild(s); }); }
+function apLoadCss(href){ const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l); }
+function apLoadLeaflet(){
+  if (window.L && L.markerClusterGroup) return Promise.resolve();
+  if (!apMapInitP) apMapInitP = (async () => {
+    ['vendor/leaflet.css?v=1', 'vendor/MarkerCluster.css?v=1', 'vendor/MarkerCluster.Default.css?v=1'].forEach(apLoadCss);
+    await apLoadScript('vendor/leaflet.js?v=1'); await apLoadScript('vendor/leaflet.markercluster.js?v=1');
+  })().catch(e => { apMapInitP = null; throw e; });
+  return apMapInitP;
+}
+function apSetMain(v, quiet){
+  apMainView = v === 'list' ? 'list' : 'map';
+  if (!quiet){ try { localStorage.setItem('apMain', apMainView); } catch (e) {} }
+  document.querySelectorAll('#apMain button').forEach(b => b.classList.toggle('on', b.dataset.m === apMainView));
+  $('apMapWrap').style.display = apMainView === 'map' ? 'block' : 'none';
+  $('apListWrap').style.display = apMainView === 'list' ? 'block' : 'none';
+  if (apMainView === 'map') apMapEnsure();
+}
+async function apMapEnsure(){
+  try { await apLoadLeaflet(); } catch (e) { $('apMapPanel').innerHTML = `<div class="apdup">${esc(e.message)} — 목록 화면을 이용해주세요.</div>`; return; }
+  if ($('apMapWrap').style.display === 'none') return;
+  if (!apMap) apMapCreate();
+  apMap.invalidateSize();
+  apMapRefresh();
+}
+function apMapCreate(){
+  const key = VWORLD_KEY, tile = (layer, ext) => `https://api.vworld.kr/req/wmts/1.0.0/${key}/${layer}/{z}/{y}/{x}.${ext}`;
+  apMap = L.map('apMapEl', { zoomControl: true, preferCanvas: true }).setView(AP_CENTER, 13);
+  const opt = { maxZoom: 19, maxNativeZoom: 18, attribution: '© 브이월드(국토교통부)' };
+  apBase = L.tileLayer(tile('Base', 'png'), opt).addTo(apMap);
+  apSat = L.tileLayer(tile('Satellite', 'jpeg'), opt); apHyb = L.tileLayer(tile('Hybrid', 'png'), { ...opt, maxNativeZoom: 18 });
+  apCad = L.tileLayer.wms('https://api.vworld.kr/req/wms', { layers: 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun', styles: 'lp_pa_cbnd_bubun_line,lp_pa_cbnd_bonbun_line', format: 'image/png', transparent: true, version: '1.3.0', key, domain: location.hostname, maxZoom: 19, opacity: .9 });
+  apCad.addTo(apMap);
+  // 브이월드 타일이 계속 실패하면(키·도메인 문제 등) 기본 지도로 대체
+  [apBase, apSat].forEach(l => { l.on('tileload', () => { apTileOk++; }); l.on('tileerror', () => { apTileErr++; if (apTileErr >= 6 && !apTileOk && !apFallback) apMapFallback(); }); });
+  apCluster = L.markerClusterGroup({ maxClusterRadius: 45, showCoverageOnHover: false }); apMap.addLayer(apCluster);
+  apMap.on('click', () => { /* 지도 빈 곳 클릭: 아무 동작 없음 */ });
+}
+function apMapFallback(){
+  apFallback = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(apMap);
+  apFallback.bringToBack();
+  $('apMnote').textContent = '⚠ 브이월드 지도를 불러오지 못해 기본 지도로 표시 중이에요 (인증키·도메인 등록 확인 필요).';
+}
+function apCaseState(c){
+  if (c.archived_at) return 'arc';
+  const props = apProps(c), reqs = apReqs(c), ch = reqs.find(r => r.firm_id === c.chosen_firm_id);
+  if (ch && apReqSum(ch, props).mode !== 'none') return 'sel';
+  return reqs.some(r => apReqSum(r, props).done) ? 'done' : 'wait';
+}
+function apMapRefresh(){
+  if (!apMap || !apCluster) return;
+  apCluster.clearLayers(); apMarkers = {};
+  const withArc = $('apMarch').checked; let missing = 0, latest = null;
+  apCases.forEach(c => {
+    if (c.archived_at && !withArc) return;
+    const props = apProps(c), st = apCaseState(c);
+    props.forEach((p, i) => {
+      if (p.lat === null || p.lat === undefined || p.lng === null || p.lng === undefined){ missing++; return; }
+      const icon = L.divIcon({ className: 'apin-wrap', html: `<div class="apin s-${st}"><b>${props.length > 1 ? i + 1 : ''}</b></div>`, iconSize: [26, 26], iconAnchor: [13, 26], popupAnchor: [0, -24] });
+      const m = L.marker([p.lat, p.lng], { icon }).bindPopup(apPopupHtml(c, p, i, props.length, st));
+      apCluster.addLayer(m); (apMarkers[c.id] = apMarkers[c.id] || []).push(m);
+      if (!latest || c.id > latest.c.id) latest = { c, p };
+    });
+  });
+  const note = $('apMnote');
+  if (!apFallback) note.textContent = missing ? `⚠ 좌표가 없는 물건 ${missing}개는 지도에 표시되지 않아요 (관리자 화면 → 지도 좌표 채우기)` : '';
+  if (apMapFirst && latest){
+    apMapFirst = false;
+    apMap.setView([latest.p.lat, latest.p.lng], 15);   // 가장 최근 등록 위치부터
+  }
+  apMapPanelRender();
+}
+function apPopupHtml(c, p, i, n, st){
+  return `<b>${esc(c.debtor_name)}</b> <span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span><br>${esc(p.address)}${n > 1 ? ` <span class="muted">(물건 ${n}개 중 ${i + 1}번)</span>` : ''}
+    <br><span class="muted">${esc(p.kind)}${p.jimok ? ` · ${esc(p.jimok)}` : ''}${p.area ? ` · ${Number(p.area).toLocaleString('ko-KR')}㎡` : ''}</span>
+    <br>${esc(apTypeText(c))} · ${esc(c.request_date)}<br><b>${esc(apCaseMoney(c))}</b> <span class="muted">· ${AP_STATE[st]}</span>
+    <br><button class="btn small primary" data-apopen="${c.id}">상세 보기</button>`;
+}
+const apDist = (a, b, c2, d) => { const R = 6371000, t = Math.PI / 180, dLa = (c2 - a) * t, dLo = (d - b) * t, x = Math.sin(dLa / 2) ** 2 + Math.cos(a * t) * Math.cos(c2 * t) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
+const apDistText = (m) => m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)}km`;
+function apRecHtml(c, p, extra, cls){
+  return `<div class="aprec ${cls || ''}" data-apopen="${c.id}" data-aplat="${p && p.lat !== null && p.lat !== undefined ? p.lat : ''}" data-aplng="${p && p.lng !== null && p.lng !== undefined ? p.lng : ''}">
+    <div class="h"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}${c.archived_at ? ' <span class="muted">📦</span>' : ''}</div>
+    <div class="m">${p ? esc(p.address) : ''}${extra ? ` · <b>${esc(extra)}</b>` : ''}</div>
+    <div class="m">${esc(c.request_date)} · ${esc(apTypeText(c))} · ${esc(nameOf(c.requester_email))}</div>
+    <div class="w">${esc(apCaseMoney(c))}</div></div>`;
+}
+function apMapPanelRender(){
+  const el = $('apMapPanel'), a = apMapLast;
+  if (!a){
+    const rec = [...apCases].sort((x, y) => String(y.created_at).localeCompare(String(x.created_at))).slice(0, 8);
+    el.innerHTML = `<div style="font-weight:800;margin-bottom:6px">🔎 새 의뢰 전에 기존 기록부터 찾아보세요</div>
+      <div class="muted" style="margin-bottom:12px;font-size:13px">위 검색창에 지번을 입력하면 그 위치로 이동하고, 같은 필지와 근처의 기존 감정 기록을 보여 드려요.</div>
+      <div style="font-weight:800;margin:8px 0">최근 등록 기록</div>${rec.map(c => apRecHtml(c, apProps(c)[0], '')).join('') || '<div class="muted">아직 기록이 없어요.</div>'}`;
+    return;
+  }
+  const r = +$('apMr').value, withArc = $('apMarch').checked;
+  const same = apSameRecords(a.pnu, a.addr, null).filter(x => withArc || !x.c.archived_at);
+  const sameIds = new Set(same.map(x => x.c.id + ':' + x.p.id));
+  const near = [];
+  if (a.lat !== null && a.lng !== null) apCases.forEach(c => { if (c.archived_at && !withArc) return; apProps(c).forEach(p => {
+    if (p.lat === null || p.lat === undefined || sameIds.has(c.id + ':' + p.id)) return;
+    const d = apDist(a.lat, a.lng, p.lat, p.lng); if (d <= r) near.push({ c, p, d }); }); });
+  near.sort((x, y) => x.d - y.d);
+  let h = `<div style="font-weight:800;font-size:15px;margin-bottom:2px">📍 ${esc(a.addr)}</div><div class="muted" style="margin-bottom:12px;font-size:12.5px">${a.lat === null ? '좌표를 가져오지 못해 지도 이동과 근처 검색은 되지 않았어요.' : `검색한 위치 · 반경 ${r >= 1000 ? r / 1000 + 'km' : r + 'm'} 기준`}</div>`;
+  if (same.length) h += `<div style="font-weight:800;margin:6px 0">✅ 이 필지 기록 ${same.length}건</div>` + same.map(x => apRecHtml(x.c, x.p, '', 'same')).join('');
+  else h += `<div class="apnew"><div style="font-weight:800;margin-bottom:4px">🆕 신규 — 이 필지의 기록이 없어요</div>${apCan() ? '<button class="btn primary" data-apnew="1">＋ 이 주소로 감정평가 의뢰</button>' : '<div class="muted" style="font-size:12.5px">의뢰 등록은 감정평가 권한이 있는 담당자가 할 수 있어요.</div>'}</div>`;
+  if (near.length) h += `<div style="font-weight:800;margin:12px 0 6px">📌 근처 기록 ${near.length}건 <span class="muted" style="font-weight:500">(가까운 순)</span></div>` + near.slice(0, 30).map(x => apRecHtml(x.c, x.p, apDistText(x.d))).join('') + (near.length > 30 ? `<div class="muted">… 외 ${near.length - 30}건</div>` : '');
+  else if (same.length === 0) h += `<div class="muted" style="margin-top:6px">반경 ${r >= 1000 ? r / 1000 + 'km' : r + 'm'} 안에 다른 기록도 없어요.</div>`;
+  if (same.length && apCan()) h += `<div style="margin-top:10px"><button class="btn small" data-apnew="1">그래도 새로 의뢰하기</button></div>`;
+  el.innerHTML = h;
+}
+function apMapLocate(a){
+  apMapLast = a;
+  if (apTemp){ apMap.removeLayer(apTemp); apTemp = null; }
+  if (a.lat !== null && a.lng !== null){
+    apTemp = L.marker([a.lat, a.lng], { icon: L.divIcon({ className: 'apin-wrap', html: '<div class="apq"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), zIndexOffset: 1000 }).addTo(apMap);
+    apMap.setView([a.lat, a.lng], 17);
+  }
+  apMapPanelRender();
+  $('apMapPanel').scrollTop = 0;
+}
+async function apMapSearch(){
+  const q = $('apMq').value.trim(), res = $('apMres');
+  if (q.length < 2) return alert('검색어를 두 글자 이상 입력해주세요.');
+  res.style.display = 'block'; res.innerHTML = '<div class="it" style="cursor:default">검색 중…</div>';
+  const { items, raw } = await apSearchAddr(q);
+  if (!items.length){
+    res.innerHTML = `<div class="it" style="cursor:default;color:var(--danger)">검색 결과가 없어요. 동·리 이름과 번지를 함께 입력해보세요.</div>
+      <details style="padding:6px 12px"><summary class="muted" style="cursor:pointer;font-size:12px">🔧 응답 원본 보기</summary><pre style="white-space:pre-wrap;font-size:11px;max-height:160px;overflow:auto">${esc(JSON.stringify(raw, null, 1)).slice(0, 2500)}</pre></details>`;
+    return;
+  }
+  res.innerHTML = items.map(it => `<div class="it" data-addr="${esc(it.addr)}" data-pnu="${esc(it.pnu)}" data-lat="${it.lat ?? ''}" data-lng="${it.lng ?? ''}">${esc(it.addr)}${it.road ? `<small>${esc(it.road)}</small>` : ''}</div>`).join('');
+}
+function apMapWire(){
+  $('apMgo').onclick = apMapSearch;
+  $('apMq').addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); apMapSearch(); } });
+  $('apMres').addEventListener('click', (e) => {
+    const it = e.target.closest('.it[data-addr]'); if (!it) return;
+    $('apMres').style.display = 'none'; $('apMq').value = it.dataset.addr;
+    if (!apMap) return;
+    apMapLocate({ addr: it.dataset.addr, pnu: it.dataset.pnu || '', lat: apCoord(it.dataset.lat), lng: apCoord(it.dataset.lng) });
+  });
+  $('apMr').onchange = apMapPanelRender;
+  $('apMarch').onchange = apMapRefresh;
+  $('apMcad').onchange = () => { if (!apMap) return; $('apMcad').checked ? apCad.addTo(apMap) : apMap.removeLayer(apCad); };
+  $('apMlayer').onclick = (e) => {
+    const b = e.target.closest('[data-l]'); if (!b || !apMap) return;
+    document.querySelectorAll('#apMlayer button').forEach(x => x.classList.toggle('on', x === b));
+    if (b.dataset.l === 'sat'){ apMap.removeLayer(apBase); apSat.addTo(apMap); apHyb.addTo(apMap); apSat.bringToBack(); } else { apMap.removeLayer(apSat); apMap.removeLayer(apHyb); apBase.addTo(apMap); apBase.bringToBack(); }
+    if (apFallback) apFallback.bringToBack();
+  };
+  $('apMapPanel').addEventListener('click', (e) => {
+    if (e.target.closest('[data-apnew]') && apMapLast) return apOpenForm(null, apMapLast);
+    const r = e.target.closest('[data-apopen]'); if (!r) return;
+    const lat = apCoord(r.dataset.aplat), lng = apCoord(r.dataset.aplng);
+    if (lat !== null && lng !== null && apMap) apMap.setView([lat, lng], Math.max(apMap.getZoom(), 17));
+    apOpenDetail(+r.dataset.apopen);
+  });
+  $('apMapEl').addEventListener('click', (e) => { const b = e.target.closest('[data-apopen]'); if (b) apOpenDetail(+b.dataset.apopen); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('#apMres') && !e.target.closest('#apMq') && !e.target.closest('#apMgo')) { const r = $('apMres'); if (r) r.style.display = 'none'; } });
+}
+async function apShowOnMap(c){
+  apCloseDetail(); apSetMain('map');
+  await apMapEnsure();
+  const ms = apMarkers[c.id];
+  if (ms && ms.length){
+    apMap.setView(ms[0].getLatLng(), 17);
+    apCluster.zoomToShowLayer(ms[0], () => ms[0].openPopup());
+  } else toast('이 의뢰의 물건에는 좌표가 없어 지도에 표시할 수 없어요');
+}
+
+// ---------- 관리자: 지도 좌표 채우기 ----------
+function apRenderGeo(){
+  const box = $('aGeo'); if (!box) return;
+  const miss = apCases.flatMap(c => apProps(c)).filter(p => p.lat === null || p.lat === undefined);
+  box.innerHTML = `<div style="font-size:14px">좌표가 없는 물건: <b>${miss.length}개</b> <span class="muted">(지도에 표시되려면 좌표가 필요해요. 새로 등록하는 물건은 자동으로 저장돼요)</span></div>
+    <button class="btn primary small" id="aGeoRun" style="margin-top:8px" ${miss.length ? '' : 'disabled'}>📍 좌표 채우기</button> <span id="aGeoMsg" class="muted" style="margin-left:8px"></span>`;
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('#aGeoRun'); if (!b) return;
+  const miss = apCases.flatMap(c => apProps(c)).filter(p => p.lat === null || p.lat === undefined);
+  b.disabled = true; let done = 0, fail = 0;
+  for (const p of miss){
+    $('aGeoMsg').textContent = `처리 중… ${done + fail}/${miss.length}`;
+    const { items } = await apSearchAddr(p.address);
+    const hit = items.find(x => x.pnu && p.pnu && x.pnu === p.pnu && x.lat !== null) || items.find(x => x.lat !== null);
+    if (hit){ const { error } = await sb.from('appraisal_properties').update({ lat: hit.lat, lng: hit.lng, pnu: p.pnu || hit.pnu || null }).eq('id', p.id); if (error) fail++; else done++; } else fail++;
+    await new Promise(r => setTimeout(r, 250));
+  }
+  $('aGeoMsg').textContent = `완료: ${done}개 저장, ${fail}개 실패`;
+  await loadAppraisal(); b.disabled = false;
 });

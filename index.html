@@ -358,6 +358,7 @@
   <div class="kv"><div class="k">담당자 목록 · 체크하면 바로 저장됩니다 (권한이 없는 구분은 보기만 가능)</div>
     <div id="aList"></div></div>
   <div class="kv" style="margin-top:24px"><div class="k">감정평가기관 목록 · 숨김으로 하면 새 의뢰에서 선택되지 않습니다</div><div id="aFirms"></div></div>
+  <div class="kv" style="margin-top:24px"><div class="k">감정평가 지도 좌표</div><div id="aGeo"></div></div>
   <div class="kv" style="margin-top:24px"><div class="k">감정평가 의뢰서 · 본점/지점 회신 연락처 (팩스 의뢰서에 인쇄됩니다)</div><div id="aContacts"></div></div>
   <div class="kv" style="margin-top:24px"><div class="k">＋ 담당자 등록</div>
     <div class="row"><input id="aName" placeholder="이름 (예: 홍길동)" maxlength="30" /><input id="aEmail" type="email" placeholder="로그인 이메일" /></div>
@@ -1288,6 +1289,6 @@
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
-<script src="appraisal.js?v=21"></script>
+<script src="appraisal.js?v=22"></script>
 </body>
 </html>
