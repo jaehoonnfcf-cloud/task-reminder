@@ -352,7 +352,7 @@
     .bar{ padding:12px 14px 4px; padding-top:max(12px, env(safe-area-inset-top)); }
     .toolbar{ border-radius:18px; }
   }
-  @media (max-width:760px){ #wrap{ padding:4px 14px 36px; } .divs{ margin-left:0; } .divs button{ padding:8px 6px; } }
+  @media (max-width:760px){ #wrap{ padding:4px 14px 36px; } .divs{ margin-left:0; } .divs button{ padding:8px 6px; } #adminBtn{ display:none !important; } }
   /* 휴대폰: 글자·카드를 한 단계 작게 */
   @media (max-width:760px){
     .bar{ gap:8px; } .logo{ font-size:16px; } .btn{ font-size:13px; min-height:36px; padding:7px 14px; } .btn.small{ min-height:32px; padding:5px 12px; font-size:12.5px; }
@@ -407,11 +407,9 @@
     </div>
     <span class="spacer"></span>
     <span class="pill ro" id="roPill" style="display:none" title="이 업무구분에 대한 등록·수정 권한이 없습니다">👀 보기 전용</span>
-    <span class="pill link" id="tgPill" title="텔레그램 다시 연결" style="display:none"></span>
     <button class="btn glass small" id="newBtn">＋ 새 업무</button>
     <button class="whoBtn" id="who" title="내 프로필 (사진·이름 변경)"></button>
     <button class="btn glass small" id="adminBtn" style="display:none">⚙ 관리자</button>
-    <button class="btn glass small" id="logout">로그아웃</button>
   </div>
   <div id="wrap">
     <div id="tgBanner"><b>🔔 텔레그램 알림</b><span id="tgStatus" class="muted" style="flex:1"></span></div>
@@ -497,6 +495,8 @@
   </div>
   <label>이름</label><input id="pName" maxlength="30" />
   <button class="btn primary" id="pSave" style="margin-top:14px;min-height:44px;padding:8px 26px">이름 저장</button>
+  <div class="kv" style="margin-top:22px"><div class="k">🔔 알림 (텔레그램)</div><div id="pTg" class="v" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div></div>
+  <div class="foot" style="justify-content:space-between;align-items:center"><button class="btn" id="pAdmin" style="display:none">⚙ 관리자 화면</button><button class="btn danger" id="pLogout" style="margin-left:auto">로그아웃</button></div>
   <input type="file" id="pFile" accept="image/*" hidden />
 </div></div>
 <input type="file" id="aFile" accept="image/*" hidden />
@@ -620,7 +620,8 @@
   }
   $('loginBtn').onclick = doLogin;
   $('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-  $('logout').onclick = () => sb.auth.signOut();
+  $('pLogout').onclick = () => { closeProfile(); sb.auth.signOut(); };
+  $('pAdmin').onclick = () => { closeProfile(); $('adminBtn').click(); };
   sb.auth.onAuthStateChange((_e, session) => session ? start(session) : show(false));
   function show(on){
     $('login').style.display = on ? 'none' : 'flex'; $('app').style.display = on ? 'flex' : 'none';
@@ -650,15 +651,20 @@
   }
 
   // ---------- 텔레그램 ----------
+  let tgLinked = false;
+  function renderProfileTg(){
+    const el = $('pTg'); if (!el) return;
+    el.innerHTML = tgLinked ? '<span style="color:var(--green);font-weight:700">✅ 연결됨</span><span class="muted">한 번만 연결하면 돼요</span><button class="btn small" id="pTgGo">다시 연결</button>'
+      : '<span style="color:var(--warn);font-weight:700">연결되지 않았어요</span><button class="btn small primary" id="pTgGo">연결하기</button>';
+    $('pTgGo').onclick = () => { closeProfile(); loadTelegram(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  }
   async function loadTelegram(forceCard){
     const { data } = await sb.from('telegram_links').select('chat_id, link_code').eq('email', me).maybeSingle();
     const linked = !!(data && data.chat_id), pending = !!(data && data.link_code);
-    const pill = $('tgPill'), banner = $('tgBanner');
-    if (linked && !pending && !forceCard){
-      banner.style.display = 'none'; pill.style.display = ''; pill.textContent = '🔔 알림 연결됨'; pill.onclick = () => loadTelegram(true);
-      return;
-    }
-    pill.style.display = 'none'; banner.style.display = 'flex';
+    const banner = $('tgBanner');
+    tgLinked = linked && !pending; renderProfileTg();
+    if (linked && !pending && !forceCard){ banner.style.display = 'none'; return; }
+    banner.style.display = 'flex';
     $('tgStatus').innerHTML = (linked ? '새 텔레그램으로 다시 연결합니다. ' : '연결되지 않았습니다. ')
       + '<button class="btn small primary" id="tgBtn">텔레그램 연결하기</button>'
       + (linked ? ' <button class="btn small" id="tgCancel">취소</button>' : '');
@@ -1340,7 +1346,7 @@
   }
 
   // ---------- 내 프로필 ----------
-  function renderProfile(){ $('pAvWrap').innerHTML = avHtml(me, 'big'); $('pDel').style.display = avatarUrl[me] ? '' : 'none'; }
+  function renderProfile(){ $('pAdmin').style.display = isAdmin() ? '' : 'none'; renderProfileTg(); $('pAvWrap').innerHTML = avHtml(me, 'big'); $('pDel').style.display = avatarUrl[me] ? '' : 'none'; }
   $('who').onclick = () => { $('pName').value = nameOf(me); renderProfile(); $('profOv').style.display = 'block'; document.body.style.overflow = 'hidden'; };
   const closeProfile = () => { $('profOv').style.display = 'none'; document.body.style.overflow = ''; };
   $('pClose').onclick = closeProfile;
@@ -1440,6 +1446,6 @@
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
-<script src="appraisal.js?v=30"></script>
+<script src="appraisal.js?v=31"></script>
 </body>
 </html>
