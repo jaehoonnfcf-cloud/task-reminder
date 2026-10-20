@@ -373,6 +373,17 @@
     .kv .v{ font-size:14px; } .step{ font-size:13px; padding:5px 10px; }
   }
 
+
+  /* 요약 타일 재배치: 라벨 위 · 숫자 아래 (왼쪽), 아이콘은 오른쪽 — 3줄 → 2줄로 낮고 읽기 쉽게 */
+  .tile{ display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"l ic" "n ic"; align-items:center; column-gap:12px; row-gap:2px; text-align:left; padding:16px 20px; }
+  .tile::before{ grid-area:ic; align-self:center; margin:0; width:44px; height:44px; border-radius:15px; font-size:21px; }
+  .tile .l{ grid-area:l; margin:0; font-size:13px; font-weight:700; color:var(--muted); }
+  .tile .n{ grid-area:n; font-size:30px; line-height:1.1; letter-spacing:-.03em; }
+  @media (max-width:760px){
+    .tile{ padding:12px 14px; column-gap:8px; border-radius:18px; }
+    .tile::before{ width:34px; height:34px; border-radius:12px; font-size:16px; margin:0; }
+    .tile .l{ font-size:12px; } .tile .n{ font-size:24px; }
+  }
 </style>
 </head>
 <body>
@@ -1429,6 +1440,6 @@
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
-<script src="appraisal.js?v=29"></script>
+<script src="appraisal.js?v=30"></script>
 </body>
 </html>
