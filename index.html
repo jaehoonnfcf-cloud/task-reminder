@@ -384,6 +384,13 @@
     .tile::before{ width:34px; height:34px; border-radius:12px; font-size:16px; margin:0; }
     .tile .l{ font-size:12px; } .tile .n{ font-size:24px; }
   }
+
+  /* 업무 목록의 담당자 사진을 크게 */
+  .thead,.trow{ grid-template-columns:58px minmax(200px,1fr) 250px 118px 96px 150px; }
+  .trow .avs{ padding-left:10px; } .trow .av{ width:40px; height:40px; font-size:15px; margin-left:-10px; border-width:2px; }
+  .trow .av.done::after{ width:16px; height:16px; line-height:16px; font-size:10px; right:-4px; bottom:-4px; }
+  @media (max-width:900px){ .trow{ grid-template-columns:auto minmax(0,1fr) auto; } }
+  @media (max-width:760px){ .trow .av{ width:34px; height:34px; font-size:13px; margin-left:-8px; } .trow .avs{ padding-left:8px; } }
 </style>
 </head>
 <body>
@@ -1446,6 +1453,6 @@
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
-<script src="appraisal.js?v=31"></script>
+<script src="appraisal.js?v=32"></script>
 </body>
 </html>
