@@ -35,65 +35,64 @@ const apComma = (s) => { const n = apNum(s); return n === null ? '' : n.toLocale
 (function(){
   const st = document.createElement('style');
   st.textContent = `
-  #app[data-div=appraisal]{ background:linear-gradient(135deg,#b45309 0%,#be185d 55%,#6d28d9 100%); }
   #appraisal{ display:none; flex-direction:column; gap:14px; min-width:0; }
-  .aphead,.aprow{ display:grid; grid-template-columns:minmax(170px,1.1fr) minmax(200px,1.5fr) minmax(170px,1.3fr) 190px 86px; gap:12px; align-items:center; padding:0 18px; }
-  .aphead{ font-size:12px; font-weight:700; color:var(--muted); padding-top:9px; padding-bottom:9px; border-bottom:1px solid var(--line); background:#fafbfc; }
-  .aprow{ padding-top:12px; padding-bottom:12px; border-bottom:1px solid var(--line); cursor:pointer; background:#fff; }
-  .aprow:hover{ background:#f7f8fa; }
-  .aprow .tt{ font-size:15.5px; font-weight:700; line-height:1.35; word-break:break-word; }
+  .aphead,.aprow{ display:grid; grid-template-columns:minmax(170px,1.1fr) minmax(200px,1.5fr) minmax(170px,1.3fr) 190px 86px; gap:12px; align-items:center; padding:0 26px; }
+  .aphead{ font-size:12px; font-weight:700; color:var(--muted); padding-top:4px; padding-bottom:8px; }
+  .aprow{ padding-top:16px; padding-bottom:16px; cursor:pointer; background:#fff; border-radius:22px; box-shadow:var(--sh); margin-bottom:12px; transition:box-shadow .15s, transform .15s; }
+  .aprow:hover{ background:#fff; box-shadow:var(--sh-hover); transform:translateY(-1px); }
+  .aprow .tt{ font-size:16.5px; letter-spacing:-.02em; font-weight:700; line-height:1.35; word-break:break-word; }
   .aprow .ts{ font-size:12.5px; color:var(--muted); margin-top:2px; }
-  .afc{ display:inline-flex; align-items:center; gap:3px; font-size:12.5px; font-weight:700; padding:3px 9px; border-radius:6px; margin:2px 4px 2px 0; background:#fff3d6; color:#7a4b00; white-space:nowrap; }
+  .afc{ display:inline-flex; align-items:center; gap:3px; font-size:12.5px; font-weight:700; padding:4px 11px; border-radius:99px; margin:2px 4px 2px 0; background:var(--warn-soft); color:var(--warn); white-space:nowrap; }
   .afc.ok{ background:var(--green-soft); color:var(--green); }
   .apmoney{ font-size:14px; font-weight:700; line-height:1.4; }
   .apmoney small{ display:block; font-size:12px; font-weight:500; color:var(--muted); }
-  .chip.sc-본점{ background:#dbeafe; color:#1e40af; } .chip.sc-지점{ background:#dcfce7; color:#166534; } .chip.sc-통합{ background:#ede9fe; color:#5b21b6; }
+  .chip.sc-본점{ background:var(--accent-soft); color:var(--accent); } .chip.sc-지점{ background:#eef1f6; color:#4b5563; } .chip.sc-통합{ background:#f3eefc; color:#7c3aed; }
   .apPanel{ max-width:1040px !important; }
   .apsec{ margin-top:22px; } .apsec > .k{ font-size:13px; font-weight:800; color:#44546f; margin-bottom:8px; }
   .apinfo{ margin-top:14px; display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px 18px; }
   .apinfo .k{ font-size:12px; color:var(--muted); font-weight:600; } .apinfo .v{ font-size:15px; font-weight:600; margin-top:2px; word-break:break-word; }
   table.apt{ width:100%; border-collapse:collapse; font-size:14px; }
-  table.apt th{ text-align:left; font-size:12.5px; color:#44546f; font-weight:700; background:#fafbfc; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:bottom; }
+  table.apt th{ text-align:left; font-size:12.5px; color:#5a6172; font-weight:700; background:var(--field); padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:bottom; }
   table.apt td{ padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
   .apm{ overflow-x:auto; } .apm table{ min-width:560px; }
   .apm th.f{ min-width:170px; } .apm td.c{ min-width:170px; }
   .apm input.amt,.apm input.tamt{ width:100%; text-align:right; font-weight:700; }
   .apm textarea.note{ width:100%; font-size:14px; }
   .apm .hint{ font-size:12px; color:var(--muted); text-align:right; margin-top:2px; min-height:16px; }
-  .apm tr.tot td{ background:#f4f5f7; font-weight:800; font-size:15px; text-align:right; }
+  .apm tr.tot td{ background:var(--chipbg); font-weight:800; font-size:15px; text-align:right; }
   .apm tr.tot td:first-child{ text-align:left; }
-  .apm th.f.chosen, .apm td.chosen{ background:#eefbf3; }
+  .apm th.f.chosen, .apm td.chosen{ background:#e6f7ee; }
   .apm .fh{ display:flex; align-items:center; gap:6px; font-size:15px; color:var(--ink); }
   .apm .fh label{ display:inline-flex; align-items:center; gap:4px; margin:0; font-size:12.5px; font-weight:700; color:var(--green); }
   .apm .fh input[type=radio]{ width:16px; height:16px; min-height:0; -webkit-appearance:auto; appearance:auto; }
   .apm input[type=date]{ font-size:13px; padding:5px 8px; min-height:34px; margin-top:6px; }
-  .apblock{ border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; background:#fbfbfc; }
+  .apblock{ border:0; border-radius:20px; padding:14px 16px; margin-bottom:12px; background:var(--field); }
   .apblock .bh{ display:flex; align-items:center; justify-content:space-between; font-weight:800; font-size:14px; margin-bottom:6px; }
   .apblock .grid{ display:grid; grid-template-columns:130px 1fr; gap:0 10px; }
   .apblock .grid3{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0 10px; }
-  .apres{ border:1px solid var(--line); border-radius:8px; background:#fff; max-height:240px; overflow:auto; margin-top:6px; display:none; }
+  .apres{ border:1px solid var(--line); border-radius:16px; background:#fff; max-height:240px; overflow:auto; margin-top:6px; display:none; }
   .apres .it{ padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--line); font-size:14px; } .apres .it:hover{ background:var(--accent-soft); }
   .apres .it small{ display:block; color:var(--muted); font-size:12px; }
   .apst{ font-size:12.5px; margin-top:4px; color:var(--muted); } .apst.ok{ color:var(--green); } .apst.bad{ color:var(--danger); }
   .apaddr{ background:#f1f2f4 !important; font-weight:600; }
   #apFirmList,#apNotifyList{ display:flex; flex-wrap:wrap; gap:4px 16px; }
-  .apmapbox{ display:grid; grid-template-columns:minmax(0,1fr) 370px; height:calc(100vh - 230px); min-height:500px; border-top:1px solid var(--line); }
-  #apMapEl{ min-height:300px; background:#e8ecf1; z-index:0; } #apMapPanel{ overflow-y:auto; padding:14px 16px; border-left:1px solid var(--line); background:#fff; }
-  .aplegend{ display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; padding:9px 16px; font-size:12.5px; border-top:1px solid var(--line); }
+  .apmapbox{ display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:16px; height:calc(100vh - 300px); min-height:520px; }
+  #apMapEl{ min-height:300px; background:#e8ecf1; z-index:0; border-radius:28px; box-shadow:var(--sh); overflow:hidden; } #apMapPanel{ overflow-y:auto; padding:18px 18px; background:#fff; border-radius:28px; box-shadow:var(--sh); }
+  .aplegend{ display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; padding:14px 8px 2px; font-size:12.5px; color:var(--muted); }
   .aplegend i.apin{ display:inline-block; width:12px; height:12px; margin-right:5px; vertical-align:-1px; }
   .apin{ border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.45); }
   .apin.s-wait{ background:#f59e0b; } .apin.s-done{ background:#2563eb; } .apin.s-sel{ background:#16a34a; } .apin.s-arc{ background:#9ca3af; }
   .apin-wrap{ background:none !important; border:0 !important; } .apin-wrap .apin{ width:26px; height:26px; display:flex; align-items:center; justify-content:center; }
   .apin-wrap .apin b{ transform:rotate(45deg); color:#fff; font-size:11px; font-weight:800; }
   .apq{ width:18px; height:18px; border-radius:50%; background:#ef4444; border:3px solid #fff; box-shadow:0 0 0 4px rgba(239,68,68,.35); }
-  .aprec{ border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; cursor:pointer; background:#fff; } .aprec:hover{ background:#f7f8fa; }
+  .aprec{ border:0; border-radius:18px; padding:12px 14px; margin-bottom:10px; cursor:pointer; background:var(--chipbg); transition:box-shadow .15s; } .aprec:hover{ background:#eceff5; }
   .aprec .h{ font-weight:800; font-size:14.5px; } .aprec .m{ font-size:12.5px; color:var(--muted); margin-top:2px; } .aprec .w{ font-size:13.5px; font-weight:700; margin-top:4px; }
-  .aprec.same{ border-color:#16a34a; background:#f0fdf4; }
-  .apnew{ border:2px dashed #cbd2dc; border-radius:10px; padding:14px; text-align:center; margin-bottom:10px; }
-  .apdup{ margin-top:6px; padding:7px 10px; border-radius:8px; background:#fff3d6; color:#7a4b00; font-size:12.5px; font-weight:600; }
+  .aprec.same{ background:#e6f7ee; } .aprec.same:hover{ background:#dcf3e6; }
+  .apnew{ border:2px dashed #cdd3df; border-radius:20px; padding:16px; text-align:center; margin-bottom:10px; }
+  .apdup{ margin-top:6px; padding:8px 12px; border-radius:14px; background:var(--warn-soft); color:#8a5a00; font-size:12.5px; font-weight:600; }
   .leaflet-popup-content{ font-family:inherit; font-size:13.5px; line-height:1.5; margin:12px 14px; } .leaflet-popup-content button{ margin-top:6px; }
   @media (max-width:900px){
-    .apmapbox{ grid-template-columns:1fr; height:auto; } #apMapEl{ height:56vh; } #apMapPanel{ border-left:0; border-top:1px solid var(--line); max-height:none; }
+    .apmapbox{ grid-template-columns:1fr; height:auto; } #apMapEl{ height:56vh; } #apMapPanel{ max-height:none; }
     .aphead{ display:none; }
     .aprow{ grid-template-columns:minmax(0,1fr) auto; gap:6px 10px; padding:12px 14px; }
     .aprow > :nth-child(2),.aprow > :nth-child(3){ grid-column:1 / -1; }
@@ -155,7 +154,7 @@ function renderAppraisal(){
   const el = $('appraisal');
   if (!el.dataset.ready){
     el.dataset.ready = '1';
-    el.innerHTML = `<div class="seg" id="apMain" style="align-self:flex-start;background:rgba(255,255,255,.92)"><button data-m="map">🗺 지도 (기록 찾기)</button><button data-m="list">📋 목록</button></div>
+    el.innerHTML = `<div class="seg" id="apMain" style="align-self:flex-start;background:#fff;box-shadow:var(--sh)"><button data-m="map">🗺 지도 (기록 찾기)</button><button data-m="list">📋 목록</button></div>
     <div id="apMapWrap" class="list-panel" style="display:none">
       <div class="toolbar" style="position:relative">
         <input id="apMq" class="search" type="search" placeholder="🔍 지번 검색 (예: 동산면 원창리 99) — 기존 감정 기록 찾기" style="min-width:240px" />
