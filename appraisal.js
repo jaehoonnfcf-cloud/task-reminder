@@ -566,38 +566,44 @@ function apReportHtml(c){
   const sums = reqs.map(r => apReqSum(r, props));
   const chosenIdx = reqs.findIndex(r => r.firm_id === c.chosen_firm_id);
   const num = (v) => (v === null || v === undefined || v === '') ? '-' : n(v);
-  const propRows = props.map((p, i) => `<tr><td class="c">${i + 1}</td><td class="c">${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? `<br><span class="m">${esc(p.detail)}</span>` : ''}</td><td class="c">${esc(p.jimok || '-')}</td>
-    <td class="r">${p.kind === '건물' ? num(p.land_area) : (p.kind === '토지' ? num(p.area) : '-')}</td><td class="r">${p.kind === '토지' ? '-' : num(p.area)}</td></tr>`).join('');
-  const head = reqs.map((r, i) => `<th class="${i === chosenIdx ? 'sel' : ''}">${esc(apFirmName(r.firm_id))}${i === chosenIdx ? '<br><span class="m">★ 채택</span>' : ''}</th>`).join('');
-  const body = props.map((p, i) => `<tr><td>${i + 1}. ${esc(p.address)}</td>${reqs.map((r, k) => { const v = sums[k].map.get(p.id); return `<td class="r ${k === chosenIdx ? 'sel' : ''}">${v === undefined ? '-' : n(v)}</td>`; }).join('')}</tr>`).join('');
-  const total = reqs.map((r, k) => `<td class="r b ${k === chosenIdx ? 'sel' : ''}">${sums[k].mode === 'none' ? '-' : n(sums[k].total)}${sums[k].mode === 'total' ? '<br><span class="m">(총액만 접수)</span>' : ''}${sums[k].mode !== 'none' ? `<br><span class="m">${esc(apWon(sums[k].total))}</span>` : ''}</td>`).join('');
-  const recv = reqs.map((r, k) => `<td class="c ${k === chosenIdx ? 'sel' : ''}">${esc(r.received_at || '-')}</td>`).join('');
-  const notes = reqs.map((r, k) => `<td class="${k === chosenIdx ? 'sel' : ''}" style="white-space:pre-wrap">${esc(r.note || '')}</td>`).join('');
+  const nameOfFirm = (r) => apFirmName(r.firm_id);
+  const propRows = props.map((p, i) => `<tr><td class="c nw">${i + 1}</td><td class="c nw">${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? ` <span class="m">(${esc(p.detail)})</span>` : ''}</td><td class="c nw">${esc(p.jimok || '-')}</td>
+    <td class="r nw">${p.kind === '건물' ? num(p.land_area) : (p.kind === '토지' ? num(p.area) : '-')}</td><td class="r nw">${p.kind === '토지' ? '-' : num(p.area)}</td></tr>`).join('');
+  const many = reqs.length > 4;
+  const head = reqs.map((r, i) => `<th class="nw ${i === chosenIdx ? 'sel' : ''}">${esc(nameOfFirm(r))}${i === chosenIdx ? ' ★' : ''}</th>`).join('');
+  const body = props.map((p, i) => `<tr><td>${i + 1}. ${esc(p.address)}</td>${reqs.map((r, k) => { const v = sums[k].map.get(p.id); return `<td class="r nw ${k === chosenIdx ? 'sel' : ''}">${v === undefined ? '-' : n(v)}</td>`; }).join('')}</tr>`).join('');
+  const total = reqs.map((r, k) => `<td class="r nw b ${k === chosenIdx ? 'sel' : ''}">${sums[k].mode === 'none' ? '-' : n(sums[k].total)}${sums[k].mode === 'total' ? ' *' : ''}</td>`).join('');
+  const recv = reqs.map((r, k) => `<td class="c nw ${k === chosenIdx ? 'sel' : ''}">${esc(r.received_at || '-')}</td>`).join('');
+  const hasNote = reqs.some(r => r.note);
+  const notes = reqs.map((r, k) => `<td class="${k === chosenIdx ? 'sel' : ''}">${esc(r.note || '')}</td>`).join('');
+  const foot = [sums.some(s => s.mode === 'total') && '* 물건별 금액 없이 총액만 접수한 평가기관입니다.', chosenIdx >= 0 && '★ 채택한 평가기관입니다.'].filter(Boolean).join('　');
   const ch = chosenIdx >= 0 ? sums[chosenIdx] : null;
   const priced = sums.filter(s => s.mode !== 'none').map(s => s.total);
   const summary = ch && ch.mode !== 'none'
-    ? `채택: <b>${esc(apFirmName(reqs[chosenIdx].firm_id))}</b> — 평가금액 합계 <b>${n(ch.total)}원</b> (${esc(apWon(ch.total))})`
+    ? `채택: <b>${esc(nameOfFirm(reqs[chosenIdx]))}</b> — 평가금액 합계 <b>${n(ch.total)}원</b> (${esc(apWon(ch.total))})`
     : priced.length ? `채택 없음 (가격 조회용) — 평가금액 ${n(Math.min(...priced))}원 ~ ${n(Math.max(...priced))}원` : '평가금액 미접수';
-  const css = `@page{size:A4;margin:16mm 14mm}*{box-sizing:border-box}body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#111;font-size:12px;line-height:1.5;margin:0}
-  h1{font-size:22px;text-align:center;margin:0 0 4px;letter-spacing:2px}.sub{text-align:center;color:#555;margin-bottom:14px;font-size:12px}
-  .sign{float:right;border-collapse:collapse;margin:0 0 10px 10px}.sign td,.sign th{border:1px solid #333;width:58px;height:22px;text-align:center;font-size:11px;padding:0}.sign td{height:44px}
+  const css = `@page{size:A4;margin:15mm 13mm}*{box-sizing:border-box}body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#111;font-size:12px;line-height:1.45;margin:0}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}.top .ttl{flex:1;text-align:center;padding-top:6px}.top .sp{width:190px}
+  h1{font-size:22px;margin:0 0 4px;letter-spacing:2px}.sub{color:#555;font-size:12px}
+  .sign{border-collapse:collapse;width:190px;table-layout:fixed}.sign td,.sign th{border:1px solid #333;text-align:center;font-size:11px;padding:0}.sign th{height:20px;background:#f3f3f3}.sign td{height:46px}
   h2{font-size:14px;margin:18px 0 6px;padding-left:8px;border-left:4px solid #333}
-  table.t{width:100%;border-collapse:collapse;table-layout:auto}table.t th,table.t td{border:1px solid #444;padding:5px 7px;vertical-align:middle}
-  table.t th{background:#eee;font-weight:700;text-align:center}table.t td.k{background:#f3f3f3;font-weight:700;width:15%;text-align:center}
-  .r{text-align:right}.c{text-align:center}.b{font-weight:700}.m{color:#666;font-size:10.5px;font-weight:400}.sel{background:#fff6d6 !important}
-  .box{border:2px solid #333;padding:9px 12px;margin-top:14px;font-size:13px}.clear{clear:both}tr{page-break-inside:avoid}
-  .foot{margin-top:18px;color:#666;font-size:10.5px;text-align:right}`;
+  table.t{width:100%;border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:5px 8px;vertical-align:middle;word-break:keep-all}
+  table.t th{background:#eee;font-weight:700;text-align:center}table.t td.k{background:#f3f3f3;font-weight:700;text-align:center;white-space:nowrap;width:1%}
+  .nw{white-space:nowrap}.r{text-align:right}.c{text-align:center}.b{font-weight:700}.m{color:#666;font-size:11px;font-weight:400}.sel{background:#fff6d6 !important}
+  .box{border:2px solid #333;padding:9px 12px;margin-top:14px;font-size:13px}tr{page-break-inside:avoid}
+  .note{margin-top:5px;color:#555;font-size:11px}.foot{margin-top:18px;color:#666;font-size:10.5px;text-align:right}
+  ${many ? 'table.price th,table.price td{font-size:11px;padding:4px 5px}' : ''}`;
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>감정평가 결과 보고서 - ${esc(c.debtor_name)}</title><style>${css}</style></head><body>
-  <table class="sign"><tr><th>담당</th><th>검토</th><th>결재</th></tr><tr><td></td><td></td><td></td></tr></table>
-  <h1>감정평가 결과 보고서</h1><div class="sub">${esc(c.scope)} · ${esc(c.handling_type ? (c.handling_type === '기타' && c.handling_note ? `기타(${c.handling_note})` : c.handling_type) : '')}</div><div class="clear"></div>
+  <div class="top"><div class="sp"></div><div class="ttl"><h1>감정평가 결과 보고서</h1><div class="sub">${esc(c.scope)}${c.handling_type ? ` · ${esc(c.handling_type === '기타' && c.handling_note ? `기타(${c.handling_note})` : c.handling_type)}` : ''}</div></div>
+  <table class="sign"><tr><th>담당</th><th>과장</th><th>상무</th></tr><tr><td></td><td></td><td></td></tr></table></div>
   <table class="t"><tr><td class="k">채무자(예정자)</td><td>${esc(c.debtor_name)}</td><td class="k">구분</td><td>${esc(c.scope)}</td></tr>
-  <tr><td class="k">취급구분</td><td>${esc(apTypeText(c))}</td><td class="k">대출신청금액</td><td>${c.loan_amount === null || c.loan_amount === undefined ? '-' : `${n(c.loan_amount)}원 (${esc(apWon(c.loan_amount))})`}</td></tr>
+  <tr><td class="k">취급구분</td><td>${esc(apTypeText(c))}</td><td class="k">대출신청금액</td><td>${c.loan_amount === null || c.loan_amount === undefined ? '-' : `${n(c.loan_amount)}원 <span class="m">(${esc(apWon(c.loan_amount))})</span>`}</td></tr>
   <tr><td class="k">의뢰자</td><td>${esc(nameOf(c.requester_email))}</td><td class="k">의뢰일</td><td>${esc(c.request_date)}</td></tr>
   ${c.memo ? `<tr><td class="k">메모</td><td colspan="3" style="white-space:pre-wrap">${esc(c.memo)}</td></tr>` : ''}</table>
   <h2>1. 물건 내역 (${props.length}건)</h2>
-  <table class="t"><thead><tr><th style="width:5%">번호</th><th style="width:11%">구분</th><th>소재지</th><th style="width:10%">지목</th><th style="width:13%">대지·토지면적(㎡)</th><th style="width:13%">건물·전용면적(㎡)</th></tr></thead><tbody>${propRows}</tbody></table>
+  <table class="t"><thead><tr><th class="nw">번호</th><th class="nw">구분</th><th>소재지</th><th class="nw">지목</th><th class="nw">대지·토지(㎡)</th><th class="nw">건물·전용(㎡)</th></tr></thead><tbody>${propRows}</tbody></table>
   <h2>2. 평가기관별 평가금액 (단위: 원)</h2>
-  ${reqs.length ? `<table class="t"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td class="b">합계</td>${total}</tr><tr><td class="b">가격 수령일</td>${recv}</tr><tr><td class="b">특이사항</td>${notes}</tr></tbody></table>` : '<div>의뢰한 평가기관이 없습니다.</div>'}
+  ${reqs.length ? `<table class="t price"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td class="b">합계</td>${total}</tr><tr><td class="b nw">가격 수령일</td>${recv}</tr>${hasNote ? `<tr><td class="b nw">특이사항</td>${notes}</tr>` : ''}</tbody></table>${foot ? `<div class="note">${foot}</div>` : ''}` : '<div>의뢰한 평가기관이 없습니다.</div>'}
   <div class="box">${summary}</div>
   <div class="foot">출력일 ${esc(kstToday())} · ${esc(nameOf(me))} · 할일요정</div></body></html>`;
 }
