@@ -126,7 +126,7 @@ function renderAppraisal(){
     el.dataset.ready = '1';
     el.innerHTML = `<div class="list-panel">
       <div class="toolbar">
-        <select id="apScope"><option value="all">본점·지점·통합</option><option value="본점">본점</option><option value="지점">지점</option><option value="통합">통합</option></select>
+        <select id="apScope"><option value="all">본점·지점</option><option value="본점">본점</option><option value="지점">지점</option></select>
         <label class="chk"><input type="checkbox" id="apMine" /> 내 의뢰만</label>
         <input id="apQ" class="search" type="search" placeholder="🔍 채무자·소재지 검색" />
       </div>
@@ -324,8 +324,8 @@ function apOpenForm(id){
   const notify = new Set(c ? c.notify_emails : [me]);
   $('apFormPanel').innerHTML = `
     <div class="ph"><h2>${c ? '감정평가 의뢰 수정' : '새 감정평가 의뢰'}</h2><button class="x" data-act="close">✕</button></div>
-    <label>본점 / 지점 / 통합 <span style="color:var(--danger)">*</span></label>
-    <select id="apfScope"><option value="">선택하세요 (필수)</option><option>본점</option><option>지점</option><option>통합</option></select>
+    <label>본점 / 지점 <span style="color:var(--danger)">*</span></label>
+    <select id="apfScope"><option value="">선택하세요 (필수)</option><option>본점</option><option>지점</option></select>
     <div class="row">
       <div><label>채무자 (예정자) <span style="color:var(--danger)">*</span></label><input id="apfDebtor" maxlength="60" placeholder="이름" /></div>
       <div><label>의뢰자 (자동)</label><input id="apfReq" disabled /></div>
@@ -416,7 +416,7 @@ async function apDoSearch(blk){
 }
 async function apSaveForm(){
   const scope = $('apfScope').value, debtor = $('apfDebtor').value.trim();
-  if (!scope) return alert('본점 / 지점 / 통합 중 하나를 선택해주세요.');
+  if (!scope) return alert('본점 / 지점 중 하나를 선택해주세요.');
   if (!debtor) return alert('채무자(예정자) 이름을 입력해주세요.');
   const blocks = [...document.querySelectorAll('#apfProps .apblock')];
   const props = [];

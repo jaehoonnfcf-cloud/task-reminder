@@ -211,3 +211,6 @@ grant update (perm_appraisal) on public.team_members to authenticated;
 -- appraisal_requests(건×평가기관) / appraisal_prices(의뢰×물건, 원 단위) — 조회는 팀원 전체, 쓰기는 has_appraisal(), 건 삭제는 등록자·관리자.
 -- 평가기관 초기값: 대화, 통일, 나라, 삼창, 하나, 경일, 가온, 태평양, 중앙 (관리자 화면에서 추가·숨김)
 -- 알림: task-notify 이벤트 appraisal_created / appraisal_priced / appraisal_chosen → 건의 notify_emails(체크한 사람)에게만
+-- 감정평가는 본점/지점만 (통합 없음)
+alter table public.appraisal_cases drop constraint appraisal_cases_scope_check;
+alter table public.appraisal_cases add constraint appraisal_cases_scope_check check (scope in ('본점','지점'));
