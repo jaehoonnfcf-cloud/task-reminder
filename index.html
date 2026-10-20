@@ -343,7 +343,7 @@
   .arow,.ahead{ border-bottom-color:var(--line); }
   .toast{ background:#16181d; border-radius:99px; padding:12px 22px; box-shadow:0 12px 32px rgba(20,24,40,.35); }
   /* 아이폰 홈 화면 앱: 상단 가장자리 아래의 시스템 흐림 띠에 로고·메뉴가 걸리지 않도록 상단 여백을 더 둔다 */
-  .ios-sa .bar{ padding-top:max(56px, calc(env(safe-area-inset-top) + 20px)); }
+  .ios-sa .bar{ padding-top:max(28px, calc(env(safe-area-inset-top) + 8px)); }
   @media (max-width:900px){
     .trow{ padding:14px 16px; border-radius:20px; margin-bottom:10px; } .thead{ display:none; }
     #hello{ font-size:27px; margin-top:8px; } .tile::before{ margin-bottom:8px; width:34px; height:34px; font-size:16px; } .tile .n{ font-size:26px; }
@@ -1407,6 +1407,6 @@
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
-<script src="appraisal.js?v=25"></script>
+<script src="appraisal.js?v=26"></script>
 </body>
 </html>
