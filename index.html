@@ -280,7 +280,16 @@
   .divs button.on .n{ background:#fff; color:#16181d; }
   .whoBtn{ color:var(--ink); } .whoBtn:hover{ background:rgba(20,24,40,.06); }
   #wrap{ padding:6px 28px 48px; gap:16px; }
-  @media (min-width:1500px){ .bar{ max-width:1680px; } }
+  /* 넓은 화면: 시세·뉴스 열이 맨 위(헤더 줄)부터 시작하고, 헤더(메뉴·새 업무·프로필)는 왼쪽 열 폭 안에서 우측 정렬 */
+  @media (min-width:1500px){
+    body{ background:radial-gradient(1100px 480px at 50% -140px,#fff 0%,rgba(255,255,255,0) 70%),#eceef3; }
+    #app[style*="flex"]{ display:grid !important; grid-template-columns:minmax(0,1fr) 350px; grid-template-rows:auto auto 1fr; column-gap:18px; width:100%; max-width:1736px; margin:0 auto; padding:0 28px; align-content:start; }
+    #app[style*="flex"] .bar{ grid-column:1; grid-row:1; max-width:none; margin:0; padding-left:0; padding-right:0; }
+    #app[style*="flex"] #wrap{ display:contents; }
+    #app[style*="flex"] #tgBanner{ grid-column:1; grid-row:2; }
+    #app[style*="flex"] #main{ grid-column:1; grid-row:3; }
+    #app[style*="flex"] #side{ grid-column:2; grid-row:1 / span 3; align-self:start; margin-top:16px; position:sticky; top:16px; }
+  }
   #tgBanner{ border-radius:22px; box-shadow:var(--sh); }
   /* 인사말 제목 */
   #hello{ font-size:34px; font-weight:800; line-height:1.2; letter-spacing:-.035em; margin:14px 0 6px; }
@@ -1467,6 +1476,6 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('calOv') && $('calOv').style.display === 'block') calClose(); else if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
 <script src="appraisal.js?v=40"></script>
-<script src="calendar.js?v=2"></script>
+<script src="calendar.js?v=3"></script>
 </body>
 </html>
