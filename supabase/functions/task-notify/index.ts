@@ -129,13 +129,16 @@ async function handle(req: Request): Promise<Response> {
       const req2 = c.appraisal_requests.find((r: any) => r.firm_id === body.firm_id);
       if (!req2) return new Response("bad request", { status: 400 });
       const amt = new Map<number, number>(req2.appraisal_prices.map((p: any) => [p.property_id, Number(p.amount)] as [number, number]));
-      // 가격을 한 번에 받는 묶음(group_no 가 같은 물건)은 하나의 단위로 본다 (가격은 묶음의 첫 물건에 저장)
+      // 이 평가기관이 가격을 한 번에 불러준 물건 묶음(requests.bundles = [[물건id, …], …])은 하나의 단위로 본다 (가격은 묶음의 첫 물건에 저장)
+      const ids = new Set(props.map((p: any) => p.id));
+      const inB = new Map<number, number>();
+      ((req2.bundles ?? []) as number[][]).forEach((bd, bi) => { const m = bd.filter((id) => ids.has(id)); if (m.length >= 2) m.forEach((id) => inB.set(id, bi)); });
       const units: { key: number; nos: number[] }[] = [];
-      const gm = new Map<number, { key: number; nos: number[] }>();
+      const seen = new Map<number, { key: number; nos: number[] }>();
       props.forEach((p: any, i: number) => {
-        if (p.group_no === null || p.group_no === undefined) { units.push({ key: p.id, nos: [i + 1] }); return; }
-        let u = gm.get(p.group_no);
-        if (!u) { u = { key: p.id, nos: [] }; gm.set(p.group_no, u); units.push(u); }
+        if (!inB.has(p.id)) { units.push({ key: p.id, nos: [i + 1] }); return; }
+        const bi = inB.get(p.id)!; let u = seen.get(bi);
+        if (!u) { u = { key: p.id, nos: [] }; seen.set(bi, u); units.push(u); }
         u.nos.push(i + 1);
       });
       const byItem = amt.size > 0;   // 물건별 입력이 없고 총액만 받은 경우는 total_amount 사용

@@ -109,10 +109,12 @@ const apComma = (s) => { const n = apNum(s); return n === null ? '' : n.toLocale
   d.innerHTML = `
   <div class="ov" id="apDetailOv"><div class="panel apPanel" id="apDetailPanel"></div></div>
   <div class="ov" id="apFormOv"><div class="panel apPanel" id="apFormPanel"></div></div>
+  <div class="ov" id="apBundleOv" style="z-index:30"><div class="panel" id="apBundlePanel" style="max-width:520px"></div></div>
   <div class="ov" id="apFaxOv" style="z-index:30"><div class="panel" id="apFaxPanel" style="max-width:540px"></div></div>`;
   document.body.appendChild(d);
   $('apDetailOv').addEventListener('click', (e) => { if (e.target === $('apDetailOv')) apCloseDetail(); });
   $('apFormOv').addEventListener('click', (e) => { if (e.target === $('apFormOv')) apCloseForm(); });
+  $('apBundleOv').addEventListener('click', (e) => { if (e.target === $('apBundleOv')) apBundleClose(); });
   $('apFaxOv').addEventListener('click', (e) => { if (e.target === $('apFaxOv')) apCloseFax(); });
 })();
 
@@ -120,22 +122,23 @@ const apComma = (s) => { const n = apNum(s); return n === null ? '' : n.toLocale
 const apProps = (c) => [...(c.appraisal_properties || [])].sort((a, b) => a.seq - b.seq);
 const apFirmName = (id) => (apFirms.find(f => f.id === id) || {}).name || '?';
 const apReqs = (c) => [...(c.appraisal_requests || [])].sort((a, b) => ((apFirms.find(f => f.id === a.firm_id) || {}).sort || 0) - ((apFirms.find(f => f.id === b.firm_id) || {}).sort || 0));
-// 가격을 한 번에 받는 물건 묶음(group_no 가 같은 물건)을 하나의 '단위'로 본다. 가격은 묶음의 첫 물건(key)에 저장한다.
-function apUnits(props){
-  const groups = new Map(), out = [];
+// 평가기관이 가격을 한 번에 불러준 물건들(의뢰별 bundles: [[물건id, 물건id], …])을 하나의 '단위'로 본다. 가격은 묶음의 첫 물건(key)에 저장한다.
+function apUnits(props, bundles){
+  const ids = new Set(props.map(p => p.id)), inB = new Map(), out = [];
+  (bundles || []).forEach((b, bi) => { const m = (b || []).filter(id => ids.has(id)); if (m.length >= 2) m.forEach(id => inB.set(id, bi)); });
+  const seen = new Map();
   props.forEach((p, idx) => {
-    if (p.group_no === null || p.group_no === undefined){ out.push({ key: p.id, members: [p], nos: [idx + 1], group: false }); return; }
-    let u = groups.get(p.group_no);
-    if (!u){ u = { key: p.id, members: [], nos: [], group: true }; groups.set(p.group_no, u); out.push(u); }
+    if (!inB.has(p.id)){ out.push({ key: p.id, members: [p], nos: [idx + 1], group: false }); return; }
+    const bi = inB.get(p.id); let u = seen.get(bi);
+    if (!u){ u = { key: p.id, members: [], nos: [], group: true, bi }; seen.set(bi, u); out.push(u); }
     u.members.push(p); u.nos.push(idx + 1);
   });
-  out.forEach(u => { if (u.group && u.members.length < 2) u.group = false; });
   return out;
 }
 const apNos = (u) => u.nos.join('·');
 function apReqSum(r, props){
   const m = new Map((r.appraisal_prices || []).map(p => [p.property_id, Number(p.amount)]));
-  const units = apUnits(props), have = units.filter(u => m.has(u.key));
+  const units = apUnits(props, r.bundles), have = units.filter(u => m.has(u.key));
   const useTotal = have.length === 0 && r.total_amount !== null && r.total_amount !== undefined;   // 물건별 입력 없이 총액만 받은 경우
   return { total: useTotal ? Number(r.total_amount) : units.reduce((s, u) => s + (m.get(u.key) || 0), 0), filled: have.length, done: useTotal || (units.length > 0 && have.length === units.length), mode: useTotal ? 'total' : have.length ? 'items' : 'none', map: m };
 }
@@ -240,21 +243,20 @@ function renderApDetail(){
   // 다시 그리기 전에, 아직 저장하지 않고 입력 중인 금액(다른 기관 칸)을 보존한다
   const draft = [...$('apDetailPanel').querySelectorAll('[data-k]')].filter(i => i.value !== i.dataset.orig).map(i => [i.dataset.k, i.value]);
   const unit = (p) => p.kind === '토지' ? '토지' : p.kind === '건물' ? '연면적' : '전용';
-  const units = apUnits(props), grpOf = new Map(); units.forEach(u => { if (u.group) u.members.forEach(m => grpOf.set(m.id, u)); });
-  const propRows = props.map((p, i) => `<tr><td>${i + 1}${grpOf.has(p.id) ? `<div><span class="chip" title="가격을 한 번에 받는 묶음">🔗 ${esc(apNos(grpOf.get(p.id)))}</span></div>` : ''}</td><td>${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? `<div class="muted">${esc(p.detail)}</div>` : ''}</td><td>${esc(p.jimok || '-')}</td><td style="text-align:right">${p.kind === '건물' ? `대지 ${p.land_area !== null && p.land_area !== undefined ? Number(p.land_area).toLocaleString('ko-KR') + '㎡' : '-'}<div>건물 ${p.area !== null ? Number(p.area).toLocaleString('ko-KR') + '㎡' : '-'}</div>` : `${p.area !== null ? `${Number(p.area).toLocaleString('ko-KR')}㎡` : '-'}<div class="muted">${unit(p)}</div>`}</td></tr>`).join('');
+  const propRows = props.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? `<div class="muted">${esc(p.detail)}</div>` : ''}</td><td>${esc(p.jimok || '-')}</td><td style="text-align:right">${p.kind === '건물' ? `대지 ${p.land_area !== null && p.land_area !== undefined ? Number(p.land_area).toLocaleString('ko-KR') + '㎡' : '-'}<div>건물 ${p.area !== null ? Number(p.area).toLocaleString('ko-KR') + '㎡' : '-'}</div>` : `${p.area !== null ? `${Number(p.area).toLocaleString('ko-KR')}㎡` : '-'}<div class="muted">${unit(p)}</div>`}</td></tr>`).join('');
   const head = reqs.map(r => {
     const sel = c.chosen_firm_id === r.firm_id;
     return `<th class="f ${sel ? 'chosen' : ''}"><div class="fh"><b>${esc(apFirmName(r.firm_id))}</b>${can ? `<label><input type="radio" name="apChosen" value="${r.firm_id}" ${sel ? 'checked' : ''} data-act="choose"/> 채택</label>` : sel ? '<label>✔ 채택</label>' : ''}</div>
-      <input type="date" class="rcv" data-r="${r.id}" value="${esc(r.received_at || '')}" ${can ? '' : 'disabled'} title="가격 수령일"/></th>`;
+      <input type="date" class="rcv" data-r="${r.id}" value="${esc(r.received_at || '')}" ${can ? '' : 'disabled'} title="가격 수령일"/>
+      ${can && props.length > 1 ? `<button class="btn small" data-act="bundle" data-r="${r.id}" style="margin-top:6px;width:100%" title="이 평가기관이 여러 물건의 가격을 한 번에 불러준 경우">🔗 물건 묶기${apUnits(props, r.bundles).some(u => u.group) ? ' (' + apUnits(props, r.bundles).filter(u => u.group).length + ')' : ''}</button>` : ''}</th>`;
   }).join('');
   const unitSub = (p) => `${esc(p.kind)}${p.kind === '건물' && p.land_area ? ` · 대지 ${Number(p.land_area).toLocaleString('ko-KR')}㎡` : ''}${p.area !== null ? ` · ${p.kind === '건물' ? '건물 ' : ''}${Number(p.area).toLocaleString('ko-KR')}㎡` : ''}`;
-  const unitCell = (u) => u.group
-    ? `<span class="chip" style="margin-bottom:3px">🔗 일괄 ${esc(apNos(u))}번</span>${u.members.map(m => `<div>${esc(m.address)} <span class="muted">${unitSub(m)}</span></div>`).join('')}`
-    : `${u.nos[0]}. ${esc(u.members[0].address)}<div class="muted">${unitSub(u.members[0])}</div>`;
-  const body = units.map(u => { const p = u.members[0]; return `<tr><td>${unitCell(u)}</td>${reqs.map(r => {
-    const v = apReqSum(r, props).map.get(p.id);
-    return `<td class="c ${c.chosen_firm_id === r.firm_id ? 'chosen' : ''}"><input class="amt" inputmode="numeric" data-r="${r.id}" data-p="${p.id}" data-k="a:${r.id}:${p.id}" placeholder="${can ? '원 단위' : ''}" value="${v === undefined ? '' : v.toLocaleString('ko-KR')}" data-orig="${v === undefined ? '' : v.toLocaleString('ko-KR')}" ${can ? '' : 'disabled'}/><div class="hint">${v === undefined ? '' : apWon(v)}</div></td>`;
-  }).join('')}</tr>`; }).join('');
+  const body = props.map((p, i) => `<tr><td>${i + 1}. ${esc(p.address)}<div class="muted">${unitSub(p)}</div></td>${reqs.map(r => {
+    const u = apUnits(props, r.bundles).find(x => x.members.some(m => m.id === p.id)), cls = `c ${c.chosen_firm_id === r.firm_id ? 'chosen' : ''}`;
+    if (u && u.group && u.key !== p.id) return `<td class="${cls}"><div class="muted" style="text-align:center;padding:10px 0">↳ ${esc(apNos(u))}번 일괄</div></td>`;
+    const v = apReqSum(r, props).map.get(p.id), tag = u && u.group ? `<div class="muted" style="margin-bottom:3px;text-align:right">🔗 ${esc(apNos(u))}번 일괄 가격</div>` : '';
+    return `<td class="${cls}">${tag}<input class="amt" inputmode="numeric" data-r="${r.id}" data-p="${p.id}" data-k="a:${r.id}:${p.id}" placeholder="${can ? '원 단위' : ''}" value="${v === undefined ? '' : v.toLocaleString('ko-KR')}" data-orig="${v === undefined ? '' : v.toLocaleString('ko-KR')}" ${can ? '' : 'disabled'}/><div class="hint">${v === undefined ? '' : apWon(v)}</div></td>`;
+  }).join('')}</tr>`).join('');
   const tinp = reqs.map(r => {
     const sm = apReqSum(r, props), has = sm.mode === 'items', v = sm.mode === 'total' ? Number(r.total_amount).toLocaleString('ko-KR') : '';
     return `<td class="c ${c.chosen_firm_id === r.firm_id ? 'chosen' : ''}"><input class="tamt" inputmode="numeric" data-r="${r.id}" data-k="t:${r.id}" data-orig="${v}" value="${v}" placeholder="${has ? '물건별 입력의 합계가 적용됨' : '총액만 받은 경우'}" ${can && !has ? '' : 'disabled'}/><div class="hint">${v ? apWon(sm.total) : ''}</div></td>`;
@@ -274,7 +276,7 @@ function renderApDetail(){
       <div><div class="k">알림 받는 사람</div><div class="v">${esc((c.notify_emails || []).map(nameOf).join(', ') || '없음')}</div></div>
     </div>
     ${c.memo ? `<div class="apsec"><div class="k">메모</div><div style="white-space:pre-wrap">${esc(c.memo)}</div></div>` : ''}
-    <div class="apsec"><div class="k">물건 (${props.length}건${units.some(u => u.group) ? ' · 🔗 묶음은 가격을 한 번에 받아요' : ''})</div><div class="apm"><table class="apt"><thead><tr><th>#</th><th>구분</th><th>소재지</th><th>지목</th><th style="text-align:right">면적</th></tr></thead><tbody>${propRows || '<tr><td colspan="5" class="muted">등록된 물건이 없어요.</td></tr>'}</tbody></table></div></div>
+    <div class="apsec"><div class="k">물건 (${props.length}건)</div><div class="apm"><table class="apt"><thead><tr><th>#</th><th>구분</th><th>소재지</th><th>지목</th><th style="text-align:right">면적</th></tr></thead><tbody>${propRows || '<tr><td colspan="5" class="muted">등록된 물건이 없어요.</td></tr>'}</tbody></table></div></div>
     <div class="apsec"><div class="k">평가기관별 가격 ${can ? '· 기관별로 입력하고 저장하세요' : ''}</div>
       ${reqs.length && props.length ? `<div class="apm"><table class="apt"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td><b>전체금액만 입력</b><div class="muted">물건별 금액 없이 총액만 받은 경우</div></td>${tinp}</tr><tr class="tot"><td>합계</td>${tot}</tr><tr><td><b>특이사항</b><div class="muted">기관별 코멘트</div></td>${notes}</tr><tr><td></td>${save}</tr></tbody></table></div>` : '<div class="blk-empty">의뢰한 평가기관이나 물건이 없어요. 수정에서 추가해주세요.</div>'}
       ${can && c.chosen_firm_id ? '<div style="margin-top:8px"><button class="btn small" data-act="unchoose">채택 해제 (가격만 조회)</button></div>' : ''}
@@ -338,6 +340,7 @@ $('apDetailPanel').addEventListener('click', async (e) => {
     if (error) return alert(error.message);
     apCloseDetail(); return loadAppraisal();
   }
+  if (act === 'bundle') return apBundleOpen(c.id, +b.dataset.r);
   if (act === 'save'){
     b.disabled = true;
     try { await apSavePrices(c, +b.dataset.r); } finally { b.disabled = false; }
@@ -358,7 +361,7 @@ async function apSavePrices(c, rid){
   if (up.length){ const { error } = await sb.from('appraisal_prices').upsert(up, { onConflict: 'request_id,property_id' }); if (error) return alert(error.message); }
   if (del.length){ const { error } = await sb.from('appraisal_prices').delete().eq('request_id', rid).in('property_id', del); if (error) return alert(error.message); }
   const inDate = $('apDetailPanel').querySelector(`input.rcv[data-r="${rid}"]`).value || null;
-  const recv = inDate || ((up.length === apUnits(props).length && up.length) || totalAmount !== null ? kstToday() : null);
+  const recv = inDate || ((up.length === apUnits(props, req.bundles).length && up.length) || totalAmount !== null ? kstToday() : null);
   const { error: e2 } = await sb.from('appraisal_requests').update({ received_at: recv, total_amount: totalAmount, note }).eq('id', rid);
   if (e2) return alert(e2.message);
   if (changed && (up.length || totalAmount !== null || note)) sb.functions.invoke('task-notify', { body: { event: 'appraisal_priced', case_id: c.id, firm_id: req.firm_id } });
@@ -480,12 +483,12 @@ function apAddPropBlock(p){
         <div class="apres"></div></div></div>
     <input class="pa apaddr" placeholder="↑ 검색해서 주소를 선택하세요" readonly style="margin-top:8px" />
     <div class="apst"></div>
-    <div class="grid3"><div><label>지목</label><input class="pj" list="apJimokDl" /></div><div class="lwc"><label>대지면적 (㎡)</label><input class="pl" inputmode="decimal" /></div><div><label class="la">면적</label><input class="pr" inputmode="decimal" /></div><div class="gwc"><label title="같은 묶음으로 고른 물건은 감정평가기관이 가격을 한 번에 불러줘요">가격 묶음</label><select class="pg"><option value="">개별</option>${[1, 2, 3, 4, 5, 6].map(n => `<option value="${n}">묶음 ${n}</option>`).join('')}</select></div><div><label class="ld">비고</label><input class="pd" maxlength="80" /></div></div>`;
+    <div class="grid3"><div><label>지목</label><input class="pj" list="apJimokDl" /></div><div class="lwc"><label>대지면적 (㎡)</label><input class="pl" inputmode="decimal" /></div><div><label class="la">면적</label><input class="pr" inputmode="decimal" /></div><div><label class="ld">비고</label><input class="pd" maxlength="80" /></div></div>`;
   $('apfProps').appendChild(blk);
   if (!$('apJimokDl')){ const dl = document.createElement('datalist'); dl.id = 'apJimokDl'; dl.innerHTML = AP_JIMOK.map(j => `<option value="${j}">`).join(''); document.body.appendChild(dl); }
   if (p){
     blk.querySelector('.pk').value = p.kind; blk.querySelector('.pa').value = p.address; blk.dataset.verified = '1'; blk.dataset.pnu = p.pnu || ''; blk.dataset.lat = p.lat ?? ''; blk.dataset.lng = p.lng ?? '';
-    blk.querySelector('.pj').value = p.jimok || ''; blk.querySelector('.pl').value = p.land_area === null || p.land_area === undefined ? '' : p.land_area; blk.querySelector('.pr').value = p.area === null ? '' : p.area; blk.querySelector('.pg').value = p.group_no ?? ''; blk.querySelector('.pd').value = p.detail || '';
+    blk.querySelector('.pj').value = p.jimok || ''; blk.querySelector('.pl').value = p.land_area === null || p.land_area === undefined ? '' : p.land_area; blk.querySelector('.pr').value = p.area === null ? '' : p.area; blk.querySelector('.pd').value = p.detail || '';
   }
   apKindSync(blk); apRenumber();
 }
@@ -570,10 +573,8 @@ async function apSaveForm(){
       landArea = Number(b.querySelector('.pl').value.trim().replace(/,/g, ''));
       if (!landArea || isNaN(landArea) || landArea <= 0) return alert(`물건 ${i + 1}: 대지면적(㎡)을 숫자로 입력해주세요.`);
     }
-    props.push({ id: b.dataset.id ? +b.dataset.id : null, seq: i + 1, kind, address: addr, pnu: b.dataset.pnu || null, lat: b.dataset.lat ? Number(b.dataset.lat) : null, lng: b.dataset.lng ? Number(b.dataset.lng) : null, jimok: jimok || null, area, land_area: landArea, group_no: b.querySelector('.pg').value ? Number(b.querySelector('.pg').value) : null, detail: b.querySelector('.pd').value.trim() || null });
+    props.push({ id: b.dataset.id ? +b.dataset.id : null, seq: i + 1, kind, address: addr, pnu: b.dataset.pnu || null, lat: b.dataset.lat ? Number(b.dataset.lat) : null, lng: b.dataset.lng ? Number(b.dataset.lng) : null, jimok: jimok || null, area, land_area: landArea, detail: b.querySelector('.pd').value.trim() || null });
   }
-  const gcount = new Map(); props.forEach(p => { if (p.group_no) gcount.set(p.group_no, (gcount.get(p.group_no) || 0) + 1); });
-  for (const [g, n] of gcount) if (n < 2) return alert(`가격 묶음 ${g}에 물건이 하나뿐이에요. 같은 묶음으로 고른 물건이 2개 이상이어야 해요. 묶음을 풀거나 다른 물건도 같은 묶음으로 선택해주세요.`);
   const firms = [...document.querySelectorAll('#apFirmList input:checked')].map(i => +i.value);
   const notify = [...document.querySelectorAll('#apNotifyList input:checked')].map(i => i.value);
   const patch = { scope, handling_type: htype, handling_note: htype === '기타' ? hnote : null, debtor_name: debtor, request_date: $('apfDate').value || kstToday(), loan_amount: apNum($('apfLoan').value), memo: $('apfMemo').value.trim() || null, notify_emails: notify };
@@ -591,15 +592,6 @@ async function apSaveForm(){
     } else {
       const c = apCases.find(x => x.id === cid);
       const upd = { ...patch }; if (c.chosen_firm_id && !firms.includes(c.chosen_firm_id)) upd.chosen_firm_id = null;
-      // 묶음 구성이 바뀌면 그 물건들에 입력된 가격은 의미가 달라지므로 지운다(확인 후)
-      const oldG = new Map(apProps(c).map(p => [p.id, p.group_no ?? null]));
-      const chg = props.filter(p => p.id && (oldG.get(p.id) ?? null) !== (p.group_no ?? null));
-      const gs = new Set(); chg.forEach(p => { if (oldG.get(p.id)) gs.add(oldG.get(p.id)); if (p.group_no) gs.add(p.group_no); });
-      const affected = new Set(chg.map(p => p.id));
-      props.forEach(p => { if (p.id && ((p.group_no && gs.has(p.group_no)) || (oldG.get(p.id) && gs.has(oldG.get(p.id))))) affected.add(p.id); });
-      const priced = c.appraisal_requests.some(rq => (rq.appraisal_prices || []).some(pr => affected.has(pr.property_id)));
-      if (affected.size && priced && !confirm('가격 묶음을 바꾸면 관련 물건에 입력된 평가기관 가격이 지워져요. 계속할까요?')) return;
-      c.__clearPrices = priced ? [...affected] : [];
       let err = (await sb.from('appraisal_cases').update(upd).eq('id', cid)).error;
       const oldIds = apProps(c).map(p => p.id), keep = props.filter(p => p.id).map(p => p.id);
       const gone = oldIds.filter(i => !keep.includes(i));
@@ -607,8 +599,6 @@ async function apSaveForm(){
       for (const p of props.filter(p => p.id)){ if (err) break; const { id, ...rest } = p; err = (await sb.from('appraisal_properties').update(rest).eq('id', id)).error; }
       const news = props.filter(p => !p.id);
       if (!err && news.length) err = (await sb.from('appraisal_properties').insert(news.map(({ id, ...p }) => ({ ...p, case_id: cid })))).error;
-      if (!err && c.__clearPrices && c.__clearPrices.length) err = (await sb.from('appraisal_prices').delete().in('property_id', c.__clearPrices)).error;
-      delete c.__clearPrices;
       const oldF = c.appraisal_requests.map(r => r.firm_id);
       const rmF = oldF.filter(f => !firms.includes(f)), addF = firms.filter(f => !oldF.includes(f));
       if (!err && rmF.length){
@@ -673,7 +663,13 @@ function apReportHtml(c){
     <td class="r nw">${p.kind === '건물' ? num(p.land_area) : (p.kind === '토지' ? num(p.area) : '-')}</td><td class="r nw">${p.kind === '토지' ? '-' : num(p.area)}</td></tr>`).join('');
   const many = reqs.length > 4;
   const head = reqs.map((r, i) => `<th class="nw ${i === chosenIdx ? 'sel' : ''}">${esc(nameOfFirm(r))}${i === chosenIdx ? ' ★' : ''}</th>`).join('');
-  const body = apUnits(props).map(u => `<tr><td>${u.group ? `${esc(apNos(u))}. ${u.members.map(m => esc(m.address)).join(' / ')} <span class="m">(일괄)</span>` : `${u.nos[0]}. ${esc(u.members[0].address)}`}</td>${reqs.map((r, k) => { const v = sums[k].map.get(u.key); return `<td class="r nw ${k === chosenIdx ? 'sel' : ''}">${v === undefined ? '-' : n(v)}</td>`; }).join('')}</tr>`).join('');
+  const unitsK = reqs.map(r => apUnits(props, r.bundles));
+  const body = props.map((p, i) => `<tr><td>${i + 1}. ${esc(p.address)}</td>${reqs.map((r, k) => {
+    const u = unitsK[k].find(x => x.members.some(m => m.id === p.id)), sel = k === chosenIdx ? 'sel' : '';
+    if (u && u.group && u.key !== p.id) return `<td class="c nw ${sel}"><span class="m">〃 (${esc(apNos(u))} 일괄)</span></td>`;
+    const v = sums[k].map.get(u ? u.key : p.id);
+    return `<td class="r nw ${sel}">${v === undefined ? '-' : n(v)}${u && u.group ? ` <span class="m">(${esc(apNos(u))} 일괄)</span>` : ''}</td>`;
+  }).join('')}</tr>`).join('');
   const total = reqs.map((r, k) => `<td class="r nw b ${k === chosenIdx ? 'sel' : ''}">${sums[k].mode === 'none' ? '-' : n(sums[k].total)}${sums[k].mode === 'total' ? ' *' : ''}</td>`).join('');
   const recv = reqs.map((r, k) => `<td class="c nw ${k === chosenIdx ? 'sel' : ''}">${esc(r.received_at || '-')}</td>`).join('');
   const hasNote = reqs.some(r => r.note);
@@ -1088,4 +1084,47 @@ document.addEventListener('click', async (e) => {
   }
   $('aGeoMsg').textContent = `완료: ${done}개 저장, ${fail}개 실패`;
   await loadAppraisal(); b.disabled = false;
+});
+
+
+// ---------- 평가기관별 '물건 묶기' (가격을 한 번에 불러준 경우) ----------
+let apBundleCtx = null;
+function apBundleOpen(cid, rid){ apBundleCtx = { cid, rid }; apBundleRender(); $('apBundleOv').style.display = 'block'; }
+function apBundleClose(){ $('apBundleOv').style.display = 'none'; apBundleCtx = null; }
+function apBundleRender(){
+  const c = apCases.find(x => x.id === apBundleCtx.cid), req = c && c.appraisal_requests.find(x => x.id === apBundleCtx.rid);
+  if (!c || !req){ apBundleClose(); return; }
+  const props = apProps(c), units = apUnits(props, req.bundles), inB = new Set(units.filter(u => u.group).flatMap(u => u.members.map(m => m.id)));
+  const nm = apFirmName(req.firm_id);
+  $('apBundlePanel').innerHTML = `<div class="ph"><h2>🔗 물건 묶기 · ${esc(nm)}</h2><button class="x" data-bn="close">✕</button></div>
+    <div class="muted" style="margin:6px 0 12px;font-size:13px">${esc(nm)}에서 여러 물건의 가격을 <b>한 번에</b> 불러줬다면 그 물건들을 묶으세요. 묶은 물건은 가격표에서 한 칸으로 입력해요. 다른 평가기관에는 영향이 없어요.</div>
+    ${units.filter(u => u.group).length ? `<div style="font-weight:800;margin-bottom:6px">현재 묶음</div>${units.filter(u => u.group).map(u => `<div class="aprec" style="cursor:default;display:flex;align-items:center;gap:10px"><div style="flex:1"><b>🔗 ${esc(apNos(u))}번 일괄</b><div class="m">${u.members.map(m => esc(m.address)).join(' / ')}</div></div><button class="btn small danger" data-bn="unbind" data-i="${u.bi}">풀기</button></div>`).join('')}` : '<div class="muted" style="margin-bottom:8px">아직 묶은 물건이 없어요.</div>'}
+    <div style="font-weight:800;margin:14px 0 6px">새로 묶기 <span class="muted" style="font-weight:500">(2개 이상 체크)</span></div>
+    <div class="checks" style="flex-direction:column;align-items:flex-start;gap:2px">${props.map((p, i) => `<label ${inB.has(p.id) ? 'style="opacity:.45"' : ''}><input type="checkbox" class="bnchk" value="${p.id}" ${inB.has(p.id) ? 'disabled' : ''}/> ${i + 1}. ${esc(p.address)} <span class="muted">${esc(p.kind)}${p.area ? ` · ${Number(p.area).toLocaleString('ko-KR')}㎡` : ''}</span></label>`).join('')}</div>
+    <div class="acts" style="margin-top:16px"><button class="btn primary" data-bn="bind" style="min-height:44px">선택한 물건 묶기</button><button class="btn" data-bn="close" style="min-height:44px">닫기</button></div>`;
+}
+async function apBundleSave(c, req, bundles, clearIds){
+  const hasPrice = (req.appraisal_prices || []).some(pr => clearIds.includes(pr.property_id));
+  if (hasPrice && !confirm('묶음이 바뀌면 이 평가기관에 입력된 관련 물건의 가격이 지워져요. 계속할까요?')) return false;
+  let err = (await sb.from('appraisal_requests').update({ bundles }).eq('id', req.id)).error;
+  if (!err && hasPrice) err = (await sb.from('appraisal_prices').delete().eq('request_id', req.id).in('property_id', clearIds)).error;
+  if (err){ alert(err.message); return false; }
+  return true;
+}
+$('apBundlePanel').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-bn]'); if (!b || !apBundleCtx) return;
+  if (b.dataset.bn === 'close') return apBundleClose();
+  const c = apCases.find(x => x.id === apBundleCtx.cid), req = c && c.appraisal_requests.find(x => x.id === apBundleCtx.rid); if (!req) return;
+  const cur = (req.bundles || []).map(x => [...x]);
+  if (b.dataset.bn === 'bind'){
+    const ids = [...document.querySelectorAll('#apBundlePanel .bnchk:checked')].map(i => +i.value);
+    if (ids.length < 2) return alert('묶을 물건을 2개 이상 체크해주세요.');
+    const order = apProps(c).map(p => p.id); ids.sort((x, y) => order.indexOf(x) - order.indexOf(y));
+    if (!await apBundleSave(c, req, [...cur, ids], ids)) return;
+  } else if (b.dataset.bn === 'unbind'){
+    const i = +b.dataset.i, units = apUnits(apProps(c), req.bundles), u = units.find(x => x.group && x.bi === i); if (!u) return;
+    const left = cur.filter((_, k) => k !== i);
+    if (!await apBundleSave(c, req, left, u.members.map(m => m.id))) return;
+  }
+  await loadAppraisal(); if (apBundleCtx) apBundleRender();
 });

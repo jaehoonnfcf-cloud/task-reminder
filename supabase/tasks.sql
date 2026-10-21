@@ -253,3 +253,7 @@ alter table public.appraisal_properties add column if not exists group_no smalli
 -- 취급구분에 '추가대출' 추가
 alter table public.appraisal_cases drop constraint appraisal_cases_handling_type_check;
 alter table public.appraisal_cases add constraint appraisal_cases_handling_type_check check (handling_type in ('신규대출','추가대출','기한연장','채권관리','기타'));
+
+-- 가격 묶음은 평가기관(의뢰)별 결과값: appraisal_requests.bundles = [[물건id, 물건id], …]. 묶음의 가격은 첫 물건 id 에 저장.
+-- (앞서 추가했던 appraisal_properties.group_no 는 더 이상 사용하지 않음)
+alter table public.appraisal_requests add column if not exists bundles jsonb not null default '[]'::jsonb;
