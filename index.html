@@ -296,10 +296,12 @@
   #hello span{ color:var(--muted); font-weight:700; }
   #hello{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
   #helloT{ min-width:0; }
-  #clock{ flex:none; text-align:right; letter-spacing:-.02em; line-height:1.25; padding-top:4px; }
-  #clock .cd1{ font-size:20px; font-weight:800; color:var(--ink); white-space:nowrap; } #clock .cd1 b{ font-weight:800; margin-left:6px; font-variant-numeric:tabular-nums; }
-  #clock .cd2{ font-size:12.5px; font-weight:600; color:var(--muted); margin-top:3px; white-space:nowrap; }
-  @media (max-width:760px){ #hello{ flex-direction:column; gap:6px; } #clock{ text-align:left; padding-top:0; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; } #clock .cd2{ margin-top:0; } #clock .cd1{ font-size:15px; } #clock .cd2{ font-size:11px; } #clock .cd1 b{ margin-left:4px; } }
+  #clock{ flex:none; text-align:left; background:#fff; border-radius:24px; box-shadow:var(--sh); padding:14px 22px 14px; min-width:190px; margin-top:2px; }
+  #clock .cdd{ font-size:13px; font-weight:700; color:var(--muted); letter-spacing:-.01em; }
+  #clock .cdt{ font-size:44px; font-weight:800; color:var(--ink); line-height:1.05; letter-spacing:-.04em; font-variant-numeric:tabular-nums; margin-top:2px; }
+  #clock .cd2{ display:inline-block; font-size:12.5px; font-weight:700; color:var(--accent); background:var(--accent-soft); padding:4px 11px; border-radius:99px; margin-top:9px; white-space:nowrap; }
+  @media (max-width:760px){ #hello{ flex-direction:column; gap:10px; } #clock{ align-self:stretch; display:grid; grid-template-columns:auto 1fr; align-items:center; column-gap:16px; padding:12px 18px; border-radius:22px; min-width:0; }
+    #clock .cdt{ grid-row:1 / 3; font-size:38px; margin:0; } #clock .cdd{ align-self:end; text-align:right; } #clock .cd2{ margin:4px 0 0; justify-self:end; font-size:12px; } }
   #main{ gap:16px; }
   #shared,#personal,#appraisal{ gap:16px; }
   /* 요약 타일 */
@@ -461,7 +463,7 @@
   <div id="wrap">
     <div id="tgBanner"><b>🔔 텔레그램 알림</b><span id="tgStatus" class="muted" style="flex:1"></span></div>
     <div id="main">
-    <div id="hello"><div id="helloT"></div><div id="clock"><div class="cd1"></div><div class="cd2"></div></div></div>
+    <div id="hello"><div id="helloT"></div><div id="clock"><div class="cdd"></div><div class="cdt"></div><div class="cd2"></div></div></div>
     <div id="shared">
     <div id="cal"></div>
     <div id="tiles"></div>
@@ -684,7 +686,8 @@
     const el = $('clock'); if (!el) return;
     const k = new Date(Date.now() + 9 * 3600e3), dow = k.getUTCDay(), hh = k.getUTCHours(), mm = k.getUTCMinutes();
     const DW = ['일', '월', '화', '수', '목', '금', '토'];
-    el.querySelector('.cd1').innerHTML = `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 (${DW[dow]})<b>${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}</b>`;
+    el.querySelector('.cdd').textContent = `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 ${DW[dow]}요일`;
+    el.querySelector('.cdt').textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     const left = WORK_END * 60 - (hh * 60 + mm);
     el.querySelector('.cd2').textContent = dow === 0 || dow === 6 ? '푹 쉬는 주말이에요 😴' : left > 0 ? `퇴근까지 ${left >= 60 ? `${Math.floor(left / 60)}시간 ` : ''}${left % 60 ? `${left % 60}분` : ''} ⏳`.replace('시간 ⏳', '시간 ⏳') : '오늘도 수고하셨어요 🎉';
   }
