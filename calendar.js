@@ -1,7 +1,7 @@
 // 조합 주요일정 — 여신·수신 화면 맨 위, 일~토 2주. 관리자만 등록/수정/삭제, 팀원은 보기만 한다.
 // index.html 의 전역(sb, $, esc, isAdmin, kstToday, toast)을 함께 쓴다.
 
-const CAL_KINDS = { '행사': '#7c3aed', '휴가': '#e08a00', '기타': '#8a90a0' };
+const CAL_KINDS = { '조합행사': '#7c3aed', '휴가': '#e08a00', '출장': '#0f9d8a', '외부행사': '#3b6cf5', '기타': '#8a90a0' };
 const CAL_DOW = ['일', '월', '화', '수', '목', '금', '토'];
 let calEvents = [], calEditId = null, calTimer = null;
 let calFold = (() => { try { return localStorage.getItem('calFold') === '1'; } catch (e) { return false; } })();
@@ -98,7 +98,7 @@ function calOpen(id, date){
   const e = id ? calEvents.find(x => x.id === id) : null; if (id && !e) return;
   $('calPanel').innerHTML = `<div class="ph"><h2>${e ? '일정 수정' : '일정 추가'}</h2><button class="x" data-c="close">✕</button></div>
     <label>제목 <span style="color:var(--danger)">*</span></label><input id="calTitle" maxlength="100" placeholder="예: 이사회 / 휴가 : 최정훈 / 오전반가 : 곽선화" />
-    <label>종류</label><div class="checks" id="calKind">${Object.keys(CAL_KINDS).map(k => `<label><input type="radio" name="calKindR" value="${k}" ${(e ? e.kind : '행사') === k ? 'checked' : ''}/> <i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${CAL_KINDS[k]}"></i> ${k}</label>`).join('')}</div>
+    <label>종류</label><div class="checks" id="calKind">${Object.keys(CAL_KINDS).map(k => `<label><input type="radio" name="calKindR" value="${k}" ${(e ? e.kind : '조합행사') === k ? 'checked' : ''}/> <i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${CAL_KINDS[k]}"></i> ${k}</label>`).join('')}</div>
     <div class="row"><div><label>시작일 <span style="color:var(--danger)">*</span></label><input id="calStart" type="date" /></div><div><label>종료일 (여러 날일 때)</label><input id="calEnd" type="date" /></div></div>
     <label>시간 (선택)</label><input id="calTime" type="time" style="max-width:180px" />
     <div class="acts" style="margin-top:20px;justify-content:space-between"><div style="display:flex;gap:8px"><button class="btn primary" data-c="save" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" data-c="close" style="min-height:44px">취소</button></div>${e ? '<button class="btn danger" data-c="del">삭제</button>' : ''}</div>`;
@@ -121,7 +121,7 @@ $('calPanel').addEventListener('click', async (ev) => {
     if (!title) return alert('제목을 입력해주세요.');
     if (!start) return alert('시작일을 선택해주세요.');
     if (end && end < start) return alert('종료일이 시작일보다 앞이에요.');
-    const row = { title, kind: (document.querySelector('input[name=calKindR]:checked') || {}).value || '행사', start_date: start, end_date: end && end !== start ? end : null, event_time: time || null };
+    const row = { title, kind: (document.querySelector('input[name=calKindR]:checked') || {}).value || '조합행사', start_date: start, end_date: end && end !== start ? end : null, event_time: time || null };
     b.disabled = true;
     const { error } = calEditId ? await sb.from('calendar_events').update(row).eq('id', calEditId) : await sb.from('calendar_events').insert(row);
     b.disabled = false;

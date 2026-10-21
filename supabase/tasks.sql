@@ -259,7 +259,7 @@ alter table public.appraisal_cases add constraint appraisal_cases_handling_type_
 alter table public.appraisal_requests add column if not exists bundles jsonb not null default '[]'::jsonb;
 
 -- 조합 주요일정(calendar_events): 여신·수신 화면 맨 위 2주 달력. 조회는 팀원 전체, 등록·수정·삭제는 관리자만.
--- columns: title, start_date, end_date(여러 날), event_time(선택), kind(행사/휴가/기타), created_by. realtime publication 포함.
+-- columns: title, start_date, end_date(여러 날), event_time(선택), kind(조합행사/휴가/출장/외부행사/기타), created_by. realtime publication 포함.
 
 -- 업무카드 댓글(work_task_comments): 여신/수신 업무 상세창 댓글. 조회는 팀원 전체, 작성은 업무 작성자·담당자·해당 구분 권한자, 삭제는 본인 또는 관리자.
 create table if not exists public.work_task_comments (
@@ -277,3 +277,8 @@ create policy cmt_delete on public.work_task_comments for delete to authenticate
 grant select, insert, delete on public.work_task_comments to authenticated;
 grant all on public.work_task_comments to service_role;
 alter publication supabase_realtime add table public.work_task_comments;
+
+-- 일정 종류 변경: 행사 → 조합행사 (출장·외부행사 추가)
+alter table public.calendar_events drop constraint if exists calendar_events_kind_check;
+update public.calendar_events set kind = '조합행사' where kind = '행사';
+alter table public.calendar_events add constraint calendar_events_kind_check check (kind in ('조합행사','휴가','출장','외부행사','기타'));
