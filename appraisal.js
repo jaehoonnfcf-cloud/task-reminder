@@ -135,7 +135,9 @@ function apUnits(props, bundles){
   });
   return out;
 }
-const apNos = (u) => u.nos.join('·');
+// 물건 번호 표기: 연속이면 1~5, 떨어져 있으면 1~3·5
+const apRange = (nos) => { const out = []; let i = 0; while (i < nos.length){ let j = i; while (j + 1 < nos.length && nos[j + 1] === nos[j] + 1) j++; out.push(j > i ? `${nos[i]}~${nos[j]}` : `${nos[i]}`); i = j + 1; } return out.join('·'); };
+const apNos = (u) => apRange(u.nos);
 function apReqSum(r, props){
   const m = new Map((r.appraisal_prices || []).map(p => [p.property_id, Number(p.amount)]));
   const units = apUnits(props, r.bundles), have = units.filter(u => m.has(u.key));

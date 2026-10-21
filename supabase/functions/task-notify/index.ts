@@ -12,6 +12,11 @@ const won = (n?: number) => {
   const e = Math.floor(n / 1e8), m = Math.floor((n % 1e8) / 1e4), r = n % 1e4;
   return [e && `${e}억`, m && `${m.toLocaleString("ko-KR")}만`, r && `${r.toLocaleString("ko-KR")}`].filter(Boolean).join(" ") + "원";
 };
+const rangeText = (nos: number[]) => {
+  const out: string[] = []; let i = 0;
+  while (i < nos.length) { let j = i; while (j + 1 < nos.length && nos[j + 1] === nos[j] + 1) j++; out.push(j > i ? `${nos[i]}~${nos[j]}` : `${nos[i]}`); i = j + 1; }
+  return out.join("·");
+};
 const sc = (v?: string | null) => (v ? `[${v}]` : "");
 async function tg(chatId: number, text: string) {
   await fetch(`https://api.telegram.org/bot${BOT}/sendMessage`, {
@@ -143,7 +148,7 @@ async function handle(req: Request): Promise<Response> {
       });
       const byItem = amt.size > 0;   // 물건별 입력이 없고 총액만 받은 경우는 total_amount 사용
       const total = byItem ? units.reduce((s: number, u) => s + (amt.get(u.key) ?? 0), 0) : Number(req2.total_amount ?? 0);
-      const lines = byItem ? units.map((u) => `  ${u.nos.join("·")}${u.nos.length > 1 ? "(일괄)" : ""}. ${won(amt.get(u.key))}`).join("\n") + "\n" : "";
+      const lines = byItem ? units.map((u) => `  ${rangeText(u.nos)}${u.nos.length > 1 ? "(일괄)" : ""}. ${won(amt.get(u.key))}`).join("\n") + "\n" : "";
       const noteTxt = req2.note ? `\n특이사항: ${req2.note}` : "";
       if (event === "appraisal_priced") await notify(to, `💰 ${tag} ${c.debtor_name}\n${fname(body.firm_id)} ${byItem || req2.total_amount !== null ? "평가가격이 입력됐어요" : "특이사항이 입력됐어요"}\n${lines}${byItem || req2.total_amount !== null ? `합계 ${won(total)}${byItem ? "" : " (총액만 입력)"}` : ""}${noteTxt}\n입력: ${who(me)}님`);
       else await notify(to, `✅ ${tag} ${c.debtor_name}\n${fname(body.firm_id)}을(를) 채택했어요 (합계 ${won(total)})\n처리: ${who(me)}님`);
