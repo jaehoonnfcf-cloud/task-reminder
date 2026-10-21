@@ -17,6 +17,42 @@ const rangeText = (nos: number[]) => {
   while (i < nos.length) { let j = i; while (j + 1 < nos.length && nos[j + 1] === nos[j] + 1) j++; out.push(j > i ? `${nos[i]}~${nos[j]}` : `${nos[i]}`); i = j + 1; }
   return out.join("·");
 };
+// ---- 주요일정 안내 (정기 알림): 아침 = 오늘, 오후 = 내일 (금요일 오후는 토·일·월) ----
+type CalEv = { title: string; start_date: string; end_date: string | null; event_time: string | null };
+const DOW = ["일", "월", "화", "수", "목", "금", "토"];
+const addDays = (iso: string, n: number) => new Date(Date.parse(iso + "T12:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+function calRange(today: string, hour: number): { from: string; to: string; label: string; multi: boolean } {
+  if (hour < 12) return { from: today, to: today, label: "오늘 주요일정", multi: false };
+  const dow = new Date(today + "T12:00:00Z").getUTCDay();   // 0=일
+  if (dow === 5) return { from: addDays(today, 1), to: addDays(today, 3), label: "주말·월요일 주요일정", multi: true };   // 금요일 오후: 토·일·월
+  return { from: addDays(today, 1), to: addDays(today, 1), label: "내일 주요일정", multi: false };
+}
+function calText(events: CalEv[], today: string, hour: number): string {
+  const rg = calRange(today, hour);
+  const rows: { day: string; ev: CalEv }[] = [];
+  for (const ev of events) {
+    const end = ev.end_date ?? ev.start_date;
+    if (ev.start_date > rg.to || end < rg.from) continue;
+    rows.push({ day: ev.start_date < rg.from ? rg.from : ev.start_date, ev });   // 이미 시작된 여러 날 일정은 범위 첫날로
+  }
+  if (!rows.length) return "";
+  rows.sort((a, b) => a.day.localeCompare(b.day) || String(a.ev.event_time ?? "").localeCompare(String(b.ev.event_time ?? "")));
+  const lines = rows.map(({ day, ev }) => {
+    const d = new Date(day + "T12:00:00Z");
+    const pre = rg.multi ? `${DOW[d.getUTCDay()]} ${d.getUTCMonth() + 1}/${d.getUTCDate()} ` : "";
+    const tm = ev.event_time ? `${ev.event_time.slice(0, 5)} ` : "";
+    let sfx = "";
+    if (ev.end_date && ev.end_date > day) { const [, em, ed] = ev.end_date.split("-"), [, dm] = day.split("-"); sfx = ` (~${em === dm ? +ed : `${+em}/${+ed}`})`; }
+    return `• ${pre}${tm}${ev.title}${sfx}`;
+  });
+  return `📅 ${rg.label}\n${lines.join("\n")}`;
+}
+async function calendarBlock(today: string, hour: number): Promise<string> {
+  const rg = calRange(today, hour);
+  const { data } = await db.from("calendar_events").select("title, start_date, end_date, event_time")
+    .gte("start_date", addDays(rg.from, -60)).lte("start_date", rg.to).order("start_date").order("event_time", { nullsFirst: true });
+  return calText((data ?? []) as CalEv[], today, hour);
+}
 const sc = (v?: string | null) => (v ? `[${v}]` : "");
 async function tg(chatId: number, text: string) {
   await fetch(`https://api.telegram.org/bot${BOT}/sendMessage`, {
@@ -97,12 +133,23 @@ async function handle(req: Request): Promise<Response> {
       const tag = diff < 0 ? ` 🔴기한초과(${t.due_date})` : diff === 0 ? " 🟠오늘마감" : ` (D-${diff})`;
       add(t.owner_email, "개인", `• ${t.recurring_id ? "[고정] " : ""}${t.title}${tag}`);
     }
-    for (const [email, secs] of byUser) {
-      const total = SECTIONS.reduce((n, k) => n + (secs[k]?.length ?? 0), 0);
-      const blocks = SECTIONS.filter((k) => secs[k]?.length).map((k) => `■ ${k} (${secs[k].length})\n${secs[k].join("\n")}`);
-      await notify([email], `⏰ 아직 남은 업무가 ${total}건 있어요\n\n${blocks.join("\n\n")}`);
+    // 주요일정: 연결된 팀원 전체에게. 업무가 있으면 알림 맨 위에 붙이고, 업무가 없으면 일정만 따로 보낸다 (일정도 없으면 보내지 않음)
+    const hour = new Date(Date.now() + 9 * 3600e3).getUTCHours();
+    const calBlk = await calendarBlock(today, hour);
+    const everyone = new Set<string>(byUser.keys());
+    if (calBlk) { const { data: lk } = await db.from("telegram_links").select("email").not("chat_id", "is", null); for (const r of lk ?? []) everyone.add(r.email); }
+    for (const email of everyone) {
+      const secs = byUser.get(email);
+      const parts: string[] = [];
+      if (secs) {
+        const total = SECTIONS.reduce((n, k) => n + (secs[k]?.length ?? 0), 0);
+        parts.push(`⏰ 아직 남은 업무가 ${total}건 있어요`);
+        if (calBlk) parts.push(calBlk);
+        parts.push(...SECTIONS.filter((k) => secs[k]?.length).map((k) => `■ ${k} (${secs[k].length})\n${secs[k].join("\n")}`));
+      } else if (calBlk) parts.push(calBlk);
+      if (parts.length) await notify([email], parts.join("\n\n"));
     }
-    return ok({ users: byUser.size });
+    return ok({ users: everyone.size, calendar: !!calBlk });
   }
 
   // 3) 페이지에서 호출: 신규 등록 / 완료 이벤트 (로그인 JWT 로 본인 확인)
