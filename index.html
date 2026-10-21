@@ -476,6 +476,7 @@
     <div id="appraisal"></div>
     <div id="debt"></div>
     <div id="personal" style="display:none">
+      <div id="pcal"></div>
       <div id="ptiles"></div>
       <div class="list-panel">
         <div class="toolbar">
@@ -679,7 +680,7 @@
     renderWho();
     setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
     divn = storedDiv === 'credit' || storedDiv === 'deposit' || storedDiv === 'personal' || storedDiv === 'appraisal' || (storedDiv === 'debt' && canWrite('debt')) ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
-    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadDebt === 'function') await loadDebt(); if (typeof loadCal === 'function') await loadCal(); ensureSide(); startRealtime();
+    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadDebt === 'function') await loadDebt(); if (typeof loadCal === 'function') await loadCal(); if (typeof loadPcal === 'function') await loadPcal(); ensureSide(); startRealtime();
   }
 
   async function reloadMembers(){
@@ -897,7 +898,8 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_steps' }, scheduleReload)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_comments' }, scheduleReload)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, scheduleMembers)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, () => { if (typeof scheduleCal === 'function') scheduleCal(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, () => { if (typeof scheduleCal === 'function') { scheduleCal(); schedulePcal(); } })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'personal_events' }, () => { if (typeof schedulePcal === 'function') schedulePcal(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_logs' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_cases' }, scheduleAp)
@@ -909,8 +911,8 @@
   }
   function stopRealtime(){ try { if (rtChan) sb.removeChannel(rtChan); } catch (e) {} rtChan = null; }
   // 실시간 연결이 끊겨도 놓치지 않도록: 화면에 다시 돌아오면 갱신 + 1분마다 갱신
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && me){ loadTasks(); loadPersonal(); loadAppraisal(); if (typeof loadDebt === 'function') loadDebt(); if (typeof loadCal === 'function') loadCal(); } });
-  setInterval(() => { if (!document.hidden && me){ loadTasks(); loadAppraisal(); if (typeof loadDebt === 'function') loadDebt(); if (typeof loadCal === 'function') loadCal(); } }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && me){ loadTasks(); loadPersonal(); loadAppraisal(); if (typeof loadDebt === 'function') loadDebt(); if (typeof loadCal === 'function'){ loadCal(); loadPcal(); } } });
+  setInterval(() => { if (!document.hidden && me){ loadTasks(); loadAppraisal(); if (typeof loadDebt === 'function') loadDebt(); if (typeof loadCal === 'function'){ loadCal(); loadPcal(); } } }, 60000);
 
   // ---------- 동작 (공통) ----------
   async function completeStep(tid, seq){
@@ -1532,7 +1534,7 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('calOv') && $('calOv').style.display === 'block') calClose(); else if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
 <script src="appraisal.js?v=40"></script>
-<script src="calendar.js?v=5"></script>
+<script src="calendar.js?v=6"></script>
 <script src="debt.js?v=4"></script>
 </body>
 </html>

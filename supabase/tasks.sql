@@ -335,3 +335,24 @@ alter publication supabase_realtime add table public.debt_cases, public.debt_log
 -- 채권관리 이력 수정: 본인이 쓴 이력 또는 관리자만 날짜·종류·내용 수정
 create policy dl_upd on public.debt_logs for update to authenticated using (has_debt() and (created_by = auth.email() or is_admin())) with check (has_debt() and (created_by = auth.email() or is_admin()));
 grant update (log_date, kind, body) on public.debt_logs to authenticated;
+
+-- 개인일정(personal_events): 개인업무 화면 맨 위 2주 달력. 본인만 조회·등록·수정·삭제 (조합 달력의 공휴일은 화면에서 같이 보여줌).
+-- 조합 주요일정(calendar_events)은 화면에서 '조합일정' 이라는 이름으로 표시.
+create table if not exists public.personal_events (
+  id bigint generated always as identity primary key,
+  owner_email text not null default auth.email(),
+  title text not null check (char_length(title) between 1 and 100),
+  kind text not null default '개인' check (kind in ('개인','약속','휴가','출장','기타')),
+  start_date date not null,
+  end_date date check (end_date is null or end_date >= start_date),
+  event_time time,
+  created_at timestamptz not null default now()
+);
+create index if not exists personal_events_owner_idx on public.personal_events (owner_email, start_date);
+alter table public.personal_events enable row level security;
+create policy pe_sel on public.personal_events for select to authenticated using (owner_email = auth.email());
+create policy pe_ins on public.personal_events for insert to authenticated with check (owner_email = auth.email() and is_member());
+create policy pe_upd on public.personal_events for update to authenticated using (owner_email = auth.email()) with check (owner_email = auth.email());
+create policy pe_del on public.personal_events for delete to authenticated using (owner_email = auth.email());
+grant select, insert, update, delete on public.personal_events to authenticated;
+alter publication supabase_realtime add table public.personal_events;
