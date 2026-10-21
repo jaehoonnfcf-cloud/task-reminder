@@ -953,7 +953,7 @@ function apMapRefresh(){
       const icon = L.divIcon({ className: 'apin-wrap', html: `<div class="apin s-${st}"><b>${props.length > 1 ? i + 1 : ''}</b></div>`, iconSize: [26, 26], iconAnchor: [13, 26], popupAnchor: [0, -24] });
       const m = L.marker([p.lat, p.lng], { icon }).bindPopup(apPopupHtml(c, p, i, props.length, st));
       apCluster.addLayer(m); (apMarkers[c.id] = apMarkers[c.id] || []).push(m);
-      if (!latest || c.id > latest.c.id) latest = { c, p };
+      if (!latest || String(c.request_date) > String(latest.c.request_date) || (c.request_date === latest.c.request_date && c.id > latest.c.id)) latest = { c, p };   // 의뢰일이 가장 최근인 기록
     });
   });
   const note = $('apMnote');
@@ -982,10 +982,10 @@ function apRecHtml(c, p, extra, cls){
 function apMapPanelRender(){
   const el = $('apMapPanel'), a = apMapLast;
   if (!a){
-    const rec = [...apCases].sort((x, y) => String(y.created_at).localeCompare(String(x.created_at))).slice(0, 8);
+    const rec = [...apCases].sort((x, y) => String(y.request_date).localeCompare(String(x.request_date)) || String(y.created_at).localeCompare(String(x.created_at))).slice(0, 8);   // 의뢰일자 최신순 (과거 자료를 나중에 입력해도 최근 의뢰가 위)
     el.innerHTML = `<div style="font-weight:800;margin-bottom:6px">🔎 새 의뢰 전에 기존 기록부터 찾아보세요</div>
       <div class="muted" style="margin-bottom:12px;font-size:13px">위 검색창에 지번을 입력하면 그 위치로 이동하고, 같은 필지와 근처의 기존 감정 기록을 보여 드려요.</div>
-      <div style="font-weight:800;margin:8px 0">최근 등록 기록</div>${rec.map(c => apRecHtml(c, apProps(c)[0], '')).join('') || '<div class="muted">아직 기록이 없어요.</div>'}`;
+      <div style="font-weight:800;margin:8px 0">최근 의뢰 기록 <span class="muted" style="font-weight:500">(의뢰일 순)</span></div>${rec.map(c => apRecHtml(c, apProps(c)[0], '')).join('') || '<div class="muted">아직 기록이 없어요.</div>'}`;
     return;
   }
   const r = +$('apMr').value, withArc = $('apMarch').checked;
