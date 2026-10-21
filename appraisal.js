@@ -16,7 +16,7 @@ let apCases = [], apFirms = [], apSettings = {}, apOpenId = null, apFormId = nul
 let apMainView = (() => { try { return localStorage.getItem('apMain') || 'map'; } catch (e) { return 'map'; } })();
 let apQ = '', apMine = false, apScope = 'all', apType = 'all', apView = 'active';
 
-const AP_TYPES = ['신규대출', '기한연장', '채권관리', '기타'];
+const AP_TYPES = ['신규대출', '추가대출', '기한연장', '채권관리', '기타'];
 const apTypeText = (c) => c.handling_type ? (c.handling_type === '기타' && c.handling_note ? `기타 · ${c.handling_note}` : c.handling_type) : '-';
 const apCaseNo = (c) => `${String(c.request_date || '').slice(0, 4)}-${String(c.id).padStart(4, '0')}`;
 const apCan = () => !!(meRow && (meRow.is_admin || meRow.perm_appraisal));
@@ -554,7 +554,7 @@ async function apSaveForm(){
   const scope = (document.querySelector('input[name=apfScopeR]:checked') || {}).value, debtor = $('apfDebtor').value.trim();
   const htype = (document.querySelector('input[name=apfTypeR]:checked') || {}).value, hnote = $('apfTypeNote').value.trim();
   if (!scope) return alert('본점 / 지점 중 하나를 선택해주세요.');
-  if (!htype) return alert('취급구분(신규대출 / 기한연장 / 채권관리 / 기타)을 선택해주세요.');
+  if (!htype) return alert('취급구분(신규대출 / 추가대출 / 기한연장 / 채권관리 / 기타)을 선택해주세요.');
   if (htype === '기타' && !hnote) return alert('기타를 선택했어요. 사유를 입력해주세요.');
   if (!debtor) return alert('채무자(예정자) 이름을 입력해주세요.');
   const blocks = [...document.querySelectorAll('#apfProps .apblock')];

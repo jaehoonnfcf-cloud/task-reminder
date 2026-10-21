@@ -249,3 +249,7 @@ alter table public.appraisal_properties add column if not exists lng double prec
 
 -- 감정평가 물건 '가격 묶음': group_no 가 같은 물건은 가격을 한 번에 받는다. 가격은 묶음의 첫 물건(appraisal_prices.property_id)에만 저장
 alter table public.appraisal_properties add column if not exists group_no smallint check (group_no is null or group_no between 1 and 20);
+
+-- 취급구분에 '추가대출' 추가
+alter table public.appraisal_cases drop constraint appraisal_cases_handling_type_check;
+alter table public.appraisal_cases add constraint appraisal_cases_handling_type_check check (handling_type in ('신규대출','추가대출','기한연장','채권관리','기타'));
