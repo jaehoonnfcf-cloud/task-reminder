@@ -331,3 +331,7 @@ create policy dl_del on public.debt_logs for delete to authenticated using (has_
 grant select, insert, update, delete on public.debt_cases to authenticated;
 grant select, insert, delete on public.debt_logs to authenticated;
 alter publication supabase_realtime add table public.debt_cases, public.debt_logs;
+
+-- 채권관리 이력 수정: 본인이 쓴 이력 또는 관리자만 날짜·종류·내용 수정
+create policy dl_upd on public.debt_logs for update to authenticated using (has_debt() and (created_by = auth.email() or is_admin())) with check (has_debt() and (created_by = auth.email() or is_admin()));
+grant update (log_date, kind, body) on public.debt_logs to authenticated;
