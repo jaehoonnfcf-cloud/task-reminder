@@ -79,7 +79,14 @@
   .q-name{ color:#44546f; font-weight:600; } .q-price{ font-weight:800; font-variant-numeric:tabular-nums; }
   .q-chg{ font-size:12.5px; font-weight:700; min-width:92px; text-align:right; font-variant-numeric:tabular-nums; }
   .q-chg.up{ color:#d6342c; } .q-chg.down{ color:#0c66e4; } .q-chg.flat{ color:var(--muted); }
-  #news{ overflow-y:auto; max-height:calc(100vh - 520px); min-height:260px; }
+  #news{ overflow-y:auto; max-height:300px; }
+  .rc{ display:block; width:100%; text-align:left; border:0; background:transparent; font:inherit; color:var(--ink); cursor:pointer; padding:11px 16px; border-bottom:1px solid #f0f1f3; }
+  .rc:last-child{ border-bottom:0; } .rc:hover{ background:#f6f8ff; }
+  .rc .rh{ display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted); margin-bottom:3px; }
+  .rc .rh b{ color:var(--ink); font-weight:800; } .rc .rh .t{ margin-left:auto; white-space:nowrap; }
+  .rc .rt{ font-size:12.5px; font-weight:700; color:var(--accent); margin-bottom:2px; display:flex; gap:6px; align-items:center; white-space:nowrap; overflow:hidden; }
+  .rc .rt span:last-child{ overflow:hidden; text-overflow:ellipsis; }
+  .rc .rb{ font-size:13.5px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
   .ni{ display:block; padding:11px 16px; border-bottom:1px solid #f0f1f3; text-decoration:none; color:var(--ink); }
   .ni:hover{ background:#f6f8ff; }
   .ni .nm{ display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); margin-bottom:3px; }
@@ -499,6 +506,7 @@
     </div>
     <aside id="side">
       <div class="side-card"><div class="side-h"><span>📈 시세정보</span><span class="muted" id="qTime"></span></div><div id="quotes"><div class="side-empty">불러오는 중...</div></div></div>
+      <div class="side-card" id="rcCard" style="display:none"><div class="side-h"><span>💬 최근 댓글</span><span class="muted">눌러서 업무 열기</span></div><div id="rcList"></div></div>
       <div class="side-card"><div class="side-h"><span>📰 경제뉴스</span><span class="muted" id="nTime"></span></div><div id="news"><div class="side-empty">불러오는 중...</div></div></div>
     </aside>
   </div>
@@ -763,9 +771,36 @@
     if (error){ $('list').innerHTML = `<div class="empty">${esc(error.message)}</div>`; return; }
     tasks = data || [];
     render();
+    loadRecentComments();
     if (openId) { const t = byId(openId); if (t) renderDetail(t); else closeDetail(); }
   }
   const byId = (id) => tasks.find(t => t.id === id);
+  // ---------- 최근 댓글 (넓은 화면 오른쪽 열, 수신/기타·여신 화면에서만) ----------
+  let recentCmts = [];
+  async function loadRecentComments(){
+    const { data, error } = await sb.from('work_task_comments').select('id, task_id, author_email, body, created_at').order('created_at', { ascending: false }).order('id', { ascending: false }).limit(30);
+    if (error) return;
+    recentCmts = data || [];
+    renderRecentComments();
+  }
+  function renderRecentComments(){
+    const card = $('rcCard'); if (!card) return;
+    const show = divn === 'credit' || divn === 'deposit';
+    card.style.display = show ? '' : 'none'; if (!show) return;
+    const rows = recentCmts.filter(c => byId(c.task_id)).slice(0, 5);
+    $('rcList').innerHTML = rows.map(c => {
+      const t = byId(c.task_id), dv = taskDiv(t) === 'deposit' ? '수신' : '여신';
+      return `<button class="rc" data-rc="${c.task_id}"><div class="rh">${avHtml(c.author_email, '', 'margin:0;width:20px;height:20px;font-size:10px;border-width:0')}<b>${esc(nameOf(c.author_email))}</b><span class="t">${ago(c.created_at)}</span></div>
+        <div class="rt"><span>${dv}${t.scope ? '·' + esc(t.scope) : ''}</span><span>${esc(t.title)}</span></div><div class="rb">${esc(c.body)}</div></button>`;
+    }).join('') || '<div class="side-empty">아직 댓글이 없어요.</div>';
+  }
+  $('rcList').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rc]'); if (!b) return;
+    const t = byId(+b.dataset.rc); if (!t) return;
+    if (taskDiv(t) !== divn){ divn = taskDiv(t); try { localStorage.setItem('div', divn); } catch (x) {} fGrp = null; render(); }   // 다른 구분의 업무면 그 화면으로 옮겨서 연다
+    openDetail(t.id);
+    setTimeout(() => { const w = $('cmtWrap'); if (w) w.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 120);
+  });
   const stepsOf = (t) => [...t.work_task_steps].sort((a, b) => a.seq - b.seq);
   const isDone = (t) => t.task_type === 'loan' ? (t.work_task_steps.length > 0 && t.work_task_steps.every(s => s.done_at)) : t.work_task_assignees.every(a => a.done_at);
   const curIdx = (t) => { const s = stepsOf(t); const i = s.findIndex(x => !x.done_at); return i < 0 ? s.length : i; };
@@ -797,6 +832,7 @@
     $('roPill').style.display = w ? 'none' : '';
     $('adminBtn').style.display = isAdmin() ? '' : 'none';
     $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
+    renderRecentComments();
   }
 
   function render(){
@@ -892,7 +928,7 @@
     if (error || !data || !data.items || !data.items.length){ if (!newsOk) $('news').innerHTML = '<div class="side-empty">뉴스를 불러오지 못했습니다.<br>잠시 후 다시 시도합니다.</div>'; return; }
     newsOk = true;
     $('nTime').textContent = hhmm(data.updated) + ' 기준';
-    $('news').innerHTML = data.items.filter(n => /^https?:\/\//.test(n.link)).map(n =>
+    $('news').innerHTML = data.items.filter(n => /^https?:\/\//.test(n.link)).slice(0, 6).map(n =>
       `<a class="ni" href="${esc(n.link)}" target="_blank" rel="noopener noreferrer"><div class="nm"><span class="src">${esc(n.source)}</span><span>${ago(n.date)}</span></div><div class="nt">${esc(n.title)}</div></a>`).join('');
   }
   let sideTimers = false;
