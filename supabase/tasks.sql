@@ -246,3 +246,6 @@ alter table public.appraisal_firms add column if not exists fax text not null de
 -- 감정평가 지도: 물건 좌표 (주소 검색 결과의 좌표를 등록 시 저장, 기존 물건은 관리자 화면에서 채우기)
 alter table public.appraisal_properties add column if not exists lat double precision;
 alter table public.appraisal_properties add column if not exists lng double precision;
+
+-- 감정평가 물건 '가격 묶음': group_no 가 같은 물건은 가격을 한 번에 받는다. 가격은 묶음의 첫 물건(appraisal_prices.property_id)에만 저장
+alter table public.appraisal_properties add column if not exists group_no smallint check (group_no is null or group_no between 1 and 20);

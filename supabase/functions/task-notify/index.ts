@@ -129,9 +129,18 @@ async function handle(req: Request): Promise<Response> {
       const req2 = c.appraisal_requests.find((r: any) => r.firm_id === body.firm_id);
       if (!req2) return new Response("bad request", { status: 400 });
       const amt = new Map<number, number>(req2.appraisal_prices.map((p: any) => [p.property_id, Number(p.amount)] as [number, number]));
+      // 가격을 한 번에 받는 묶음(group_no 가 같은 물건)은 하나의 단위로 본다 (가격은 묶음의 첫 물건에 저장)
+      const units: { key: number; nos: number[] }[] = [];
+      const gm = new Map<number, { key: number; nos: number[] }>();
+      props.forEach((p: any, i: number) => {
+        if (p.group_no === null || p.group_no === undefined) { units.push({ key: p.id, nos: [i + 1] }); return; }
+        let u = gm.get(p.group_no);
+        if (!u) { u = { key: p.id, nos: [] }; gm.set(p.group_no, u); units.push(u); }
+        u.nos.push(i + 1);
+      });
       const byItem = amt.size > 0;   // 물건별 입력이 없고 총액만 받은 경우는 total_amount 사용
-      const total = byItem ? props.reduce((s: number, p: any) => s + (amt.get(p.id) ?? 0), 0) : Number(req2.total_amount ?? 0);
-      const lines = byItem ? props.map((p: any, i: number) => `  ${i + 1}. ${won(amt.get(p.id))}`).join("\n") + "\n" : "";
+      const total = byItem ? units.reduce((s: number, u) => s + (amt.get(u.key) ?? 0), 0) : Number(req2.total_amount ?? 0);
+      const lines = byItem ? units.map((u) => `  ${u.nos.join("·")}${u.nos.length > 1 ? "(일괄)" : ""}. ${won(amt.get(u.key))}`).join("\n") + "\n" : "";
       const noteTxt = req2.note ? `\n특이사항: ${req2.note}` : "";
       if (event === "appraisal_priced") await notify(to, `💰 ${tag} ${c.debtor_name}\n${fname(body.firm_id)} ${byItem || req2.total_amount !== null ? "평가가격이 입력됐어요" : "특이사항이 입력됐어요"}\n${lines}${byItem || req2.total_amount !== null ? `합계 ${won(total)}${byItem ? "" : " (총액만 입력)"}` : ""}${noteTxt}\n입력: ${who(me)}님`);
       else await notify(to, `✅ ${tag} ${c.debtor_name}\n${fname(body.firm_id)}을(를) 채택했어요 (합계 ${won(total)})\n처리: ${who(me)}님`);
