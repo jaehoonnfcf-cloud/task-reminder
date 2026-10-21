@@ -297,10 +297,11 @@
   #hello span{ color:var(--muted); font-weight:700; }
   #hello{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
   #helloT{ min-width:0; }
-  #clock{ flex:none; text-align:left; background:#fff; border-radius:24px; box-shadow:var(--sh); padding:14px 22px 14px; min-width:190px; margin-top:2px; }
-  #clock .cdd{ font-size:13px; font-weight:700; color:var(--muted); letter-spacing:-.01em; }
-  #clock .cdt{ font-size:44px; font-weight:800; color:var(--ink); line-height:1.05; letter-spacing:-.04em; font-variant-numeric:tabular-nums; margin-top:2px; }
-  #clock .cd2{ display:inline-block; font-size:12.5px; font-weight:700; color:var(--accent); background:var(--accent-soft); padding:4px 11px; border-radius:99px; margin-top:9px; white-space:nowrap; }
+  #clock{ flex:none; background:#fff; border-radius:24px; box-shadow:var(--sh); padding:10px 20px; margin-top:4px; display:grid; grid-template-columns:auto auto; align-items:center; column-gap:16px; }
+  #clock .cdd{ font-size:13px; font-weight:700; color:var(--muted); letter-spacing:-.01em; align-self:end; text-align:right; white-space:nowrap; }
+  #clock .cdt{ grid-row:1 / 3; grid-column:1; font-size:42px; font-weight:800; color:var(--ink); line-height:1; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
+  #clock .cdd,#clock .cd2{ grid-column:2; }
+  #clock .cd2{ justify-self:end; font-size:12px; font-weight:700; color:var(--accent); background:var(--accent-soft); padding:3px 10px; border-radius:99px; margin-top:5px; white-space:nowrap; }
   @media (max-width:760px){ #hello{ flex-direction:column; gap:10px; } #clock{ align-self:stretch; display:grid; grid-template-columns:auto 1fr; align-items:center; column-gap:16px; padding:12px 18px; border-radius:22px; min-width:0; }
     #clock .cdt{ grid-row:1 / 3; font-size:38px; margin:0; } #clock .cdd{ align-self:end; text-align:right; } #clock .cd2{ margin:4px 0 0; justify-self:end; font-size:12px; } }
   #main{ gap:16px; }
