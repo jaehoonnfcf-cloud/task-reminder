@@ -361,6 +361,8 @@
     .bar{ padding:12px 14px 4px; padding-top:max(12px, env(safe-area-inset-top)); }
     .toolbar{ border-radius:18px; }
   }
+  .divs .ls{ display:none; }
+  @media (max-width:760px){ .divs .lf{ display:none; } .divs .ls{ display:inline; } .divs button{ padding:8px 4px !important; font-size:14px !important; } .divs .n{ margin-left:2px !important; padding:0 5px !important; } }
   @media (max-width:760px){ #wrap{ padding:4px 14px 36px; } .divs{ margin-left:0; } .divs button{ padding:8px 6px; } #adminBtn{ display:none !important; } }
   /* 휴대폰: 글자·카드를 한 단계 작게 */
   @media (max-width:760px){
@@ -438,11 +440,11 @@
   <div class="bar">
     <span class="logo">🧚 할일요정</span>
     <div class="divs" id="divBtns">
-      <button data-div="deposit">수신/기타<span class="n" id="nDeposit"></span></button>
-      <button data-div="credit">여신업무<span class="n" id="nCredit"></span></button>
-      <button data-div="appraisal">🏛 감정평가<span class="n" id="nAppraisal"></span></button>
-      <button data-div="debt" id="debtBtn" style="display:none">📞 채권관리<span class="n" id="nDebt"></span></button>
-      <button data-div="personal">🔒 개인업무<span class="n" id="nPersonal"></span></button>
+      <button data-div="deposit"><span class="lf">수신/기타</span><span class="ls">수신</span><span class="n" id="nDeposit"></span></button>
+      <button data-div="credit"><span class="lf">여신업무</span><span class="ls">여신</span><span class="n" id="nCredit"></span></button>
+      <button data-div="appraisal"><span class="lf">🏛 감정평가</span><span class="ls">감정</span><span class="n" id="nAppraisal"></span></button>
+      <button data-div="debt" id="debtBtn" style="display:none"><span class="lf">📞 채권관리</span><span class="ls">채권</span><span class="n" id="nDebt"></span></button>
+      <button data-div="personal"><span class="lf">🔒 개인업무</span><span class="ls">개인</span><span class="n" id="nPersonal"></span></button>
     </div>
     <span class="spacer"></span>
     <span class="pill ro" id="roPill" style="display:none" title="이 업무구분에 대한 등록·수정 권한이 없습니다">👀 보기 전용</span>
