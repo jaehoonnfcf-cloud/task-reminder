@@ -294,6 +294,12 @@
   /* 인사말 제목 */
   #hello{ font-size:34px; font-weight:800; line-height:1.2; letter-spacing:-.035em; margin:14px 0 6px; }
   #hello span{ color:var(--muted); font-weight:700; }
+  #hello{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+  #helloT{ min-width:0; }
+  #clock{ flex:none; text-align:right; letter-spacing:-.02em; line-height:1.25; padding-top:4px; }
+  #clock .cd1{ font-size:20px; font-weight:800; color:var(--ink); white-space:nowrap; } #clock .cd1 b{ font-weight:800; margin-left:6px; font-variant-numeric:tabular-nums; }
+  #clock .cd2{ font-size:12.5px; font-weight:600; color:var(--muted); margin-top:3px; white-space:nowrap; }
+  @media (max-width:760px){ #hello{ flex-direction:column; gap:6px; } #clock{ text-align:left; padding-top:0; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; } #clock .cd2{ margin-top:0; } #clock .cd1{ font-size:15px; } #clock .cd2{ font-size:11px; } #clock .cd1 b{ margin-left:4px; } }
   #main{ gap:16px; }
   #shared,#personal,#appraisal{ gap:16px; }
   /* 요약 타일 */
@@ -455,7 +461,7 @@
   <div id="wrap">
     <div id="tgBanner"><b>🔔 텔레그램 알림</b><span id="tgStatus" class="muted" style="flex:1"></span></div>
     <div id="main">
-    <div id="hello"></div>
+    <div id="hello"><div id="helloT"></div><div id="clock"><div class="cd1"></div><div class="cd2"></div></div></div>
     <div id="shared">
     <div id="cal"></div>
     <div id="tiles"></div>
@@ -672,6 +678,17 @@
     if (!on) stopRealtime();
   }
 
+  // 오늘 날짜·시각(한국시간) + 퇴근(18:00)까지 남은 시간
+  const WORK_END = 18;
+  function tickClock(){
+    const el = $('clock'); if (!el) return;
+    const k = new Date(Date.now() + 9 * 3600e3), dow = k.getUTCDay(), hh = k.getUTCHours(), mm = k.getUTCMinutes();
+    const DW = ['일', '월', '화', '수', '목', '금', '토'];
+    el.querySelector('.cd1').innerHTML = `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 (${DW[dow]})<b>${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}</b>`;
+    const left = WORK_END * 60 - (hh * 60 + mm);
+    el.querySelector('.cd2').textContent = dow === 0 || dow === 6 ? '푹 쉬는 주말이에요 😴' : left > 0 ? `퇴근까지 ${left >= 60 ? `${Math.floor(left / 60)}시간 ` : ''}${left % 60 ? `${left % 60}분` : ''} ⏳`.replace('시간 ⏳', '시간 ⏳') : '오늘도 수고하셨어요 🎉';
+  }
+  tickClock(); setInterval(tickClock, 15000);
   async function start(session){
     const { data: ok } = await sb.rpc('is_member');
     if (!ok){ await sb.auth.signOut(); show(false); $('loginMsg').textContent = '등록되지 않은 이메일입니다.'; return; }
@@ -752,7 +769,7 @@
     const personal = divn === 'personal', appr = divn === 'appraisal', debt = divn === 'debt';
     $('app').dataset.div = divn;
     const nm = (nameOf(me) || '').trim() || '담당자';
-    $('hello').innerHTML = debt ? '연체 채권 현황이에요 📞<br><span>오늘 챙길 조치부터 확인해요</span>' : appr ? '새 의뢰 전에,<br><span>기존 기록부터 찾아볼까요? 🔍</span>' : personal ? '나만 보는 업무예요 🔒<br><span>오늘 할 일부터 확인해요</span>' : `안녕하세요, ${esc(nm)}님 👋<br><span>오늘 챙겨야 할 업무예요</span>`;
+    $('helloT').innerHTML = debt ? '연체 채권 현황이에요 📞<br><span>오늘 챙길 조치부터 확인해요</span>' : appr ? '새 의뢰 전에,<br><span>기존 기록부터 찾아볼까요? 🔍</span>' : personal ? '나만 보는 업무예요 🔒<br><span>오늘 할 일부터 확인해요</span>' : `안녕하세요, ${esc(nm)}님 👋<br><span>오늘 챙겨야 할 업무예요</span>`;
     $('shared').style.display = personal || appr || debt ? 'none' : 'flex'; $('debt').style.display = debt ? 'flex' : 'none'; $('debtBtn').style.display = canWrite('debt') ? '' : 'none'; $('personal').style.display = personal ? 'flex' : 'none'; $('appraisal').style.display = appr ? 'flex' : 'none';
     document.querySelectorAll('#divBtns button').forEach(b => b.classList.toggle('on', b.dataset.div === divn));
     const pToday = kstToday(), pDue = ptasks.filter(t => !t.done_at && t.due_date && t.due_date <= pToday).length;
