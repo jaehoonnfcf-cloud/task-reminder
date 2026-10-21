@@ -411,6 +411,17 @@
   .asgc .av{ width:44px; height:44px; font-size:16px; margin:0; }
   .asg .av.done::after{ width:17px; height:17px; line-height:17px; font-size:11px; }
   @media (max-width:760px){ .whoBtn .av{ width:40px; height:40px; font-size:15px; } .asg .av,.asgc .av{ width:40px; height:40px; font-size:15px; } }
+
+  /* 업무 카드 댓글 */
+  .cmtc{ display:inline-block; margin-left:6px; padding:1px 8px; border-radius:99px; background:var(--accent-soft); color:var(--accent); font-size:11.5px; font-weight:800; vertical-align:2px; white-space:nowrap; }
+  .cmts{ margin-top:20px; padding-top:16px; border-top:1px solid var(--line); }
+  .cmtlist{ max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding:2px 2px 4px; }
+  .cmt{ display:flex; gap:10px; align-items:flex-start; } .cmt .av{ width:34px; height:34px; font-size:13px; flex:none; }
+  .cmt .cb{ flex:1; min-width:0; background:var(--field); border-radius:16px; padding:8px 12px; }
+  .cmt .ch{ display:flex; align-items:center; gap:8px; font-size:13px; } .cmt .ch .muted{ font-size:11.5px; } .cmt .ct{ font-size:14.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; margin-top:2px; }
+  .cdel{ margin-left:auto; border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:12px; padding:2px 6px; border-radius:99px; } .cdel:hover{ background:#e6e9f0; color:var(--danger); }
+  .cmtnew{ display:flex; gap:8px; align-items:flex-end; margin-top:10px; } .cmtnew textarea{ flex:1; min-height:44px; resize:none; border-radius:16px; }
+  @media (max-width:760px){ .cmtlist{ max-height:240px; } .cmt .ct{ font-size:14px; } }
 </style>
 </head>
 <body>
@@ -711,7 +722,7 @@
   // ---------- 데이터 ----------
   async function loadTasks(){
     const { data, error } = await sb.from('work_tasks')
-      .select('*, work_task_assignees(email, done_at), work_task_steps(seq, name, done_at, done_by)')
+      .select('*, work_task_assignees(email, done_at), work_task_steps(seq, name, done_at, done_by), work_task_comments(id)')
       .order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false });
     if (error){ $('list').innerHTML = `<div class="empty">${esc(error.message)}</div>`; return; }
     tasks = data || [];
@@ -818,7 +829,7 @@
     const avs = `<div class="avs">${asg.map(a => avHtml(a.email, !loan && a.done_at ? 'done' : '')).join('')}</div>`;
     return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}" data-id="${t.id}">
       <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}">${esc(t.scope)}</span>` : ''}</div>
-      <div class="c-title"><div class="tt">${esc(t.title)}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
+      <div class="c-title"><div class="tt">${esc(t.title)}${(t.work_task_comments || []).length ? ` <span class="cmtc">💬 ${t.work_task_comments.length}</span>` : ''}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
       <div class="c-prog prog">${prog}</div><div class="c-who">${avs}</div><div class="c-due">${due}</div><div class="c-act">${act}</div></div>`;
   }
 
@@ -879,6 +890,7 @@
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_assignees' }, scheduleReload)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_steps' }, scheduleReload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_comments' }, scheduleReload)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, scheduleMembers)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, () => { if (typeof scheduleCal === 'function') scheduleCal(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_cases' }, scheduleAp)
@@ -980,9 +992,44 @@
     }
     const lbl = `<span class="chip" style="background:#e9f2ff;color:#0b5cc4;margin-right:4px">${DIVS[taskDiv(t)]}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}" style="margin-right:4px">${esc(t.scope)}</span>` : ''}<span class="tp ${loan ? 'loan' : ''}">${loan ? '대출진행' : '일반업무'}</span> `
       + (g === 'drop' ? '<span class="chip" style="background:#f1e9e9;color:#7a3b3b">미진행</span>' : g === 'over' ? '<span class="chip over">기한초과</span>' : g === 'today' ? '<span class="chip today">오늘마감</span>' : g === 'done' ? '<span class="chip ok">완료</span>' : '');
+    const cdraft = ($('cmtInput') && openId === t.id) ? $('cmtInput').value : '';
     $('detailPanel').innerHTML = `<div class="ph"><div><div style="margin-bottom:8px">${lbl}</div><h2>${esc(t.title)}</h2></div><button class="x" data-d="close">✕</button></div>${body}
+      <div class="kv cmts" id="cmtWrap"><div class="k">💬 댓글 <span id="cmtN"></span></div><div id="cmtList" class="cmtlist"><div class="muted">불러오는 중…</div></div>
+        ${canCmt(t) ? `<div class="cmtnew"><textarea id="cmtInput" rows="2" maxlength="1000" placeholder="댓글을 입력하세요 (Enter 등록 · Shift+Enter 줄바꿈)"></textarea><button class="btn primary small" id="cmtSend">등록</button></div>` : '<div class="muted" style="margin-top:6px">이 업무에 댓글을 쓸 권한이 없어 보기만 할 수 있어요.</div>'}</div>
       ${canAct(t) ? `<div class="foot"><button class="btn" data-d="edit">✏ 수정</button>${ownerOrAdmin(t) ? '<button class="btn danger" data-d="del">삭제</button>' : ''}</div>` : `<div class="foot"><span class="muted">👀 이 업무구분에 대한 권한이 없어 보기만 할 수 있어요.</span></div>`}`;
+    if ($('cmtInput') && cdraft) $('cmtInput').value = cdraft;
+    loadComments(t.id);
   }
+  // ---------- 댓글 ----------
+  const canCmt = (t) => t.created_by === me || t.work_task_assignees.some(a => a.email === me) || canAct(t);
+  const cmtTime = (iso) => { const d = new Date(iso), p2 = (n) => String(n).padStart(2, '0'); return `${d.getMonth() + 1}/${d.getDate()} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+  async function loadComments(tid){
+    const { data, error } = await sb.from('work_task_comments').select('*').eq('task_id', tid).order('created_at').order('id');
+    if (openId !== tid) return;
+    const box = $('cmtList'); if (!box) return;
+    if (error){ box.innerHTML = `<div class="muted">${esc(error.message)}</div>`; return; }
+    const list = data || [];
+    $('cmtN').textContent = list.length ? `(${list.length})` : '';
+    box.innerHTML = list.map(c => `<div class="cmt" data-cid="${c.id}">${avHtml(c.author_email, '', 'margin:0')}<div class="cb"><div class="ch"><b>${esc(nameOf(c.author_email))}</b><span class="muted">${cmtTime(c.created_at)}</span>${(c.author_email === me || isAdmin()) ? '<button class="cdel" data-cdel="' + c.id + '" title="삭제">✕</button>' : ''}</div><div class="ct">${esc(c.body)}</div></div></div>`).join('') || '<div class="muted">아직 댓글이 없어요.</div>';
+    box.scrollTop = box.scrollHeight;
+  }
+  async function sendComment(){
+    const t = byId(openId); if (!t) return;
+    const ta = $('cmtInput'), body = ta.value.trim(); if (!body) return;
+    const btn = $('cmtSend'); btn.disabled = true;
+    const { data, error } = await sb.from('work_task_comments').insert({ task_id: t.id, body }).select('id').single();
+    btn.disabled = false;
+    if (error) return alert(error.message);
+    ta.value = '';
+    sb.functions.invoke('task-notify', { body: { event: 'comment', task_id: t.id, comment_id: data.id } });
+    await loadComments(t.id); loadTasks();
+  }
+  $('detailPanel').addEventListener('keydown', (e) => { if (e.target.id === 'cmtInput' && e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); sendComment(); } });
+  $('detailPanel').addEventListener('click', async (e) => {
+    if (e.target.id === 'cmtSend') return sendComment();
+    const del = e.target.closest('[data-cdel]');
+    if (del){ if (!confirm('이 댓글을 삭제할까요?')) return; const { error } = await sb.from('work_task_comments').delete().eq('id', +del.dataset.cdel); if (error) return alert(error.message); await loadComments(openId); return loadTasks(); }
+  });
   $('detailPanel').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-d]'); if (!b || b.tagName === 'INPUT') return;
     const t = byId(openId); if (!t) return;

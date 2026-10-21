@@ -260,3 +260,20 @@ alter table public.appraisal_requests add column if not exists bundles jsonb not
 
 -- 조합 주요일정(calendar_events): 여신·수신 화면 맨 위 2주 달력. 조회는 팀원 전체, 등록·수정·삭제는 관리자만.
 -- columns: title, start_date, end_date(여러 날), event_time(선택), kind(행사/휴가/기타), created_by. realtime publication 포함.
+
+-- 업무카드 댓글(work_task_comments): 여신/수신 업무 상세창 댓글. 조회는 팀원 전체, 작성은 업무 작성자·담당자·해당 구분 권한자, 삭제는 본인 또는 관리자.
+create table if not exists public.work_task_comments (
+  id bigint generated always as identity primary key,
+  task_id bigint not null references public.work_tasks(id) on delete cascade,
+  author_email text not null default auth.email(),
+  body text not null check (char_length(body) between 1 and 1000),
+  created_at timestamptz not null default now()
+);
+alter table public.work_task_comments enable row level security;
+create policy cmt_select on public.work_task_comments for select to authenticated using (public.is_member());
+create policy cmt_insert on public.work_task_comments for insert to authenticated
+  with check (author_email = auth.email() and (public.task_is_owner(task_id) or public.task_is_member(task_id) or public.has_div(public.task_div(task_id))));
+create policy cmt_delete on public.work_task_comments for delete to authenticated using (author_email = auth.email() or public.is_admin());
+grant select, insert, delete on public.work_task_comments to authenticated;
+grant all on public.work_task_comments to service_role;
+alter publication supabase_realtime add table public.work_task_comments;

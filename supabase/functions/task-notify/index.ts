@@ -251,6 +251,11 @@ async function handle(req: Request): Promise<Response> {
   } else if (event === "done" && (asg.some((a) => a.email === me) || okDiv)) {
     const all = asg.every((a) => a.done_at);
     await notify(everyone, all ? `🎉 [${dv}]${sg} 모두 완료했어요\n${task.title}` : `✅ [${dv}]${sg} ${who(me)}님이 완료했어요\n${task.title}`);
+  } else if (event === "comment") {
+    const { data: cm } = await db.from("work_task_comments").select("author_email, body").eq("id", body.comment_id).eq("task_id", task_id).maybeSingle();
+    if (!cm || cm.author_email !== me) return new Response("bad request", { status: 400 });
+    const txt = String(cm.body).replace(/\s+/g, " ").trim();
+    await notify(everyone.filter((e) => e && e !== me), `💬 [${task.task_type === "loan" ? "여신" : dv}]${sg} ${task.title}\n${who(me)}님: ${txt.length > 200 ? txt.slice(0, 200) + "…" : txt}`);
   } else return new Response("bad request", { status: 400 });
   return ok();
 }
