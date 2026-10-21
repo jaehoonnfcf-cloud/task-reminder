@@ -1,7 +1,7 @@
 // 조합 주요일정 — 여신·수신 화면 맨 위, 일~토 2주. 관리자만 등록/수정/삭제, 팀원은 보기만 한다.
 // index.html 의 전역(sb, $, esc, isAdmin, kstToday, toast)을 함께 쓴다.
 
-const CAL_KINDS = { '조합행사': '#7c3aed', '휴가': '#e08a00', '출장': '#0f9d8a', '외부행사': '#3b6cf5', '기타': '#8a90a0' };
+const CAL_KINDS = { '조합행사': '#7c3aed', '휴가': '#e08a00', '출장': '#0f9d8a', '외부행사': '#3b6cf5', '공휴일': '#e5484d', '기타': '#8a90a0' };
 const CAL_DOW = ['일', '월', '화', '수', '목', '금', '토'];
 let calEvents = [], calEditId = null, calTimer = null;
 let calFold = (() => { try { return localStorage.getItem('calFold') === '1'; } catch (e) { return false; } })();
@@ -19,7 +19,7 @@ let calFold = (() => { try { return localStorage.getItem('calFold') === '1'; } c
   .calc.today{ background:var(--accent-soft); }
   .cd{ font-size:12.5px; font-weight:800; color:#3b4252; margin-bottom:6px; white-space:nowrap; }
   .cd small{ font-weight:600; color:var(--muted); margin-left:3px; font-size:11.5px; }
-  .calc.dow0 .cd{ color:#e5484d; } .calc.dow6 .cd{ color:#3b6cf5; }
+  .calc.dow0 .cd, .calc.hol .cd{ color:#e5484d; } .calc.dow6 .cd{ color:#3b6cf5; }
   .calc.today .cd span.t{ background:var(--accent); color:#fff; padding:1px 7px; border-radius:99px; }
   .cev{ display:flex; gap:5px; align-items:flex-start; font-size:12px; line-height:1.35; padding:3px 0; font-weight:600; word-break:keep-all; overflow-wrap:anywhere; }
   .cev i{ flex:none; width:7px; height:7px; border-radius:50%; margin-top:5px; }
@@ -72,7 +72,7 @@ function renderCal(){
   const adm = isAdmin(), days = calDays(), today = kstToday();
   const cell = (d) => {
     const evs = calEvents.filter(e => calOn(e, d.iso)).sort((a, b) => String(a.event_time || '').localeCompare(String(b.event_time || '')) || a.id - b.id);
-    return `<div class="calc dow${d.dow} ${d.iso === today ? 'today' : ''} ${evs.length ? '' : 'empty'} ${adm ? 'adm' : ''}" data-d="${d.iso}">
+    return `<div class="calc dow${d.dow} ${evs.some(e => e.kind === '공휴일') ? 'hol' : ''} ${d.iso === today ? 'today' : ''} ${evs.length ? '' : 'empty'} ${adm ? 'adm' : ''}" data-d="${d.iso}">
       <div class="cd"><span class="${d.iso === today ? 't' : ''}">${d.m}. ${d.d}</span><small>${CAL_DOW[d.dow]}</small></div>
       <div class="cl">${evs.map(e => calLabel(e, d.iso)).join('')}</div></div>`;
   };

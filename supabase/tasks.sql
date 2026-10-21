@@ -282,3 +282,7 @@ alter publication supabase_realtime add table public.work_task_comments;
 alter table public.calendar_events drop constraint if exists calendar_events_kind_check;
 update public.calendar_events set kind = '조합행사' where kind = '행사';
 alter table public.calendar_events add constraint calendar_events_kind_check check (kind in ('조합행사','휴가','출장','외부행사','기타'));
+
+-- 공휴일 종류 추가 (달력에만 표시, 텔레그램 일정 안내에는 포함하지 않음). 공휴일은 관리자가 일정으로 직접 입력.
+alter table public.calendar_events drop constraint if exists calendar_events_kind_check;
+alter table public.calendar_events add constraint calendar_events_kind_check check (kind in ('조합행사','휴가','출장','외부행사','공휴일','기타'));

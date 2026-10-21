@@ -50,6 +50,7 @@ function calText(events: CalEv[], today: string, hour: number): string {
 async function calendarBlock(today: string, hour: number): Promise<string> {
   const rg = calRange(today, hour);
   const { data } = await db.from("calendar_events").select("title, start_date, end_date, event_time")
+    .neq("kind", "공휴일")   // 공휴일은 달력에만 표시하고 알림에는 넣지 않는다
     .gte("start_date", addDays(rg.from, -60)).lte("start_date", rg.to).order("start_date").order("event_time", { nullsFirst: true });
   return calText((data ?? []) as CalEv[], today, hour);
 }
