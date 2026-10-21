@@ -441,6 +441,7 @@
       <button data-div="credit">여신업무<span class="n" id="nCredit"></span></button>
       <button data-div="deposit">수신/기타<span class="n" id="nDeposit"></span></button>
       <button data-div="appraisal">🏛 감정평가<span class="n" id="nAppraisal"></span></button>
+      <button data-div="debt" id="debtBtn" style="display:none">📞 채권관리<span class="n" id="nDebt"></span></button>
       <button data-div="personal">🔒 개인업무<span class="n" id="nPersonal"></span></button>
     </div>
     <span class="spacer"></span>
@@ -471,6 +472,7 @@
     </div>
     </div>
     <div id="appraisal"></div>
+    <div id="debt"></div>
     <div id="personal" style="display:none">
       <div id="ptiles"></div>
       <div class="list-panel">
@@ -621,7 +623,7 @@
   try { fType = localStorage.getItem('fType') || 'all'; storedDiv = localStorage.getItem('div'); } catch (e) {}
 
   // 권한: 해당 업무구분의 등록·수정·단계수정 가능 여부 (DB 에서도 같은 규칙으로 막음)
-  const permOf = (d, m) => !!m && (d === 'credit' ? m.perm_credit : d === 'appraisal' ? (m.perm_appraisal || m.is_admin) : m.perm_deposit);
+  const permOf = (d, m) => !!m && (d === 'credit' ? m.perm_credit : d === 'appraisal' ? (m.perm_appraisal || m.is_admin) : d === 'debt' ? (m.perm_debt || m.is_admin) : m.perm_deposit);
   const canWrite = (d) => permOf(d, meRow);
   const isAdmin = () => !!(meRow && meRow.is_admin);
   const taskDiv = (t) => t.division === 'deposit' ? 'deposit' : 'credit';
@@ -674,12 +676,12 @@
     await reloadMembers();
     renderWho();
     setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
-    divn = storedDiv === 'credit' || storedDiv === 'deposit' || storedDiv === 'personal' || storedDiv === 'appraisal' ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
-    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadCal === 'function') await loadCal(); ensureSide(); startRealtime();
+    divn = storedDiv === 'credit' || storedDiv === 'deposit' || storedDiv === 'personal' || storedDiv === 'appraisal' || (storedDiv === 'debt' && canWrite('debt')) ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
+    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadDebt === 'function') await loadDebt(); if (typeof loadCal === 'function') await loadCal(); ensureSide(); startRealtime();
   }
 
   async function reloadMembers(){
-    const { data } = await sb.from('team_members').select('email,name,perm_credit,perm_deposit,perm_appraisal,is_admin,avatar_v').order('name');
+    const { data } = await sb.from('team_members').select('email,name,perm_credit,perm_deposit,perm_appraisal,perm_debt,is_admin,avatar_v').order('name');
     members = data || [];
     meRow = members.find(m => m.email === me) || meRow;
     await loadAvatars();
@@ -744,20 +746,20 @@
 
   // ---------- 목록 렌더 ----------
   function applyDivUI(){
-    const personal = divn === 'personal', appr = divn === 'appraisal';
+    const personal = divn === 'personal', appr = divn === 'appraisal', debt = divn === 'debt';
     $('app').dataset.div = divn;
     const nm = (nameOf(me) || '').trim() || '담당자';
-    $('hello').innerHTML = appr ? '새 의뢰 전에,<br><span>기존 기록부터 찾아볼까요? 🔍</span>' : personal ? '나만 보는 업무예요 🔒<br><span>오늘 할 일부터 확인해요</span>' : `안녕하세요, ${esc(nm)}님 👋<br><span>오늘 챙겨야 할 업무예요</span>`;
-    $('shared').style.display = personal || appr ? 'none' : 'flex'; $('personal').style.display = personal ? 'flex' : 'none'; $('appraisal').style.display = appr ? 'flex' : 'none';
+    $('hello').innerHTML = debt ? '연체 채권 현황이에요 📞<br><span>오늘 챙길 조치부터 확인해요</span>' : appr ? '새 의뢰 전에,<br><span>기존 기록부터 찾아볼까요? 🔍</span>' : personal ? '나만 보는 업무예요 🔒<br><span>오늘 할 일부터 확인해요</span>' : `안녕하세요, ${esc(nm)}님 👋<br><span>오늘 챙겨야 할 업무예요</span>`;
+    $('shared').style.display = personal || appr || debt ? 'none' : 'flex'; $('debt').style.display = debt ? 'flex' : 'none'; $('debtBtn').style.display = canWrite('debt') ? '' : 'none'; $('personal').style.display = personal ? 'flex' : 'none'; $('appraisal').style.display = appr ? 'flex' : 'none';
     document.querySelectorAll('#divBtns button').forEach(b => b.classList.toggle('on', b.dataset.div === divn));
     const pToday = kstToday(), pDue = ptasks.filter(t => !t.done_at && t.due_date && t.due_date <= pToday).length;
     $('nPersonal').textContent = pDue || ''; $('nPersonal').style.display = pDue ? '' : 'none';
     const myOpen = (d) => tasks.filter(t => taskDiv(t) === d && isOpen(t) && isMine(t)).length;
     $('nCredit').textContent = myOpen('credit') || ''; $('nDeposit').textContent = myOpen('deposit') || '';
     $('nCredit').style.display = myOpen('credit') ? '' : 'none'; $('nDeposit').style.display = myOpen('deposit') ? '' : 'none';
-    const w = personal || canWrite(divn);
+    const w = personal || canWrite(divn);   // debt 도 canWrite('debt')
     $('newBtn').style.display = w ? '' : 'none';
-    $('newBtn').textContent = personal ? '＋ 개인 할 일' : appr ? '＋ 새 감정평가 의뢰' : '＋ 새 업무';
+    $('newBtn').textContent = debt ? '＋ 채권 등록' : personal ? '＋ 개인 할 일' : appr ? '＋ 새 감정평가 의뢰' : '＋ 새 업무';
     $('roPill').style.display = w ? 'none' : '';
     $('adminBtn').style.display = isAdmin() ? '' : 'none';
     $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
@@ -767,6 +769,7 @@
     applyDivUI();
     if (divn === 'personal') return renderPersonal();
     if (divn === 'appraisal') return renderAppraisal();
+    if (divn === 'debt') return renderDebt();
     const today = kstToday(), q = $('q').value.trim().toLowerCase(), status = $('status').value, mine = $('mine').checked;
     const effType = divn === 'credit' ? fType : 'all';
     const divTasks = tasks.filter(t => taskDiv(t) === divn);
@@ -893,6 +896,8 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_comments' }, scheduleReload)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, scheduleMembers)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, () => { if (typeof scheduleCal === 'function') scheduleCal(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_logs' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_cases' }, scheduleAp)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_properties' }, scheduleAp)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_requests' }, scheduleAp)
@@ -902,8 +907,8 @@
   }
   function stopRealtime(){ try { if (rtChan) sb.removeChannel(rtChan); } catch (e) {} rtChan = null; }
   // 실시간 연결이 끊겨도 놓치지 않도록: 화면에 다시 돌아오면 갱신 + 1분마다 갱신
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && me){ loadTasks(); loadPersonal(); loadAppraisal(); if (typeof loadCal === 'function') loadCal(); } });
-  setInterval(() => { if (!document.hidden && me){ loadTasks(); loadAppraisal(); if (typeof loadCal === 'function') loadCal(); } }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && me){ loadTasks(); loadPersonal(); loadAppraisal(); if (typeof loadDebt === 'function') loadDebt(); if (typeof loadCal === 'function') loadCal(); } });
+  setInterval(() => { if (!document.hidden && me){ loadTasks(); loadAppraisal(); if (typeof loadDebt === 'function') loadDebt(); if (typeof loadCal === 'function') loadCal(); } }, 60000);
 
   // ---------- 동작 (공통) ----------
   async function completeStep(tid, seq){
@@ -945,6 +950,7 @@
     render();
     if (divn === 'personal') loadPersonal();
     if (divn === 'appraisal') loadAppraisal();
+    if (divn === 'debt') loadDebt();
   };
   $('list').addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]');
@@ -1115,7 +1121,7 @@
   function closeForm(){ $('formOv').style.display = 'none'; editId = null; document.body.style.overflow = $('detailOv').style.display === 'block' ? 'hidden' : ''; }
   $('fClose').onclick = closeForm; $('fCancel').onclick = closeForm;
   $('formOv').addEventListener('click', (e) => { if (e.target === $('formOv')) closeForm(); });
-  $('newBtn').onclick = () => divn === 'personal' ? openPf(null) : divn === 'appraisal' ? apOpenForm(null) : openForm('new', null);
+  $('newBtn').onclick = () => divn === 'personal' ? openPf(null) : divn === 'debt' ? dbOpenForm(null) : divn === 'appraisal' ? apOpenForm(null) : openForm('new', null);
 
   $('fSave').onclick = async () => {
     const title = $('fTitle').value.trim();
@@ -1460,6 +1466,7 @@
         <label class="chk"><input type="checkbox" data-p="perm_credit" ${m.perm_credit ? 'checked' : ''}/> 여신</label>
         <label class="chk"><input type="checkbox" data-p="perm_deposit" ${m.perm_deposit ? 'checked' : ''}/> 수신/기타</label>
         <label class="chk"><input type="checkbox" data-p="perm_appraisal" ${m.perm_appraisal ? 'checked' : ''}/> 감정평가</label>
+        <label class="chk"><input type="checkbox" data-p="perm_debt" ${m.perm_debt ? 'checked' : ''}/> 채권관리</label>
         <label class="chk"><input type="checkbox" data-p="is_admin" ${m.is_admin ? 'checked' : ''} ${self ? 'disabled title="본인의 관리자 권한은 해제할 수 없어요"' : ''}/> 관리자</label>
         <div class="btns"><button class="btn small" data-act="name">이름 수정</button><button class="btn small" data-act="photo">사진</button>${m.avatar_v ? '<button class="btn small" data-act="rmphoto">사진 삭제</button>' : ''}<button class="btn small" data-act="pw">비밀번호</button>${self ? '' : '<button class="btn small danger" data-act="del">삭제</button>'}</div></div>`;
     }).join('') || '<div class="blk-empty">등록된 담당자가 없어요.</div>';
@@ -1524,5 +1531,6 @@
 </script>
 <script src="appraisal.js?v=40"></script>
 <script src="calendar.js?v=5"></script>
+<script src="debt.js?v=1"></script>
 </body>
 </html>

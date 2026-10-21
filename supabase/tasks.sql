@@ -286,3 +286,48 @@ alter table public.calendar_events add constraint calendar_events_kind_check che
 -- 공휴일 종류 추가 (달력에만 표시, 텔레그램 일정 안내에는 포함하지 않음). 공휴일은 관리자가 일정으로 직접 입력.
 alter table public.calendar_events drop constraint if exists calendar_events_kind_check;
 alter table public.calendar_events add constraint calendar_events_kind_check check (kind in ('조합행사','휴가','출장','외부행사','공휴일','기타'));
+
+-- 채권관리(debt_cases / debt_logs): 연체 채무자별 연체기준일(연체일수는 화면에서 자동 계산), 연락·방문 이력, 다음 조치 예정일.
+-- 별도 권한 team_members.perm_debt(또는 관리자)만 조회·입력. 알림 없음(화면만).
+alter table public.team_members add column if not exists perm_debt boolean not null default false;
+grant update (perm_debt) on public.team_members to authenticated;
+create or replace function public.has_debt() returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.team_members where email = auth.email() and (is_admin or perm_debt))
+$$;
+create table if not exists public.debt_cases (
+  id bigint generated always as identity primary key,
+  debtor_name text not null check (char_length(debtor_name) between 1 and 100),
+  scope text not null default '본점' check (scope in ('본점','지점')),
+  overdue_since date not null,
+  principal bigint check (principal is null or principal >= 0),
+  assignee_email text,
+  next_action_date date,
+  next_action_note text check (next_action_note is null or char_length(next_action_note) <= 200),
+  memo text check (memo is null or char_length(memo) <= 1000),
+  status text not null default '진행중' check (status in ('진행중','종결')),
+  closed_at timestamptz,
+  created_by text not null default auth.email(),
+  created_at timestamptz not null default now()
+);
+create table if not exists public.debt_logs (
+  id bigint generated always as identity primary key,
+  case_id bigint not null references public.debt_cases(id) on delete cascade,
+  log_date date not null default current_date,
+  kind text not null check (kind in ('전화','문자','방문','면담','우편','기타')),
+  body text not null check (char_length(body) between 1 and 1000),
+  created_by text not null default auth.email(),
+  created_at timestamptz not null default now()
+);
+create index if not exists debt_logs_case_idx on public.debt_logs (case_id, log_date desc);
+alter table public.debt_cases enable row level security;
+alter table public.debt_logs enable row level security;
+create policy dc_sel on public.debt_cases for select to authenticated using (has_debt());
+create policy dc_ins on public.debt_cases for insert to authenticated with check (has_debt() and created_by = auth.email());
+create policy dc_upd on public.debt_cases for update to authenticated using (has_debt());
+create policy dc_del on public.debt_cases for delete to authenticated using (has_debt() and (created_by = auth.email() or is_admin()));
+create policy dl_sel on public.debt_logs for select to authenticated using (has_debt());
+create policy dl_ins on public.debt_logs for insert to authenticated with check (has_debt() and created_by = auth.email());
+create policy dl_del on public.debt_logs for delete to authenticated using (has_debt() and (created_by = auth.email() or is_admin()));
+grant select, insert, update, delete on public.debt_cases to authenticated;
+grant select, insert, delete on public.debt_logs to authenticated;
+alter publication supabase_realtime add table public.debt_cases, public.debt_logs;
