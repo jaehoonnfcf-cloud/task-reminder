@@ -668,7 +668,7 @@ function apReportHtml(c){
     const u = unitsK[k].find(x => x.members.some(m => m.id === p.id)), sel = k === chosenIdx ? 'sel' : '';
     if (u && u.group && u.key !== p.id) return `<td class="c nw ${sel}"><span class="m">〃 (${esc(apNos(u))} 일괄)</span></td>`;
     const v = sums[k].map.get(u ? u.key : p.id);
-    return `<td class="r nw ${sel}">${v === undefined ? '-' : n(v)}${u && u.group ? ` <span class="m">(${esc(apNos(u))} 일괄)</span>` : ''}</td>`;
+    return `<td class="r nw ${sel}">${v === undefined ? '-' : n(v)}${u && u.group ? `<br><span class="m">(${esc(apNos(u))} 일괄)</span>` : ''}</td>`;
   }).join('')}</tr>`).join('');
   const total = reqs.map((r, k) => `<td class="r nw b ${k === chosenIdx ? 'sel' : ''}">${sums[k].mode === 'none' ? '-' : n(sums[k].total)}${sums[k].mode === 'total' ? ' *' : ''}</td>`).join('');
   const recv = reqs.map((r, k) => `<td class="c nw ${k === chosenIdx ? 'sel' : ''}">${esc(r.received_at || '-')}</td>`).join('');
