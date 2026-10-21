@@ -434,6 +434,7 @@
     <div id="main">
     <div id="hello"></div>
     <div id="shared">
+    <div id="cal"></div>
     <div id="tiles"></div>
     <div class="list-panel">
       <div class="toolbar">
@@ -654,7 +655,7 @@
     renderWho();
     setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
     divn = storedDiv === 'credit' || storedDiv === 'deposit' || storedDiv === 'personal' || storedDiv === 'appraisal' ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
-    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); ensureSide(); startRealtime();
+    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadCal === 'function') await loadCal(); ensureSide(); startRealtime();
   }
 
   async function reloadMembers(){
@@ -870,6 +871,7 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_assignees' }, scheduleReload)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_steps' }, scheduleReload)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, scheduleMembers)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, () => { if (typeof scheduleCal === 'function') scheduleCal(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_cases' }, scheduleAp)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_properties' }, scheduleAp)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_requests' }, scheduleAp)
@@ -879,8 +881,8 @@
   }
   function stopRealtime(){ try { if (rtChan) sb.removeChannel(rtChan); } catch (e) {} rtChan = null; }
   // 실시간 연결이 끊겨도 놓치지 않도록: 화면에 다시 돌아오면 갱신 + 1분마다 갱신
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && me){ loadTasks(); loadPersonal(); loadAppraisal(); } });
-  setInterval(() => { if (!document.hidden && me){ loadTasks(); loadAppraisal(); } }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && me){ loadTasks(); loadPersonal(); loadAppraisal(); if (typeof loadCal === 'function') loadCal(); } });
+  setInterval(() => { if (!document.hidden && me){ loadTasks(); loadAppraisal(); if (typeof loadCal === 'function') loadCal(); } }, 60000);
 
   // ---------- 동작 (공통) ----------
   async function completeStep(tid, seq){
@@ -1462,8 +1464,9 @@
     alert(r.created ? '담당자를 등록했어요. 이메일과 비밀번호를 전달해주세요.' : '이미 있는 계정이라 권한을 갱신했어요.');
   };
 
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('calOv') && $('calOv').style.display === 'block') calClose(); else if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
 <script src="appraisal.js?v=40"></script>
+<script src="calendar.js?v=2"></script>
 </body>
 </html>

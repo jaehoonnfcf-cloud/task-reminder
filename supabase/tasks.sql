@@ -257,3 +257,6 @@ alter table public.appraisal_cases add constraint appraisal_cases_handling_type_
 -- 가격 묶음은 평가기관(의뢰)별 결과값: appraisal_requests.bundles = [[물건id, 물건id], …]. 묶음의 가격은 첫 물건 id 에 저장.
 -- (앞서 추가했던 appraisal_properties.group_no 는 더 이상 사용하지 않음)
 alter table public.appraisal_requests add column if not exists bundles jsonb not null default '[]'::jsonb;
+
+-- 조합 주요일정(calendar_events): 여신·수신 화면 맨 위 2주 달력. 조회는 팀원 전체, 등록·수정·삭제는 관리자만.
+-- columns: title, start_date, end_date(여러 날), event_time(선택), kind(행사/휴가/기타), created_by. realtime publication 포함.
