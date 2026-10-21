@@ -360,3 +360,6 @@ alter publication supabase_realtime add table public.personal_events;
 -- 서버 시각 (화면 시계를 기기 시계가 아닌 서버 기준으로 맞추기 위함)
 create or replace function public.server_now() returns timestamptz language sql stable as $$ select now() $$;
 grant execute on function public.server_now() to authenticated;
+
+-- 텔레그램 일정 안내용: Edge Function(service_role)이 개인일정을 읽어 본인에게만 보낸다
+grant select on public.personal_events to service_role;

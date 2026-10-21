@@ -22,12 +22,12 @@ type CalEv = { title: string; start_date: string; end_date: string | null; event
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 const addDays = (iso: string, n: number) => new Date(Date.parse(iso + "T12:00:00Z") + n * 864e5).toISOString().slice(0, 10);
 function calRange(today: string, hour: number): { from: string; to: string; label: string; multi: boolean } {
-  if (hour < 12) return { from: today, to: today, label: "오늘 주요일정", multi: false };
+  if (hour < 12) return { from: today, to: today, label: "오늘", multi: false };
   const dow = new Date(today + "T12:00:00Z").getUTCDay();   // 0=일
-  if (dow === 5) return { from: addDays(today, 1), to: addDays(today, 3), label: "주말·월요일 주요일정", multi: true };   // 금요일 오후: 토·일·월
-  return { from: addDays(today, 1), to: addDays(today, 1), label: "내일 주요일정", multi: false };
+  if (dow === 5) return { from: addDays(today, 1), to: addDays(today, 3), label: "주말·월요일", multi: true };   // 금요일 오후: 토·일·월
+  return { from: addDays(today, 1), to: addDays(today, 1), label: "내일", multi: false };
 }
-function calText(events: CalEv[], today: string, hour: number): string {
+function calText(events: CalEv[], today: string, hour: number, title: string, icon: string): string {
   const rg = calRange(today, hour);
   const rows: { day: string; ev: CalEv }[] = [];
   for (const ev of events) {
@@ -45,14 +45,21 @@ function calText(events: CalEv[], today: string, hour: number): string {
     if (ev.end_date && ev.end_date > day) { const [, em, ed] = ev.end_date.split("-"), [, dm] = day.split("-"); sfx = ` (~${em === dm ? +ed : `${+em}/${+ed}`})`; }
     return `• ${pre}${tm}${ev.title}${sfx}`;
   });
-  return `📅 ${rg.label}\n${lines.join("\n")}`;
+  return `${icon} ${rg.label} ${title}\n${lines.join("\n")}`;
 }
-async function calendarBlock(today: string, hour: number): Promise<string> {
-  const rg = calRange(today, hour);
+// 조합일정(공휴일 제외, 전체 공통) + 개인일정(본인에게만). 개인일정은 owner_email 별로 따로 모은다.
+async function calendarBlocks(today: string, hour: number): Promise<{ org: string; personal: Map<string, string> }> {
+  const rg = calRange(today, hour), from = addDays(rg.from, -60);
   const { data } = await db.from("calendar_events").select("title, start_date, end_date, event_time")
     .neq("kind", "공휴일")   // 공휴일은 달력에만 표시하고 알림에는 넣지 않는다
-    .gte("start_date", addDays(rg.from, -60)).lte("start_date", rg.to).order("start_date").order("event_time", { nullsFirst: true });
-  return calText((data ?? []) as CalEv[], today, hour);
+    .gte("start_date", from).lte("start_date", rg.to).order("start_date").order("event_time", { nullsFirst: true });
+  const { data: pe } = await db.from("personal_events").select("owner_email, title, start_date, end_date, event_time")
+    .gte("start_date", from).lte("start_date", rg.to).order("start_date").order("event_time", { nullsFirst: true });
+  const mine = new Map<string, CalEv[]>();
+  for (const e of pe ?? []) { const l = mine.get(e.owner_email) ?? []; l.push(e as CalEv); mine.set(e.owner_email, l); }
+  const personal = new Map<string, string>();
+  for (const [email, evs] of mine) { const t = calText(evs, today, hour, "내 일정", "🗓"); if (t) personal.set(email, t); }
+  return { org: calText((data ?? []) as CalEv[], today, hour, "조합일정", "📅"), personal };
 }
 const sc = (v?: string | null) => (v ? `[${v}]` : "");
 async function tg(chatId: number, text: string) {
@@ -134,11 +141,12 @@ async function handle(req: Request): Promise<Response> {
       const tag = diff < 0 ? ` 🔴기한초과(${t.due_date})` : diff === 0 ? " 🟠오늘마감" : ` (D-${diff})`;
       add(t.owner_email, "개인", `• ${t.recurring_id ? "[고정] " : ""}${t.title}${tag}`);
     }
-    // 주요일정: 연결된 팀원 전체에게. 업무가 있으면 알림 맨 위에 붙이고, 업무가 없으면 일정만 따로 보낸다 (일정도 없으면 보내지 않음)
+    // 일정: 조합일정은 연결된 팀원 전체에게, 개인일정은 그 본인에게만. 업무가 있으면 알림 맨 위에 붙이고, 업무가 없으면 일정만 따로 보낸다 (일정도 없으면 보내지 않음)
     const hour = new Date(Date.now() + 9 * 3600e3).getUTCHours();
-    const calBlk = await calendarBlock(today, hour);
+    const cal = await calendarBlocks(today, hour), calBlk = cal.org;
     const everyone = new Set<string>(byUser.keys());
     if (calBlk) { const { data: lk } = await db.from("telegram_links").select("email").not("chat_id", "is", null); for (const r of lk ?? []) everyone.add(r.email); }
+    for (const email of cal.personal.keys()) everyone.add(email);
     for (const email of everyone) {
       const secs = byUser.get(email);
       const parts: string[] = [];
@@ -146,11 +154,12 @@ async function handle(req: Request): Promise<Response> {
         const total = SECTIONS.reduce((n, k) => n + (secs[k]?.length ?? 0), 0);
         parts.push(`⏰ 아직 남은 업무가 ${total}건 있어요`);
         if (calBlk) parts.push(calBlk);
+        if (cal.personal.has(email)) parts.push(cal.personal.get(email)!);
         parts.push(...SECTIONS.filter((k) => secs[k]?.length).map((k) => `■ ${k} (${secs[k].length})\n${secs[k].join("\n")}`));
-      } else if (calBlk) parts.push(calBlk);
+      } else { if (calBlk) parts.push(calBlk); if (cal.personal.has(email)) parts.push(cal.personal.get(email)!); }
       if (parts.length) await notify([email], parts.join("\n\n"));
     }
-    return ok({ users: everyone.size, calendar: !!calBlk });
+    return ok({ users: everyone.size, calendar: !!calBlk, personal: cal.personal.size });
   }
 
   // 3) 페이지에서 호출: 신규 등록 / 완료 이벤트 (로그인 JWT 로 본인 확인)
