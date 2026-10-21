@@ -693,7 +693,7 @@
   }
 
   // 오늘 날짜·시각(한국시간) + 퇴근(18:00)까지 남은 시간
-  const WORK_END = 18;
+  const WORK_START = 9, WORK_END = 18;
   function tickClock(){
     const el = $('clock'); if (!el) return;
     const k = new Date(nowMs() + 9 * 3600e3), dow = k.getUTCDay(), hh = k.getUTCHours(), mm = k.getUTCMinutes();
@@ -701,7 +701,7 @@
     el.querySelector('.cdd').textContent = `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 ${DW[dow]}요일`;
     el.querySelector('.cdt').textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     const left = WORK_END * 60 - (hh * 60 + mm);
-    el.querySelector('.cd2').textContent = dow === 0 || dow === 6 ? '푹 쉬는 주말이에요 😴' : left > 0 ? `퇴근까지 ${left >= 60 ? `${Math.floor(left / 60)}시간 ` : ''}${left % 60 ? `${left % 60}분` : ''} ⏳`.replace('시간 ⏳', '시간 ⏳') : '오늘도 수고하셨어요 🎉';
+    el.querySelector('.cd2').textContent = dow === 0 || dow === 6 ? '푹 쉬는 주말이에요 😴' : hh * 60 + mm < WORK_START * 60 ? '아직 출근 전이에요 ☀️' : left > 0 ? `퇴근까지 ${left >= 60 ? `${Math.floor(left / 60)}시간 ` : ''}${left % 60 ? `${left % 60}분` : ''} ⏳`.replace('시간 ⏳', '시간 ⏳') : '오늘도 수고하셨어요 🎉';
   }
   async function syncClock(){
     try {
