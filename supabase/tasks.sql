@@ -356,3 +356,7 @@ create policy pe_upd on public.personal_events for update to authenticated using
 create policy pe_del on public.personal_events for delete to authenticated using (owner_email = auth.email());
 grant select, insert, update, delete on public.personal_events to authenticated;
 alter publication supabase_realtime add table public.personal_events;
+
+-- 서버 시각 (화면 시계를 기기 시계가 아닌 서버 기준으로 맞추기 위함)
+create or replace function public.server_now() returns timestamptz language sql stable as $$ select now() $$;
+grant execute on function public.server_now() to authenticated;
