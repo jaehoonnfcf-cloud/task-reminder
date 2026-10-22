@@ -209,6 +209,11 @@ async function handle(req: Request): Promise<Response> {
       const noteTxt = req2.note ? `\n특이사항: ${req2.note}` : "";
       if (event === "appraisal_priced") await notify(to, `💰 ${tag} ${c.debtor_name}\n${fname(body.firm_id)} ${byItem || req2.total_amount !== null ? "평가가격이 입력됐어요" : "특이사항이 입력됐어요"}\n${lines}${byItem || req2.total_amount !== null ? `합계 ${won(total)}${byItem ? "" : " (총액만 입력)"}` : ""}${noteTxt}\n입력: ${who(me)}님`);
       else await notify(to, `✅ ${tag} ${c.debtor_name}\n${fname(body.firm_id)}을(를) 채택했어요 (합계 ${won(total)})\n처리: ${who(me)}님`);
+    } else if (event === "appraisal_comment") {
+      const { data: cm } = await db.from("appraisal_comments").select("author_email, body").eq("id", body.comment_id).eq("case_id", c.id).maybeSingle();
+      if (!cm || cm.author_email !== me) return new Response("bad request", { status: 400 });
+      const txt = String(cm.body).replace(/\s+/g, " ").trim();
+      await notify(to.filter((e) => e !== me), `💬 ${tag} ${c.debtor_name}\n${who(me)}님: ${txt.length > 200 ? txt.slice(0, 200) + "…" : txt}`);
     } else return new Response("bad request", { status: 400 });
     return ok();
   }

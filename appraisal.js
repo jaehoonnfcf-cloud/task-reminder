@@ -54,6 +54,12 @@ const apComma = (s) => { const n = apNum(s); return n === null ? '' : n.toLocale
   table.apt{ width:100%; border-collapse:collapse; font-size:14px; }
   table.apt th{ text-align:left; font-size:12.5px; color:#5a6172; font-weight:700; background:var(--field); padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:bottom; }
   table.apt td{ padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .apcmts{ display:flex; flex-direction:column; gap:2px; }
+  .apcmt{ display:flex; gap:10px; padding:10px 2px; border-bottom:1px solid var(--line); }
+  .apcmt .bd{ flex:1; min-width:0; } .apcmt .hd{ font-size:12.5px; color:var(--muted); display:flex; gap:4px; align-items:center; } .apcmt .hd b{ color:var(--ink); }
+  .apcmt .tx{ font-size:14.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; margin-top:2px; }
+  .apcmt .del{ margin-left:auto; border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:14px; }
+  #apCmtInput{ width:100%; margin-top:10px; }
   .apm{ overflow-x:auto; } .apm table{ min-width:560px; }
   .apm th.f{ min-width:170px; } .apm td.c{ min-width:170px; }
   .apm input.amt,.apm input.tamt{ width:100%; text-align:right; font-weight:700; }
@@ -148,7 +154,7 @@ function apReqSum(r, props){
 
 async function loadAppraisal(){
   const [c, f, st] = await Promise.all([
-    sb.from('appraisal_cases').select('*, appraisal_properties(*), appraisal_requests(*, appraisal_prices(*))').order('id', { ascending: false }),
+    sb.from('appraisal_cases').select('*, appraisal_properties(*), appraisal_requests(*, appraisal_prices(*)), appraisal_comments(*)').order('id', { ascending: false }),
     sb.from('appraisal_firms').select('*').order('sort'),
     sb.from('appraisal_settings').select('*'),
   ]);
@@ -158,7 +164,7 @@ async function loadAppraisal(){
   apFirms = f.data || [];
   apBadge();
   if (divn === 'appraisal') renderAppraisal();
-  if (apOpenId && !(document.activeElement && $('apDetailOv').contains(document.activeElement) && /INPUT/.test(document.activeElement.tagName))) renderApDetail();
+  if (apOpenId && !(document.activeElement && $('apDetailOv').contains(document.activeElement) && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) renderApDetail();
   if (typeof apRenderFirms === 'function' && $('aFirms')) apRenderFirms();
   if ($('aContacts') && !$('aContacts').contains(document.activeElement)) apRenderContacts();
   if ($('aGeo')) apRenderGeo();
@@ -229,7 +235,7 @@ function apRowHtml(c){
   }
   const first = props[0];
   return `<div class="aprow" data-ap="${c.id}">
-    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}</div><div class="ts">${c.handling_type ? `<b>${esc(c.handling_type === '기타' && c.handling_note ? `기타·${c.handling_note}` : c.handling_type)}</b> · ` : ''}의뢰 ${esc(nameOf(c.requester_email))}${c.loan_amount !== null && c.loan_amount !== undefined ? ` · 신청 ${esc(apWon(c.loan_amount))}` : ''}${c.archived_at ? ` · 📦 보관 ${esc(c.archived_at.slice(5, 10).replace('-', '/'))}` : ''}</div></div>
+    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}${apCmts(c).length ? ` <span class="cmtc">💬 ${apCmts(c).length}</span>` : ''}</div><div class="ts">${c.handling_type ? `<b>${esc(c.handling_type === '기타' && c.handling_note ? `기타·${c.handling_note}` : c.handling_type)}</b> · ` : ''}의뢰 ${esc(nameOf(c.requester_email))}${c.loan_amount !== null && c.loan_amount !== undefined ? ` · 신청 ${esc(apWon(c.loan_amount))}` : ''}${c.archived_at ? ` · 📦 보관 ${esc(c.archived_at.slice(5, 10).replace('-', '/'))}` : ''}</div></div>
     <div><b>${props.length}건</b>${first ? ` · ${esc(first.address)}${props.length > 1 ? ` 외 ${props.length - 1}` : ''}` : ''}</div>
     <div>${reqs.map(r => `${(() => { const sm = apReqSum(r, props); return `<span class="afc ${sm.done ? 'ok' : ''}" ${sm.mode === 'items' && !sm.done ? `title="미입력: ${esc(sm.miss.join(', '))}번"` : ''}>${esc(apFirmName(r.firm_id))}${sm.done ? ' ✓' : sm.mode === 'items' ? ` ${sm.filled}/${sm.count}` : ''}</span>`; })()}`).join('') || '<span class="muted">의뢰기관 없음</span>'}</div>
     <div>${money}</div>
@@ -237,6 +243,19 @@ function apRowHtml(c){
 }
 
 // ---------- 상세 ----------
+const apCmts = (c) => [...(c.appraisal_comments || [])].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.id - b.id);
+async function apSendComment(){
+  const c = apCases.find(x => x.id === apOpenId), t = $('apCmtInput'); if (!c || !t) return;
+  const body = t.value.trim(); if (!body) return;
+  $('apCmtSend').disabled = true;
+  const { data, error } = await sb.from('appraisal_comments').insert({ case_id: c.id, body }).select('id');
+  if ($('apCmtSend')) $('apCmtSend').disabled = false;
+  if (error) return alert(error.message);
+  t.value = '';
+  if (data && data[0]) sb.functions.invoke('task-notify', { body: { event: 'appraisal_comment', case_id: c.id, comment_id: data[0].id } });   // 알림 받는 사람에게 (실패해도 등록은 유지)
+  await loadAppraisal();
+  const w = $('apCmtWrap'); if (w) w.scrollIntoView({ block: 'nearest' });
+}
 function apOpenDetail(id){ apOpenId = id; renderApDetail(); $('apDetailOv').style.display = 'block'; document.body.style.overflow = 'hidden'; }
 function apCloseDetail(){ apOpenId = null; $('apDetailOv').style.display = 'none'; document.body.style.overflow = $('apFormOv').style.display === 'block' ? 'hidden' : ''; }
 function renderApDetail(){
@@ -244,6 +263,7 @@ function renderApDetail(){
   if (!c){ if (apOpenId) apCloseDetail(); return; }
   const props = apProps(c), reqs = apReqs(c), can = apCan();
   // 다시 그리기 전에, 아직 저장하지 않고 입력 중인 금액(다른 기관 칸)을 보존한다
+  const cdraft = ($('apCmtInput') || {}).value || '';   // 작성 중인 의견은 다시 그려도 유지
   const draft = [...$('apDetailPanel').querySelectorAll('[data-k]')].filter(i => i.value !== i.dataset.orig).map(i => [i.dataset.k, i.value]);
   const unit = (p) => p.kind === '토지' ? '토지' : p.kind === '건물' ? '연면적' : '전용';
   const propRows = props.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? `<div class="muted">${esc(p.detail)}</div>` : ''}</td><td>${esc(p.jimok || '-')}</td><td style="text-align:right">${p.kind === '건물' ? `대지 ${p.land_area !== null && p.land_area !== undefined ? Number(p.land_area).toLocaleString('ko-KR') + '㎡' : '-'}<div>건물 ${p.area !== null ? Number(p.area).toLocaleString('ko-KR') + '㎡' : '-'}</div>` : `${p.area !== null ? `${Number(p.area).toLocaleString('ko-KR')}㎡` : '-'}<div class="muted">${unit(p)}</div>`}</td></tr>`).join('');
@@ -285,6 +305,9 @@ function renderApDetail(){
       ${reqs.length && props.length ? `<div class="apm"><table class="apt"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td><b>전체금액만 입력</b><div class="muted">물건별 금액 없이 총액만 받은 경우</div></td>${tinp}</tr><tr class="tot"><td>합계</td>${tot}</tr><tr><td><b>특이사항</b><div class="muted">기관별 코멘트</div></td>${notes}</tr><tr><td></td>${save}</tr></tbody></table></div>` : '<div class="blk-empty">의뢰한 평가기관이나 물건이 없어요. 수정에서 추가해주세요.</div>'}
       ${can && c.chosen_firm_id ? '<div style="margin-top:8px"><button class="btn small" data-act="unchoose">채택 해제 (가격만 조회)</button></div>' : ''}
     </div>
+    <div class="apsec" id="apCmtWrap"><div class="k">💬 담당자 의견 · 대출가능액 <span class="muted" style="font-weight:500">(${apCmts(c).length}건)</span></div>
+      <div class="apcmts">${apCmts(c).map(m => `<div class="apcmt">${avHtml(m.author_email, '', 'margin:0;width:32px;height:32px;font-size:13px;border-width:0;flex:none')}<div class="bd"><div class="hd"><b>${esc(nameOf(m.author_email))}</b> · ${esc(String(m.created_at).slice(0, 16).replace('T', ' '))}${m.author_email === me || isAdmin() ? `<button class="del" data-cdel="${m.id}" title="삭제">✕</button>` : ''}</div><div class="tx">${esc(m.body)}</div></div></div>`).join('') || '<div class="muted" style="padding:4px 2px 8px">아직 의견이 없어요. 감정평가 내역으로 책정한 대출가능액을 남겨주세요.</div>'}</div>
+      ${can ? `<textarea id="apCmtInput" rows="3" maxlength="1000" placeholder="예: 감정평가 결과를 검토해 대출가능액을 2억 5천만원으로 책정 (담보인정비율 70%)">${esc(cdraft)}</textarea><div class="acts" style="margin-top:8px;justify-content:flex-end"><button class="btn primary small" data-act="cmtsend" id="apCmtSend">등록</button></div>` : '<div class="muted" style="font-size:13px">감정평가 권한이 있는 담당자만 의견을 남길 수 있어요.</div>'}</div>
     <div class="foot" style="margin-top:22px"><button class="btn" data-act="map">🗺 지도에서 보기</button><button class="btn" data-act="print">🖨 보고서 인쇄</button><button class="btn" data-act="fax">📠 감정평가 의뢰서 (팩스)</button>${can ? `<button class="btn" data-act="edit">✏ 수정</button><button class="btn" data-act="${c.archived_at ? 'unarchive' : 'archive'}">${c.archived_at ? '↩ 보관함에서 꺼내기' : '📦 보관함으로 이동'}</button>${(c.created_by === me || isAdmin()) ? '<button class="btn danger" data-act="del">삭제</button>' : ''}` : '<span class="muted">👀 감정평가 권한이 없어 보기만 할 수 있어요.</span>'}</div>`;
   draft.sort((a, b) => (a[0][0] === 't') - (b[0][0] === 't')).forEach(([k, val]) => {
     const inp = $('apDetailPanel').querySelector(`[data-k="${k}"]`);
@@ -315,6 +338,14 @@ $('apDetailPanel').addEventListener('change', async (e) => {
   }
 });
 $('apDetailPanel').addEventListener('click', async (e) => {
+  const cd = e.target.closest('[data-cdel]');
+  if (cd){
+    if (!confirm('이 의견을 삭제할까요?')) return;
+    const { error } = await sb.from('appraisal_comments').delete().eq('id', +cd.dataset.cdel);
+    if (error) return alert(error.message);
+    return loadAppraisal();
+  }
+  if (e.target.closest('[data-act=cmtsend]')) return apSendComment();
   const b = e.target.closest('[data-act]'); if (!b || b.tagName === 'INPUT') return;
   const c = apCases.find(x => x.id === apOpenId); if (!c) return;
   const act = b.dataset.act;

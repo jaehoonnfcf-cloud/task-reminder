@@ -363,3 +363,20 @@ grant execute on function public.server_now() to authenticated;
 
 -- 텔레그램 일정 안내용: Edge Function(service_role)이 개인일정을 읽어 본인에게만 보낸다
 grant select on public.personal_events to service_role;
+
+-- 감정평가 담당자 의견(대출가능액 책정 등) 댓글: appraisal_comments. 조회는 팀원 전체, 작성은 감정평가 권한자, 삭제는 본인 또는 관리자.
+create table if not exists public.appraisal_comments (
+  id bigint generated always as identity primary key,
+  case_id bigint not null references public.appraisal_cases(id) on delete cascade,
+  author_email text not null default auth.email(),
+  body text not null check (char_length(body) between 1 and 1000),
+  created_at timestamptz not null default now()
+);
+create index if not exists appraisal_comments_case_idx on public.appraisal_comments (case_id, created_at);
+alter table public.appraisal_comments enable row level security;
+create policy acm_sel on public.appraisal_comments for select to authenticated using (is_member());
+create policy acm_ins on public.appraisal_comments for insert to authenticated with check (has_appraisal() and author_email = auth.email());
+create policy acm_del on public.appraisal_comments for delete to authenticated using (author_email = auth.email() or is_admin());
+grant select, insert, delete on public.appraisal_comments to authenticated;
+grant all on public.appraisal_comments to service_role;
+alter publication supabase_realtime add table public.appraisal_comments;
