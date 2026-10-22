@@ -107,7 +107,7 @@ async function handle(req: Request): Promise<Response> {
     if (req.headers.get("x-cron-secret") !== Deno.env.get("CRON_SECRET")) return new Response("forbidden", { status: 403 });
     const today = kstToday();
     const dueTag = (d: string | null) => !d ? "" : d < today ? ` 🔴기한초과(${d})` : d === today ? " 🟠오늘마감" : ` (~${d})`;
-    const SECTIONS = ["여신", "수신/기타", "개인"];
+    const SECTIONS = ["수신/기타", "여신", "개인"];   // 메뉴 순서(수신/기타 → 여신 → 감정평가 → 채권관리 → 개인업무)와 같게. 일정은 맨 위
     const byUser = new Map<string, Record<string, string[]>>();
     const add = (email: string, sec: string, line: string) => {
       const u = byUser.get(email) ?? {};
