@@ -163,6 +163,7 @@ async function loadAppraisal(){
   apCases = (c.data || []).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || b.id - a.id);   // 최근 등록이 맨 위
   apFirms = f.data || [];
   apBadge();
+  if (typeof renderRecentComments === 'function') renderRecentComments();
   if (divn === 'appraisal') renderAppraisal();
   if (apOpenId && !(document.activeElement && $('apDetailOv').contains(document.activeElement) && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) renderApDetail();
   if (typeof apRenderFirms === 'function' && $('aFirms')) apRenderFirms();

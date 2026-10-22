@@ -785,16 +785,24 @@
   }
   function renderRecentComments(){
     const card = $('rcCard'); if (!card) return;
-    const show = divn === 'credit' || divn === 'deposit';
+    const show = divn === 'credit' || divn === 'deposit' || divn === 'appraisal';
     card.style.display = show ? '' : 'none'; if (!show) return;
-    const rows = recentCmts.filter(c => byId(c.task_id)).slice(0, 5);
-    $('rcList').innerHTML = rows.map(c => {
-      const t = byId(c.task_id), dv = taskDiv(t) === 'deposit' ? '수신' : '여신';
-      return `<button class="rc" data-rc="${c.task_id}"><div class="rh">${avHtml(c.author_email, '', 'margin:0;width:20px;height:20px;font-size:10px;border-width:0')}<b>${esc(nameOf(c.author_email))}</b><span class="t">${ago(c.created_at)}</span></div>
-        <div class="rt"><span>${dv}${t.scope ? '·' + esc(t.scope) : ''}</span><span>${esc(t.title)}</span></div><div class="rb">${esc(c.body)}</div></button>`;
-    }).join('') || '<div class="side-empty">아직 댓글이 없어요.</div>';
+    const head = (c, tag, title) => `<div class="rh">${avHtml(c.author_email, '', 'margin:0;width:20px;height:20px;font-size:10px;border-width:0')}<b>${esc(nameOf(c.author_email))}</b><span class="t">${ago(c.created_at)}</span></div>
+        <div class="rt"><span>${tag}</span><span>${esc(title)}</span></div><div class="rb">${esc(c.body)}</div>`;
+    let html;
+    if (divn === 'appraisal'){   // 감정평가 화면: 감정평가 의견만
+      const all = (typeof apCases !== 'undefined' ? apCases : []).flatMap(k => (k.appraisal_comments || []).map(c => ({ ...c, _k: k })));
+      all.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || b.id - a.id);
+      html = all.slice(0, 5).map(c => `<button class="rc" data-rcap="${c._k.id}">${head(c, `감정평가${c._k.scope ? '·' + esc(c._k.scope) : ''}`, c._k.debtor_name)}</button>`).join('');
+    } else {   // 수신/기타·여신 화면: 그 화면 업무의 댓글만
+      html = recentCmts.filter(c => { const t = byId(c.task_id); return t && taskDiv(t) === divn; }).slice(0, 5)
+        .map(c => { const t = byId(c.task_id); return `<button class="rc" data-rc="${c.task_id}">${head(c, `${divn === 'deposit' ? '수신' : '여신'}${t.scope ? '·' + esc(t.scope) : ''}`, t.title)}</button>`; }).join('');
+    }
+    $('rcList').innerHTML = html || '<div class="side-empty">아직 댓글이 없어요.</div>';
   }
   $('rcList').addEventListener('click', (e) => {
+    const ba = e.target.closest('[data-rcap]');
+    if (ba){ apOpenDetail(+ba.dataset.rcap); setTimeout(() => { const w = $('apCmtWrap'); if (w) w.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 120); return; }
     const b = e.target.closest('[data-rc]'); if (!b) return;
     const t = byId(+b.dataset.rc); if (!t) return;
     if (taskDiv(t) !== divn){ divn = taskDiv(t); try { localStorage.setItem('div', divn); } catch (x) {} fGrp = null; render(); }   // 다른 구분의 업무면 그 화면으로 옮겨서 연다
@@ -1601,7 +1609,7 @@
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('calOv') && $('calOv').style.display === 'block') calClose(); else if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
-<script src="appraisal.js?v=41"></script>
+<script src="appraisal.js?v=42"></script>
 <script src="calendar.js?v=6"></script>
 <script src="debt.js?v=4"></script>
 </body>
