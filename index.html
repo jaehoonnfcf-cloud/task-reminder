@@ -711,14 +711,16 @@
     } catch (e) {}
   }
   tickClock(); setInterval(tickClock, 15000); setInterval(() => { if (me && !document.hidden) syncClock(); }, 600000);
+  let started = false;   // 로그인 이벤트(토큰 갱신·탭 복귀 등)로 start() 가 다시 불려도 보던 화면을 바꾸지 않도록
   async function start(session){
     const { data: ok } = await sb.rpc('is_member');
     if (!ok){ await sb.auth.signOut(); show(false); $('loginMsg').textContent = '등록되지 않은 이메일입니다.'; return; }
     me = session.user.email; show(true);
     await reloadMembers(); syncClock();
     renderWho();
-    setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
-    divn = storedDiv === 'credit' || storedDiv === 'deposit' || storedDiv === 'personal' || storedDiv === 'appraisal' || (storedDiv === 'debt' && canWrite('debt')) ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
+    if (!started) setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
+    if (!started) divn = storedDiv === 'credit' || storedDiv === 'deposit' || storedDiv === 'personal' || storedDiv === 'appraisal' || (storedDiv === 'debt' && canWrite('debt')) ? storedDiv : (canWrite('credit') ? 'credit' : canWrite('deposit') ? 'deposit' : 'credit');
+    started = true;
     await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadDebt === 'function') await loadDebt(); if (typeof loadCal === 'function') await loadCal(); if (typeof loadPcal === 'function') await loadPcal(); ensureSide(); startRealtime();
   }
 
