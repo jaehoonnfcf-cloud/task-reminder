@@ -286,7 +286,8 @@
   .divs button.on{ background:#16181d; color:#fff; }
   .divs .n{ background:var(--accent-soft); color:var(--accent); }
   .divs button.on .n{ background:#fff; color:#16181d; }
-  .whoBtn{ color:var(--ink); } .whoBtn:hover{ background:rgba(20,24,40,.06); }
+  .whoBtn{ color:var(--ink); position:relative; }
+  .whoBtn.tgoff::after{ content:''; position:absolute; top:1px; left:30px; width:12px; height:12px; border-radius:50%; background:#e5484d; border:2px solid #fff; } .whoBtn:hover{ background:rgba(20,24,40,.06); }
   #wrap{ padding:6px 28px 48px; gap:16px; }
   /* 넓은 화면: 시세·뉴스 열이 맨 위(헤더 줄)부터 시작하고, 헤더(메뉴·새 업무·프로필)는 왼쪽 열 폭 안에서 우측 정렬 */
   @media (min-width:1500px){
@@ -470,7 +471,6 @@
     <button class="btn glass small" id="adminBtn" style="display:none">⚙ 관리자</button>
   </div>
   <div id="wrap">
-    <div id="tgBanner"><b>🔔 텔레그램 알림</b><span id="tgStatus" class="muted" style="flex:1"></span></div>
     <div id="main">
     <div id="hello"><div id="helloT"></div><div id="clock"><div class="cdd"></div><div class="cdt"></div><div class="cd2"></div></div></div>
     <div id="shared">
@@ -735,34 +735,33 @@
     $('who').innerHTML = avHtml(me, '', 'margin:0') + `<span class="wn">${esc(nameOf(me))}</span>`;
   }
 
-  // ---------- 텔레그램 ----------
-  let tgLinked = false;
+  // ---------- 텔레그램 (프로필 창 안에서 연결) ----------
+  let tgLinked = false, tgPending = false, tgChat = false, tgWait = false;
   function renderProfileTg(){
     const el = $('pTg'); if (!el) return;
+    if (tgWait || tgPending){
+      el.innerHTML = '<span>텔레그램에서 <b>시작(START)</b>을 누른 뒤</span><button class="btn small primary" id="pTgRe">연결 확인</button>' + (tgChat ? '<button class="btn small" id="pTgCancel">취소</button>' : '');
+      $('pTgRe').onclick = () => { tgWait = false; loadTelegram(); };
+      if (tgChat) $('pTgCancel').onclick = async () => { await sb.from('telegram_links').update({ link_code: null }).eq('email', me); tgWait = false; loadTelegram(); };
+      return;
+    }
     el.innerHTML = tgLinked ? '<span style="color:var(--green);font-weight:700">✅ 연결됨</span><span class="muted">한 번만 연결하면 돼요</span><button class="btn small" id="pTgGo">다시 연결</button>'
       : '<span style="color:var(--warn);font-weight:700">연결되지 않았어요</span><button class="btn small primary" id="pTgGo">연결하기</button>';
-    $('pTgGo').onclick = () => { closeProfile(); loadTelegram(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  }
-  async function loadTelegram(forceCard){
-    const { data } = await sb.from('telegram_links').select('chat_id, link_code').eq('email', me).maybeSingle();
-    const linked = !!(data && data.chat_id), pending = !!(data && data.link_code);
-    const banner = $('tgBanner');
-    tgLinked = linked && !pending; renderProfileTg();
-    if (linked && !pending && !forceCard){ banner.style.display = 'none'; return; }
-    banner.style.display = 'flex';
-    $('tgStatus').innerHTML = (linked ? '새 텔레그램으로 다시 연결합니다. ' : '연결되지 않았습니다. ')
-      + '<button class="btn small primary" id="tgBtn">텔레그램 연결하기</button>'
-      + (linked ? ' <button class="btn small" id="tgCancel">취소</button>' : '');
-    if (linked) $('tgCancel').onclick = async () => { await sb.from('telegram_links').update({ link_code: null }).eq('email', me); loadTelegram(); };
-    $('tgBtn').onclick = async () => {
+    $('pTgGo').onclick = async () => {
       const code = crypto.randomUUID().replace(/-/g, '');
       // chat_id 는 건드리지 않고 코드만 갱신 (연결 완료 전까지 기존 연결 유지)
       const { error } = await sb.from('telegram_links').upsert({ email: me, link_code: code });
       if (error) return alert(error.message);
       window.open(`https://t.me/${BOT_USERNAME}?start=${code}`, '_blank');
-      $('tgStatus').innerHTML = '텔레그램에서 <b>시작(START)</b>을 누른 뒤 <button class="btn small" id="tgRe">연결 확인</button>';
-      $('tgRe').onclick = () => loadTelegram();
+      tgWait = true; tgPending = true; renderProfileTg();
     };
+  }
+  async function loadTelegram(){
+    const { data } = await sb.from('telegram_links').select('chat_id, link_code').eq('email', me).maybeSingle();
+    tgChat = !!(data && data.chat_id); tgPending = !!(data && data.link_code);
+    tgLinked = tgChat && !tgPending;
+    $('who').classList.toggle('tgoff', !tgLinked && !tgPending);   // 아직 연결 안 했으면 프로필 사진에 빨간 점
+    renderProfileTg();
   }
 
   // ---------- 데이터 ----------
