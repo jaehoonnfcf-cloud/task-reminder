@@ -30,6 +30,9 @@ const apWon = (n) => {
 };
 const apNum = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); return d ? Number(d) : null; };
 const apComma = (s) => { const n = apNum(s); return n === null ? '' : n.toLocaleString('ko-KR'); };
+// ㎡ → 평 (1평 = 400/121㎡ ≈ 3.3058㎡). 소수 둘째 자리까지
+const apPy = (m2) => { const n = Number(String(m2 ?? '').replace(/,/g, '')); return m2 === null || m2 === undefined || m2 === '' || isNaN(n) || n <= 0 ? '' : (n / (400 / 121)).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '평'; };
+const apM2Py = (m2) => { const p = apPy(m2); return `${Number(m2).toLocaleString('ko-KR')}㎡${p ? ` (${p})` : ''}`; };
 
 // ---------- 스타일 ----------
 (function(){
@@ -60,6 +63,7 @@ const apComma = (s) => { const n = apNum(s); return n === null ? '' : n.toLocale
   .apcmt .tx{ font-size:14.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; margin-top:2px; }
   .apcmt .del{ margin-left:auto; border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:14px; }
   #apCmtInput{ width:100%; margin-top:10px; }
+  .pyh{ font-size:12.5px; font-weight:700; color:var(--accent); margin-top:4px; min-height:16px; }
   .apm{ overflow-x:auto; } .apm table{ min-width:560px; }
   .apm th.f{ min-width:170px; } .apm td.c{ min-width:170px; }
   .apm input.amt,.apm input.tamt{ width:100%; text-align:right; font-weight:700; }
@@ -267,7 +271,7 @@ function renderApDetail(){
   const cdraft = ($('apCmtInput') || {}).value || '';   // 작성 중인 의견은 다시 그려도 유지
   const draft = [...$('apDetailPanel').querySelectorAll('[data-k]')].filter(i => i.value !== i.dataset.orig).map(i => [i.dataset.k, i.value]);
   const unit = (p) => p.kind === '토지' ? '토지' : p.kind === '건물' ? '연면적' : '전용';
-  const propRows = props.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? `<div class="muted">${esc(p.detail)}</div>` : ''}</td><td>${esc(p.jimok || '-')}</td><td style="text-align:right">${p.kind === '건물' ? `대지 ${p.land_area !== null && p.land_area !== undefined ? Number(p.land_area).toLocaleString('ko-KR') + '㎡' : '-'}<div>건물 ${p.area !== null ? Number(p.area).toLocaleString('ko-KR') + '㎡' : '-'}</div>` : `${p.area !== null ? `${Number(p.area).toLocaleString('ko-KR')}㎡` : '-'}<div class="muted">${unit(p)}</div>`}</td></tr>`).join('');
+  const propRows = props.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? `<div class="muted">${esc(p.detail)}</div>` : ''}</td><td>${esc(p.jimok || '-')}</td><td style="text-align:right">${p.kind === '건물' ? `대지 ${p.land_area !== null && p.land_area !== undefined ? apM2Py(p.land_area) : '-'}<div>건물 ${p.area !== null ? apM2Py(p.area) : '-'}</div>` : `${p.area !== null ? apM2Py(p.area) : '-'}<div class="muted">${unit(p)}</div>`}</td></tr>`).join('');
   const head = reqs.map(r => {
     const sel = c.chosen_firm_id === r.firm_id;
     return `<th class="f ${sel ? 'chosen' : ''}"><div class="fh"><b>${esc(apFirmName(r.firm_id))}</b>${can ? `<label><input type="radio" name="apChosen" value="${r.firm_id}" ${sel ? 'checked' : ''} data-act="choose"/> 채택</label>` : sel ? '<label>✔ 채택</label>' : ''}</div>
@@ -275,7 +279,7 @@ function renderApDetail(){
       ${(() => { const sm = apReqSum(r, props); return sm.mode === 'items' && !sm.done ? `<div class="apwarn">⚠ 미입력 ${esc(sm.miss.join(', '))}번</div>` : ''; })()}
       ${can && props.length > 1 ? `<button class="btn small" data-act="bundle" data-r="${r.id}" style="margin-top:6px;width:100%" title="이 평가기관이 여러 물건의 가격을 한 번에 불러준 경우">🔗 물건 묶기${apUnits(props, r.bundles).some(u => u.group) ? ' (' + apUnits(props, r.bundles).filter(u => u.group).length + ')' : ''}</button>` : ''}</th>`;
   }).join('');
-  const unitSub = (p) => `${esc(p.kind)}${p.kind === '건물' && p.land_area ? ` · 대지 ${Number(p.land_area).toLocaleString('ko-KR')}㎡` : ''}${p.area !== null ? ` · ${p.kind === '건물' ? '건물 ' : ''}${Number(p.area).toLocaleString('ko-KR')}㎡` : ''}`;
+  const unitSub = (p) => `${esc(p.kind)}${p.kind === '건물' && p.land_area ? ` · 대지 ${apM2Py(p.land_area)}` : ''}${p.area !== null ? ` · ${p.kind === '건물' ? '건물 ' : ''}${apM2Py(p.area)}` : ''}`;
   const body = props.map((p, i) => `<tr><td>${i + 1}. ${esc(p.address)}<div class="muted">${unitSub(p)}</div></td>${reqs.map(r => {
     const u = apUnits(props, r.bundles).find(x => x.members.some(m => m.id === p.id)), cls = `c ${c.chosen_firm_id === r.firm_id ? 'chosen' : ''}`;
     if (u && u.group && u.key !== p.id) return `<td class="${cls}"><div class="muted" style="text-align:center;padding:10px 0">↳ ${esc(apNos(u))}번 일괄</div></td>`;
@@ -503,11 +507,15 @@ function apTypeSync(){
 }
 function apCloseForm(){ $('apFormOv').style.display = 'none'; apFormId = null; document.body.style.overflow = $('apDetailOv').style.display === 'block' ? 'hidden' : ''; }
 function apRenumber(){ document.querySelectorAll('#apfProps .apblock').forEach((b, i) => { b.querySelector('.bn').textContent = `물건 ${i + 1}`; }); }
+function apPySync(blk){
+  [['.pl', '.pyl'], ['.pr', '.pyr']].forEach(([i, h]) => { const t = apPy(blk.querySelector(i).value); blk.querySelector(h).textContent = t ? `≈ ${t}` : ''; });
+}
 function apKindSync(blk){
   const k = AP_KINDS[blk.querySelector('.pk').value];
   blk.querySelector('.lwc').style.display = k.land ? '' : 'none';
   blk.querySelector('.la').textContent = k.area; blk.querySelector('.ld').textContent = k.detail;
   blk.querySelector('.pj').placeholder = blk.querySelector('.pk').value === '토지' ? '필수' : '선택';
+  apPySync(blk);
 }
 function apAddPropBlock(p){
   const blk = document.createElement('div'); blk.className = 'apblock';
@@ -519,8 +527,9 @@ function apAddPropBlock(p){
         <div class="apres"></div></div></div>
     <input class="pa apaddr" placeholder="↑ 검색해서 주소를 선택하세요" readonly style="margin-top:8px" />
     <div class="apst"></div>
-    <div class="grid3"><div><label>지목</label><input class="pj" list="apJimokDl" /></div><div class="lwc"><label>대지면적 (㎡)</label><input class="pl" inputmode="decimal" /></div><div><label class="la">면적</label><input class="pr" inputmode="decimal" /></div><div><label class="ld">비고</label><input class="pd" maxlength="80" /></div></div>`;
+    <div class="grid3"><div><label>지목</label><input class="pj" list="apJimokDl" /></div><div class="lwc"><label>대지면적 (㎡)</label><input class="pl" inputmode="decimal" /><div class="pyh pyl"></div></div><div><label class="la">면적</label><input class="pr" inputmode="decimal" /><div class="pyh pyr"></div></div><div><label class="ld">비고</label><input class="pd" maxlength="80" /></div></div>`;
   $('apfProps').appendChild(blk);
+  blk.addEventListener('input', (e) => { if (e.target.matches('.pl, .pr')) apPySync(blk); });
   if (!$('apJimokDl')){ const dl = document.createElement('datalist'); dl.id = 'apJimokDl'; dl.innerHTML = AP_JIMOK.map(j => `<option value="${j}">`).join(''); document.body.appendChild(dl); }
   if (p){
     blk.querySelector('.pk').value = p.kind; blk.querySelector('.pa').value = p.address; blk.dataset.verified = '1'; blk.dataset.pnu = p.pnu || ''; blk.dataset.lat = p.lat ?? ''; blk.dataset.lng = p.lng ?? '';
@@ -574,6 +583,7 @@ async function apApplyAddress(blk, a){
   const setIf = (sel, v, label) => { if (v !== '' && v !== null && !blk.querySelector(sel).value){ blk.querySelector(sel).value = v; filled.push(label); } };
   setIf('.pj', land.jimok, '지목');
   if (kind === '토지') setIf('.pr', land.area ?? '', '면적'); else if (kind === '건물') setIf('.pl', land.area ?? '', '대지면적');
+  apPySync(blk);
   st.className = 'apst ok';
   st.innerHTML = (filled.length ? `✔ 확인된 주소 · ${filled.join('·')} 자동 입력됨 (다르면 직접 고쳐주세요)` : `✔ 확인된 주소 · 지목·면적은 자동조회가 되지 않아 직접 입력해주세요${land.note ? ` (${esc(land.note)})` : ''}`) + dupHtml;
 }
@@ -1002,7 +1012,7 @@ function apMapRefresh(){
 }
 function apPopupHtml(c, p, i, n, st){
   return `<b>${esc(c.debtor_name)}</b> <span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span><br>${esc(p.address)}${n > 1 ? ` <span class="muted">(물건 ${n}개 중 ${i + 1}번)</span>` : ''}
-    <br><span class="muted">${esc(p.kind)}${p.jimok ? ` · ${esc(p.jimok)}` : ''}${p.area ? ` · ${Number(p.area).toLocaleString('ko-KR')}㎡` : ''}</span>
+    <br><span class="muted">${esc(p.kind)}${p.jimok ? ` · ${esc(p.jimok)}` : ''}${p.area ? ` · ${apM2Py(p.area)}` : ''}</span>
     <br>${esc(apTypeText(c))} · ${esc(c.request_date)}<br><b>${esc(apCaseMoney(c))}</b> <span class="muted">· ${AP_STATE[st]}</span>
     <br><button class="btn small primary" data-apopen="${c.id}">상세 보기</button>`;
 }
@@ -1136,7 +1146,7 @@ function apBundleRender(){
     <div class="muted" style="margin:6px 0 12px;font-size:13px">${esc(nm)}에서 여러 물건의 가격을 <b>한 번에</b> 불러줬다면 그 물건들을 묶으세요. 묶은 물건은 가격표에서 한 칸으로 입력해요. 다른 평가기관에는 영향이 없어요.</div>
     ${units.filter(u => u.group).length ? `<div style="font-weight:800;margin-bottom:6px">현재 묶음</div>${units.filter(u => u.group).map(u => `<div class="aprec" style="cursor:default;display:flex;align-items:center;gap:10px"><div style="flex:1"><b>🔗 ${esc(apNos(u))}번 일괄</b><div class="m">${u.members.map(m => esc(m.address)).join(' / ')}</div></div><button class="btn small danger" data-bn="unbind" data-i="${u.bi}">풀기</button></div>`).join('')}` : '<div class="muted" style="margin-bottom:8px">아직 묶은 물건이 없어요.</div>'}
     <div style="font-weight:800;margin:14px 0 6px">새로 묶기 <span class="muted" style="font-weight:500">(2개 이상 체크)</span></div>
-    <div class="checks" style="flex-direction:column;align-items:flex-start;gap:2px">${props.map((p, i) => `<label ${inB.has(p.id) ? 'style="opacity:.45"' : ''}><input type="checkbox" class="bnchk" value="${p.id}" ${inB.has(p.id) ? 'disabled' : ''}/> ${i + 1}. ${esc(p.address)} <span class="muted">${esc(p.kind)}${p.area ? ` · ${Number(p.area).toLocaleString('ko-KR')}㎡` : ''}</span></label>`).join('')}</div>
+    <div class="checks" style="flex-direction:column;align-items:flex-start;gap:2px">${props.map((p, i) => `<label ${inB.has(p.id) ? 'style="opacity:.45"' : ''}><input type="checkbox" class="bnchk" value="${p.id}" ${inB.has(p.id) ? 'disabled' : ''}/> ${i + 1}. ${esc(p.address)} <span class="muted">${esc(p.kind)}${p.area ? ` · ${apM2Py(p.area)}` : ''}</span></label>`).join('')}</div>
     <div class="acts" style="margin-top:16px"><button class="btn primary" data-bn="bind" style="min-height:44px">선택한 물건 묶기</button><button class="btn" data-bn="close" style="min-height:44px">닫기</button></div>`;
 }
 async function apBundleSave(c, req, bundles, clearIds){
