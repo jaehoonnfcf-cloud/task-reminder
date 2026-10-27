@@ -704,9 +704,10 @@ function apReportHtml(c){
   const sums = reqs.map(r => apReqSum(r, props));
   const chosenIdx = reqs.findIndex(r => r.firm_id === c.chosen_firm_id);
   const num = (v) => (v === null || v === undefined || v === '') ? '-' : n(v);
+  const numPy = (v) => (v === null || v === undefined || v === '') ? '-' : `${n(v)}${apPy(v) ? `<br><span class="m">(${apPy(v)})</span>` : ''}`;   // ㎡ 아래에 평 병기
   const nameOfFirm = (r) => apFirmName(r.firm_id);
   const propRows = props.map((p, i) => `<tr><td class="c nw">${i + 1}</td><td class="c nw">${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? ` <span class="m">(${esc(p.detail)})</span>` : ''}</td><td class="c nw">${esc(p.jimok || '-')}</td>
-    <td class="r nw">${p.kind === '건물' ? num(p.land_area) : (p.kind === '토지' ? num(p.area) : '-')}</td><td class="r nw">${p.kind === '토지' ? '-' : num(p.area)}</td></tr>`).join('');
+    <td class="r nw">${p.kind === '건물' ? numPy(p.land_area) : (p.kind === '토지' ? numPy(p.area) : '-')}</td><td class="r nw">${p.kind === '토지' ? '-' : numPy(p.area)}</td></tr>`).join('');
   const many = reqs.length > 4;
   const head = reqs.map((r, i) => `<th class="nw ${i === chosenIdx ? 'sel' : ''}">${esc(nameOfFirm(r))}${i === chosenIdx ? ' ★' : ''}</th>`).join('');
   const unitsK = reqs.map(r => apUnits(props, r.bundles));
