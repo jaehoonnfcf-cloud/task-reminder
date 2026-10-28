@@ -7,11 +7,16 @@ let perfFormDate = null;
 
 const pfNum = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); return d ? Number(d) : null; };
 const pfDec = (s) => { const t = String(s ?? '').replace(/[^0-9.]/g, ''); const n = parseFloat(t); return isNaN(n) ? null : n; };
-const pfN = (n) => (n === null || n === undefined || isNaN(n)) ? '-' : Number(n).toLocaleString('ko-KR');
+// 저장은 백만원 정수, 화면·입력은 억원 (1억원 = 100백만원, 소수 둘째 자리까지 = 백만원 단위 정확)
+const pfE = (n) => (n === null || n === undefined || isNaN(n)) ? '-' : (Number(n) / 100).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '억원';
+const pfEn = (n) => (n === null || n === undefined || isNaN(n)) ? '' : (Number(n) / 100).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });   // 입력칸용(단위 없음)
+const pfEin = (s) => { const t = String(s ?? '').replace(/,/g, '').trim(); if (!/^\d+(\.\d*)?$/.test(t)) return null; const n = Math.round(parseFloat(t) * 100); return isNaN(n) ? null : n; };   // 억원 문자열 → 백만원 정수
+const pfEfmt = (s) => { let t = String(s ?? '').replace(/[^0-9.]/g, ''); const k = t.indexOf('.'); let i = k < 0 ? t : t.slice(0, k), d = k < 0 ? null : t.slice(k + 1).replace(/\./g, '').slice(0, 2); i = i.replace(/^0+(?=\d)/, ''); return (i ? Number(i).toLocaleString('ko-KR') : (d !== null ? '0' : '')) + (d !== null ? '.' + d : ''); };   // 입력 중 콤마·소수 둘째 자리 제한
 const pfP = (n, d = 2) => (n === null || n === undefined || isNaN(n)) ? '-' : Number(n).toFixed(d);
 const pfDow = (iso) => ['일', '월', '화', '수', '목', '금', '토'][new Date(iso + 'T12:00:00Z').getUTCDay()];
 const pfMd = (iso) => `${+iso.slice(5, 7)}. ${+iso.slice(8, 10)}`;
 const pfSigned = (n, unit = '') => n === 0 ? `±0${unit}` : `${n > 0 ? '▲' : '▼'}${Math.abs(n).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}${unit}`;
+const pfSignedE = (n) => n === 0 ? '±0.00억원' : `${n > 0 ? '▲' : '▼'}${pfE(Math.abs(n))}`;
 const pfCls = (n) => n > 0 ? 'up' : n < 0 ? 'dn' : 'fl';
 const pfAdd = (iso, n) => new Date(Date.parse(iso + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
 
@@ -43,8 +48,8 @@ function pfPrevBizDay(from = kstToday()){
   .pfk.b .t > span:first-child{ color:#2f55c8; } .pfk.p .t > span:first-child{ color:#5b3fc4; } .pfk.r .t > span:first-child{ color:#b42318; }
   .pfk .pill{ font-size:12px; font-weight:800; padding:3px 9px; border-radius:99px; background:#fff; white-space:nowrap; }
   .pfk.b .pill{ color:#2f55c8; } .pfk.p .pill{ color:#5b3fc4; } .pfk.r .pill{ color:#b42318; } .pfk .pill.ok{ color:var(--green) !important; }
-  .pfk .big{ font-size:34px; font-weight:800; letter-spacing:-.04em; margin-top:6px; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .pfk .big small{ font-size:13px; font-weight:700; color:var(--muted); margin-left:6px; letter-spacing:0; }
+  .pfk .big{ font-size:32px; font-weight:800; letter-spacing:-.04em; margin-top:6px; font-variant-numeric:tabular-nums; line-height:1.15; }
+  .pfk .big small{ font-size:13px; font-weight:700; color:var(--muted); margin-left:6px; letter-spacing:0; white-space:nowrap; display:inline-block; }
   .pfbar{ height:10px; background:#fff; border-radius:99px; margin-top:10px; overflow:hidden; } .pfbar i{ display:block; height:100%; border-radius:99px; }
   .pfrow{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:#5a6172; margin-top:6px; font-weight:600; } .pfrow b{ color:var(--ink); }
   .pfrow .up,.up{ color:#e5484d; font-weight:800; } .pfrow .dn,.dn{ color:#2f55c8; font-weight:800; } .pfrow .fl{ color:var(--muted); font-weight:700; }
@@ -109,12 +114,12 @@ function pfKpi(cls, title, val, tgt, dPrev, dYear, hq, br, hqT, brT){
   const rate = tgt ? val / tgt * 100 : null, left = tgt ? tgt - val : null;
   const col = cls === 'b' ? ['#6f93ff', '#3563e9', '#9db8ff'] : ['#a78bfa', '#6d4df2', '#c4b5fd'];
   return `<div class="pfk ${cls}"><div class="t"><span>${title} (합산)</span>${rate !== null ? `<span class="pill ${rate >= 100 ? 'ok' : ''}">달성률 ${pfP(rate, 1)}%</span>` : '<span class="pill">목표 미설정</span>'}</div>
-    <div class="big">${pfN(val)}${tgt ? `<small>/ 목표 ${pfN(tgt)}</small>` : ''}</div>
+    <div class="big">${pfE(val)}${tgt ? `<small>/ 목표 ${pfE(tgt)}</small>` : ''}</div>
     ${rate !== null ? `<div class="pfbar"><i style="width:${Math.min(100, rate)}%;background:linear-gradient(90deg,${col[0]},${col[1]})"></i></div>` : ''}
-    <div class="pfrow"><span>${left !== null ? (left > 0 ? `목표까지 <b class="up">${pfN(left)}</b>` : `목표 초과 <b class="dn">${pfN(-left)}</b>`) : '&nbsp;'}</span><span>${dPrev === null ? '' : `전 영업일 대비 <span class="${pfCls(dPrev)}">${pfSigned(dPrev)}</span>`}</span></div>
-    <div class="pfrow"><span>${dYear === null ? '&nbsp;' : `${dYear.label} 대비`}</span>${dYear === null ? '' : `<b class="${pfCls(dYear.v)}">${pfSigned(dYear.v)} (${dYear.pct >= 0 ? '+' : ''}${pfP(dYear.pct, 1)}%)</b>`}</div>
+    <div class="pfrow"><span>${left !== null ? (left > 0 ? `목표까지 <b class="up">${pfE(left)}</b>` : `목표 초과 <b class="dn">${pfE(-left)}</b>`) : '&nbsp;'}</span><span>${dPrev === null ? '' : `전 영업일 대비 <span class="${pfCls(dPrev)}">${pfSignedE(dPrev)}</span>`}</span></div>
+    <div class="pfrow"><span>${dYear === null ? '&nbsp;' : `${dYear.label} 대비`}</span>${dYear === null ? '' : `<b class="${pfCls(dYear.v)}">${pfSignedE(dYear.v)} (${dYear.pct >= 0 ? '+' : ''}${pfP(dYear.pct, 1)}%)</b>`}</div>
     <div class="pfsplit"><i style="width:${(hq + br) ? hq / (hq + br) * 100 : 50}%;background:${col[1]}"></i><i style="width:${(hq + br) ? br / (hq + br) * 100 : 50}%;background:${col[2]}"></i></div>
-    <div class="pfsl"><span>본점 ${pfN(hq)}</span><span>지점 ${pfN(br)}</span></div></div>`;
+    <div class="pfsl"><span>본점 ${pfE(hq)}</span><span>지점 ${pfE(br)}</span></div></div>`;
 }
 
 function pfChart(){
@@ -127,7 +132,7 @@ function pfChart(){
   if (lo === hi){ lo -= 1; hi += 1; }
   const padv = (hi - lo) * 0.12; lo -= padv; hi += padv;
   const W = window.innerWidth <= 760 ? 340 : 640, H = 170, l = 46, r = 10, t = 10, b = 22, x = (k) => rows.length === 1 ? (l + W - r) / 2 : l + (W - l - r) * k / (rows.length - 1), y = (a) => t + (H - t - b) * (1 - (a - lo) / (hi - lo));
-  const fmt = (a) => perfTab === 'delinq' ? a.toFixed(2) : Math.round(a).toLocaleString('ko-KR');
+  const fmt = (a) => perfTab === 'delinq' ? a.toFixed(2) + '%' : (a / 100).toLocaleString('ko-KR', { maximumFractionDigits: (hi - lo) / 100 < 30 ? 1 : 0 }) + '억';
   let s = '';
   for (let g = 0; g <= 3; g++){ const a = lo + (hi - lo) * g / 3; s += `<line x1="${l}" x2="${W - r}" y1="${y(a)}" y2="${y(a)}" stroke="#e8ebf3"/><text x="0" y="${y(a) + 4}" font-size="10" fill="#8a90a0">${fmt(a)}</text>`; }
   if (tgt !== null && tgt !== undefined) s += `<line x1="${l}" x2="${W - r}" y1="${y(tgt)}" y2="${y(tgt)}" stroke="#e5484d" stroke-dasharray="5 4" opacity=".6"/><text x="${W - r}" y="${y(tgt) - 4}" font-size="10" fill="#e5484d" text-anchor="end">목표 ${fmt(tgt)}</text>`;
@@ -167,23 +172,23 @@ function renderPerf(){
   const goals = [['수신 본점', r.dep_hq, Y.dep_hq_t, '#3563e9'], ['수신 지점', r.dep_br, Y.dep_br_t, '#3563e9'], ['여신 본점', r.loan_hq, Y.loan_hq_t, '#6d4df2'], ['여신 지점', r.loan_br, Y.loan_br_t, '#6d4df2']];
   const has = (v) => v !== null && v !== undefined;
   const dif = (t, b) => !has(t) ? '' : (Number(t) - Number(b));
-  const cell = (d) => d === '' ? '<td></td>' : `<td class="${d > 0 ? 'd' : 'g'}">${pfN(d)}</td>`;
+  const cell = (d) => d === '' ? '<td></td>' : `<td class="${d > 0 ? 'd' : 'g'}">${pfE(d)}</td>`;
   const sumT = (a, b) => has(a) && has(b) ? Number(a) + Number(b) : null;
   const dTot = sumT(Y.dep_hq_t, Y.dep_br_t), lTot = sumT(Y.loan_hq_t, Y.loan_br_t);
   const tbl = `<div class="pfm"><table class="pft"><thead><tr><th rowspan="2" style="width:9%">구분</th><th class="g1" colspan="3">수 신</th><th class="g2" colspan="3">여 신</th><th class="g3" colspan="2">연체율</th></tr>
     <tr><th>목표(A)</th><th>잔액(B)</th><th>차액(C=A−B)</th><th>목표</th><th>잔액</th><th>차액(C=A−B)</th><th>목표</th><th>현황</th></tr></thead><tbody>
-    <tr><td class="l">본 점</td><td>${pfN(Y.dep_hq_t)}</td><td>${pfN(r.dep_hq)}</td>${cell(dif(Y.dep_hq_t, r.dep_hq))}<td>${pfN(Y.loan_hq_t)}</td><td>${pfN(r.loan_hq)}</td>${cell(dif(Y.loan_hq_t, r.loan_hq))}<td></td><td></td></tr>
-    <tr><td class="l">지 점</td><td>${pfN(Y.dep_br_t)}</td><td>${pfN(r.dep_br)}</td>${cell(dif(Y.dep_br_t, r.dep_br))}<td>${pfN(Y.loan_br_t)}</td><td>${pfN(r.loan_br)}</td>${cell(dif(Y.loan_br_t, r.loan_br))}<td></td><td></td></tr>
-    <tr class="sum"><td class="l" style="background:#fff6d6">합 산</td><td>${pfN(dTot)}</td><td>${pfN(c.dep)}</td>${cell(dTot === null ? '' : dTot - c.dep)}<td>${pfN(lTot)}</td><td>${pfN(c.loan)}</td>${cell(lTot === null ? '' : lTot - c.loan)}<td>${dT === null ? '-' : pfP(dT) + '%'}</td><td class="${ok ? 'g' : 'd'}">${pfP(dd)}%</td></tr></tbody></table></div>`;
+    <tr><td class="l">본 점</td><td>${pfE(Y.dep_hq_t)}</td><td>${pfE(r.dep_hq)}</td>${cell(dif(Y.dep_hq_t, r.dep_hq))}<td>${pfE(Y.loan_hq_t)}</td><td>${pfE(r.loan_hq)}</td>${cell(dif(Y.loan_hq_t, r.loan_hq))}<td></td><td></td></tr>
+    <tr><td class="l">지 점</td><td>${pfE(Y.dep_br_t)}</td><td>${pfE(r.dep_br)}</td>${cell(dif(Y.dep_br_t, r.dep_br))}<td>${pfE(Y.loan_br_t)}</td><td>${pfE(r.loan_br)}</td>${cell(dif(Y.loan_br_t, r.loan_br))}<td></td><td></td></tr>
+    <tr class="sum"><td class="l" style="background:#fff6d6">합 산</td><td>${pfE(dTot)}</td><td>${pfE(c.dep)}</td>${cell(dTot === null ? '' : dTot - c.dep)}<td>${pfE(lTot)}</td><td>${pfE(c.loan)}</td>${cell(lTot === null ? '' : lTot - c.loan)}<td>${dT === null ? '-' : pfP(dT) + '%'}</td><td class="${ok ? 'g' : 'd'}">${pfP(dd)}%</td></tr></tbody></table></div>`;
   const note = (has(Y.prev_dep) || has(Y.prev_loan) || has(Y.prev_delinq))
-    ? `※ ${yr - 1}년말 수신 ${pfN(Y.prev_dep)}백만원, 여신 ${pfN(Y.prev_loan)}백만원, 연체율 ${has(Y.prev_delinq) ? pfP(Y.prev_delinq) + '%' : '-'}` : (adm ? `※ ${yr - 1}년말 기준값은 “⚙ 목표·전년말”에서 입력해주세요.` : '');
+    ? `※ ${yr - 1}년말 수신 ${pfE(Y.prev_dep)}, 여신 ${pfE(Y.prev_loan)}, 연체율 ${has(Y.prev_delinq) ? pfP(Y.prev_delinq) + '%' : '-'}` : (adm ? `※ ${yr - 1}년말 기준값은 “⚙ 목표·전년말”에서 입력해주세요.` : '');
   const noGoal = !perfYears[yr] ? `<div class="pfnote" style="margin-top:12px">${adm ? `${yr}년 목표가 아직 없어요. “⚙ 목표·전년말”에서 연 1회 설정하면 달성률이 표시돼요.` : `${yr}년 목표가 아직 설정되지 않았어요.`}</div>` : '';
   el.innerHTML = `<div class="pfcard">
-    <div class="pfh"><b>📊 여수신 현황</b><span class="pftag">${pfMd(r.base_date)}(${pfDow(r.base_date)}) 기준</span><span class="m" style="color:var(--muted);font-size:13px">단위: 백만원, %</span><span class="sp"></span>
+    <div class="pfh"><b>📊 여수신 현황</b><span class="pftag">${pfMd(r.base_date)}(${pfDow(r.base_date)}) 기준</span><span class="m" style="color:var(--muted);font-size:13px">단위: 억원, %</span><span class="sp"></span>
       <span class="pfnav"><button data-pf="prev" title="이전 영업일" ${c.i > 0 ? '' : 'disabled'}>◀</button><button data-pf="next" title="다음 영업일" ${c.i < perfRows.length - 1 ? '' : 'disabled'}>▶</button></span>${btns}</div>
     <div class="pfkpis">
-      ${pfKpi('b', '수신', c.dep, c.depT, c.pDep === null ? null : c.dep - c.pDep, yearVs(c.dep, Y.prev_dep, `전년말(${pfN(Y.prev_dep)})`), Number(r.dep_hq), Number(r.dep_br))}
-      ${pfKpi('p', '여신', c.loan, c.loanT, c.pLoan === null ? null : c.loan - c.pLoan, yearVs(c.loan, Y.prev_loan, `전년말(${pfN(Y.prev_loan)})`), Number(r.loan_hq), Number(r.loan_br))}
+      ${pfKpi('b', '수신', c.dep, c.depT, c.pDep === null ? null : c.dep - c.pDep, yearVs(c.dep, Y.prev_dep, `전년말(${pfE(Y.prev_dep)})`), Number(r.dep_hq), Number(r.dep_br))}
+      ${pfKpi('p', '여신', c.loan, c.loanT, c.pLoan === null ? null : c.loan - c.pLoan, yearVs(c.loan, Y.prev_loan, `전년말(${pfE(Y.prev_loan)})`), Number(r.loan_hq), Number(r.loan_br))}
       <div class="pfk r"><div class="t"><span>연체율</span>${dT !== null ? `<span class="pill ${ok ? 'ok' : ''}">${ok ? `목표 달성 −${pfP(dT - dd)}%p` : `목표 초과 +${pfP(dd - dT)}%p`}</span>` : '<span class="pill">목표 미설정</span>'}</div>
         <div class="big">${pfP(dd)}%${dT !== null ? `<small>/ 목표 ${pfP(dT)}%</small>` : ''}</div>
         ${dT !== null ? `<div class="pfbar"><i style="width:${ok ? 100 : Math.min(100, dT / dd * 100)}%;background:${ok ? 'linear-gradient(90deg,#86efac,#12a150)' : 'linear-gradient(90deg,#fca5a5,#e5484d)'}"></i></div>` : ''}
@@ -203,28 +208,27 @@ function pfOpenIn(date){
   if (!isAdmin()) return;
   const d = date || pfPrevBizDay();
   $('pfInPanel').innerHTML = `<div class="ph"><h2>여수신 실적 입력</h2><button class="x" data-f="close">✕</button></div>
-    <div class="pfsub">단위: 백만원 · 같은 날짜를 다시 저장하면 덮어써요</div>
+    <div class="pfsub">단위: 억원 · 소수 둘째 자리까지 (예: 990.79) · 같은 날짜를 다시 저장하면 덮어써요</div>
     <label>기준일 <span style="color:var(--danger)">*</span> <span class="muted" style="font-weight:500">(기본값: 전 영업일)</span></label><input id="pfDate" type="date" />
-    <div class="pfform"><div><label>수신 · 본점</label><input id="pfDepHq" inputmode="numeric" /></div><div><label>수신 · 지점</label><input id="pfDepBr" inputmode="numeric" /></div>
-      <div><label>여신 · 본점</label><input id="pfLoanHq" inputmode="numeric" /></div><div><label>여신 · 지점</label><input id="pfLoanBr" inputmode="numeric" /></div></div>
+    <div class="pfform"><div><label>수신 · 본점 (억원)</label><input id="pfDepHq" inputmode="decimal" placeholder="0.00" /></div><div><label>수신 · 지점 (억원)</label><input id="pfDepBr" inputmode="decimal" placeholder="0.00" /></div>
+      <div><label>여신 · 본점 (억원)</label><input id="pfLoanHq" inputmode="decimal" placeholder="0.00" /></div><div><label>여신 · 지점 (억원)</label><input id="pfLoanBr" inputmode="decimal" placeholder="0.00" /></div></div>
     <label>연체율 현황 (%) — 본점·지점 합산</label><input id="pfDq" inputmode="decimal" placeholder="예: 2.88" style="max-width:200px;text-align:right;font-weight:700" />
     <div id="pfInfo" class="pfsub" style="margin-top:8px"></div>
     <div class="acts" style="margin-top:20px;justify-content:space-between"><div style="display:flex;gap:8px"><button class="btn primary" data-f="save" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" data-f="close" style="min-height:44px">취소</button></div><button class="btn danger" data-f="del" id="pfDel" style="display:none">이 날짜 삭제</button></div>`;
   $('pfDate').value = d;
   const fill = () => {
     const row = perfRows.find(r => r.base_date === $('pfDate').value);
-    $('pfDepHq').value = row ? Number(row.dep_hq).toLocaleString('ko-KR') : ''; $('pfDepBr').value = row ? Number(row.dep_br).toLocaleString('ko-KR') : '';
-    $('pfLoanHq').value = row ? Number(row.loan_hq).toLocaleString('ko-KR') : ''; $('pfLoanBr').value = row ? Number(row.loan_br).toLocaleString('ko-KR') : '';
+    $('pfDepHq').value = row ? pfEn(row.dep_hq) : ''; $('pfDepBr').value = row ? pfEn(row.dep_br) : '';
+    $('pfLoanHq').value = row ? pfEn(row.loan_hq) : ''; $('pfLoanBr').value = row ? pfEn(row.loan_br) : '';
     $('pfDq').value = row ? Number(row.delinq).toFixed(2) : '';
     $('pfDel').style.display = row ? '' : 'none';
     const v = $('pfDate').value; $('pfInfo').textContent = row ? `✏️ ${v}(${pfDow(v)}) 실적이 이미 있어요. 고쳐서 저장하면 덮어써요.` : (v ? `${v}(${pfDow(v)})${pfIsHoliday(v) ? ' · 휴일' : ''}` : '');
   };
   fill(); $('pfDate').onchange = fill;
-  ['pfDepHq', 'pfDepBr', 'pfLoanHq', 'pfLoanBr'].forEach(id => { $(id).oninput = () => { $(id).value = pfComma($(id).value); }; });
+  ['pfDepHq', 'pfDepBr', 'pfLoanHq', 'pfLoanBr'].forEach(id => { $(id).oninput = () => { $(id).value = pfEfmt($(id).value); }; });
   $('pfOvIn').style.display = 'block'; document.body.style.overflow = 'hidden';
   setTimeout(() => { try { $('pfDepHq').focus(); } catch (x) {} }, 50);
 }
-const pfComma = (s) => { const n = pfNum(s); return n === null ? '' : n.toLocaleString('ko-KR'); };
 function pfCloseIn(){ $('pfOvIn').style.display = 'none'; document.body.style.overflow = ''; }
 $('pfInPanel').addEventListener('click', async (ev) => {
   const b = ev.target.closest('[data-f]'); if (!b) return;
@@ -236,7 +240,7 @@ $('pfInPanel').addEventListener('click', async (ev) => {
     if (error) return alert(error.message);
     pfCloseIn(); toast('삭제했어요'); return loadPerf();
   }
-  const v = { dep_hq: pfNum($('pfDepHq').value), dep_br: pfNum($('pfDepBr').value), loan_hq: pfNum($('pfLoanHq').value), loan_br: pfNum($('pfLoanBr').value), delinq: pfDec($('pfDq').value) };
+  const v = { dep_hq: pfEin($('pfDepHq').value), dep_br: pfEin($('pfDepBr').value), loan_hq: pfEin($('pfLoanHq').value), loan_br: pfEin($('pfLoanBr').value), delinq: pfDec($('pfDq').value) };
   if (!date) return alert('기준일을 선택해주세요.');
   if (Object.values(v).some(x => x === null)) return alert('수신·여신 잔액(본점/지점)과 연체율을 모두 입력해주세요.');
   if (date > kstToday()) return alert('오늘 이후 날짜는 입력할 수 없어요.');
@@ -252,25 +256,25 @@ function pfOpenTg(year){
   if (!isAdmin()) return;
   const y = year || (perfSel ? +perfSel.slice(0, 4) : +kstToday().slice(0, 4));
   $('pfTgPanel').innerHTML = `<div class="ph"><h2>연 목표 · 전년말 기준값</h2><button class="x" data-g="close">✕</button></div>
-    <div class="pfsub">단위: 백만원 · 연 1회 설정해요</div>
+    <div class="pfsub">단위: 억원 · 소수 둘째 자리까지 (예: 1,040.00) · 연 1회 설정해요</div>
     <label>연도</label><input id="pgYear" type="number" min="2000" max="2100" style="max-width:140px" />
     <div class="pfsub" style="margin-top:14px;font-weight:800;color:#44546f">연 목표 (A)</div>
-    <div class="pfform"><div><label>수신 · 본점</label><input id="pgDepHq" inputmode="numeric" /></div><div><label>수신 · 지점</label><input id="pgDepBr" inputmode="numeric" /></div>
-      <div><label>여신 · 본점</label><input id="pgLoanHq" inputmode="numeric" /></div><div><label>여신 · 지점</label><input id="pgLoanBr" inputmode="numeric" /></div></div>
+    <div class="pfform"><div><label>수신 · 본점 (억원)</label><input id="pgDepHq" inputmode="decimal" placeholder="0.00" /></div><div><label>수신 · 지점 (억원)</label><input id="pgDepBr" inputmode="decimal" placeholder="0.00" /></div>
+      <div><label>여신 · 본점 (억원)</label><input id="pgLoanHq" inputmode="decimal" placeholder="0.00" /></div><div><label>여신 · 지점 (억원)</label><input id="pgLoanBr" inputmode="decimal" placeholder="0.00" /></div></div>
     <label>연체율 목표 (%)</label><input id="pgDq" inputmode="decimal" placeholder="예: 1.50" style="max-width:200px;text-align:right;font-weight:700" />
     <div class="pfsub" style="margin-top:16px;font-weight:800;color:#44546f">전년말 기준값 (각주·전년말 대비에 사용)</div>
-    <div class="pfform"><div><label>전년말 수신 (합계)</label><input id="pgPDep" inputmode="numeric" /></div><div><label>전년말 여신 (합계)</label><input id="pgPLoan" inputmode="numeric" /></div></div>
+    <div class="pfform"><div><label>전년말 수신 합계 (억원)</label><input id="pgPDep" inputmode="decimal" placeholder="0.00" /></div><div><label>전년말 여신 합계 (억원)</label><input id="pgPLoan" inputmode="decimal" placeholder="0.00" /></div></div>
     <label>전년말 연체율 (%)</label><input id="pgPDq" inputmode="decimal" placeholder="예: 3.56" style="max-width:200px;text-align:right;font-weight:700" />
     <div class="acts" style="margin-top:20px"><button class="btn primary" data-g="save" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" data-g="close" style="min-height:44px">취소</button></div>`;
   $('pgYear').value = y;
   const fill = () => {
-    const Y = perfYears[+$('pgYear').value] || {}, c = (n) => n === null || n === undefined ? '' : Number(n).toLocaleString('ko-KR');
+    const Y = perfYears[+$('pgYear').value] || {}, c = (n) => pfEn(n);
     $('pgDepHq').value = c(Y.dep_hq_t); $('pgDepBr').value = c(Y.dep_br_t); $('pgLoanHq').value = c(Y.loan_hq_t); $('pgLoanBr').value = c(Y.loan_br_t);
     $('pgDq').value = Y.delinq_t === null || Y.delinq_t === undefined ? '' : Number(Y.delinq_t).toFixed(2);
     $('pgPDep').value = c(Y.prev_dep); $('pgPLoan').value = c(Y.prev_loan); $('pgPDq').value = Y.prev_delinq === null || Y.prev_delinq === undefined ? '' : Number(Y.prev_delinq).toFixed(2);
   };
   fill(); $('pgYear').onchange = fill;
-  ['pgDepHq', 'pgDepBr', 'pgLoanHq', 'pgLoanBr', 'pgPDep', 'pgPLoan'].forEach(id => { $(id).oninput = () => { $(id).value = pfComma($(id).value); }; });
+  ['pgDepHq', 'pgDepBr', 'pgLoanHq', 'pgLoanBr', 'pgPDep', 'pgPLoan'].forEach(id => { $(id).oninput = () => { $(id).value = pfEfmt($(id).value); }; });
   $('pfOvTg').style.display = 'block'; document.body.style.overflow = 'hidden';
 }
 function pfCloseTg(){ $('pfOvTg').style.display = 'none'; document.body.style.overflow = ''; }
@@ -279,8 +283,8 @@ $('pfTgPanel').addEventListener('click', async (ev) => {
   if (b.dataset.g === 'close') return pfCloseTg();
   const year = +$('pgYear').value;
   if (!year || year < 2000 || year > 2100) return alert('연도를 확인해주세요.');
-  const row = { year, dep_hq_t: pfNum($('pgDepHq').value), dep_br_t: pfNum($('pgDepBr').value), loan_hq_t: pfNum($('pgLoanHq').value), loan_br_t: pfNum($('pgLoanBr').value), delinq_t: pfDec($('pgDq').value),
-    prev_dep: pfNum($('pgPDep').value), prev_loan: pfNum($('pgPLoan').value), prev_delinq: pfDec($('pgPDq').value), updated_by: me, updated_at: new Date().toISOString() };
+  const row = { year, dep_hq_t: pfEin($('pgDepHq').value), dep_br_t: pfEin($('pgDepBr').value), loan_hq_t: pfEin($('pgLoanHq').value), loan_br_t: pfEin($('pgLoanBr').value), delinq_t: pfDec($('pgDq').value),
+    prev_dep: pfEin($('pgPDep').value), prev_loan: pfEin($('pgPLoan').value), prev_delinq: pfDec($('pgPDq').value), updated_by: me, updated_at: new Date().toISOString() };
   b.disabled = true;
   const { error } = await sb.from('perf_year').upsert(row, { onConflict: 'year' });
   b.disabled = false;

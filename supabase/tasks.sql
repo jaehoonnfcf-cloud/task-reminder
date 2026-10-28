@@ -381,7 +381,7 @@ grant select, insert, delete on public.appraisal_comments to authenticated;
 grant all on public.appraisal_comments to service_role;
 alter publication supabase_realtime add table public.appraisal_comments;
 
--- 현황판(여수신 실적): perf_daily(일별 실적, 단위 백만원) / perf_year(연 목표 + 전년말 기준값).
+-- 현황판(여수신 실적): perf_daily(일별 실적, 저장 단위 백만원 — 화면·입력은 억원으로 환산) / perf_year(연 목표 + 전년말 기준값).
 -- 조회는 팀원 전체, 입력·수정·삭제는 관리자만. 연체율은 본점·지점 합산 지표.
 create table if not exists public.perf_daily (
   base_date date primary key,
