@@ -55,15 +55,14 @@ function pfPrevBizDay(from = kstToday()){
   .pfbar{ height:10px; background:#fff; border-radius:99px; margin-top:10px; overflow:hidden; } .pfbar i{ display:block; height:100%; border-radius:99px; }
   .pfrow{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:#5a6172; margin-top:6px; font-weight:600; } .pfrow b{ color:var(--ink); }
   .pfrow .gd{ color:var(--green); font-weight:800; } .pfrow .bd{ color:#e5484d; font-weight:800; } .pfrow .tg{ color:var(--accent); font-weight:800; } .pfrow .fl{ color:var(--muted); font-weight:700; }
-  .pfsplit{ display:flex; height:8px; border-radius:99px; overflow:hidden; margin-top:12px; background:#fff; } .pfsplit i{ display:block; }
-  .pfsl{ display:flex; justify-content:space-between; font-size:11.5px; color:#5a6172; margin-top:4px; font-weight:600; }
-  .pftwo{ display:grid; grid-template-columns:1.7fr 1fr; gap:14px; margin-top:14px; }
+  .pftwo{ display:grid; grid-template-columns:1fr; gap:14px; margin-top:14px; }
+  .pfbrs{ margin-top:12px; padding-top:10px; border-top:1px dashed rgba(60,70,110,.22); display:flex; flex-direction:column; gap:10px; }
+  .pfbt{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:13px; } .pfbt b{ font-weight:800; } .pfbt em{ font-style:normal; color:var(--muted); font-weight:600; font-size:12px; } .pfbp{ font-weight:800; font-size:13.5px; white-space:nowrap; }
+  .pfbar.sm{ height:8px; margin-top:5px; }
   .pfmini{ background:#f7f8fb; border-radius:20px; padding:14px 16px; min-width:0; }
   .pfmini .tt{ font-size:13px; font-weight:800; }
   .pftabs{ display:inline-flex; background:#eef0f6; border-radius:99px; padding:3px; gap:2px; }
   .pftabs button{ border:0; background:transparent; padding:5px 13px; border-radius:99px; font-size:12.5px; font-weight:800; color:#6a7185; cursor:pointer; } .pftabs button.on{ background:#fff; color:var(--accent); box-shadow:0 1px 3px rgba(20,24,40,.12); }
-  .pfgoal{ font-size:12.5px; font-weight:700; margin-top:10px; display:flex; justify-content:space-between; } .pfgoal:first-of-type{ margin-top:8px; }
-  .pfgb{ height:8px; background:#e4e8f3; border-radius:99px; overflow:hidden; margin-top:4px; } .pfgb i{ display:block; height:100%; border-radius:99px; }
   .pfm{ overflow-x:auto; margin-top:10px; } table.pft{ width:100%; min-width:640px; border-collapse:separate; border-spacing:0; font-size:14px; font-variant-numeric:tabular-nums; }
   table.pft th{ background:#f3f5fa; padding:8px 10px; font-size:12px; color:#5a6172; font-weight:800; text-align:center; border-bottom:1px solid #e8ebf3; }
   table.pft th.g1{ background:#e9efff; color:#2f55c8; } table.pft th.g2{ background:#efeaff; color:#5b3fc4; } table.pft th.g3{ background:#fff1e0; color:#a54800; }
@@ -112,6 +111,11 @@ function pfCalc(){
   return o;
 }
 
+// 본점·지점 각각의 목표 대비 진행 (합산과 같은 '채워지는 막대')
+function pfBr(name, v, t, color){
+  const has = t !== null && t !== undefined && Number(t) > 0, rate = has ? v / Number(t) * 100 : null;
+  return `<div class="pfbr"><div class="pfbt"><span><b>${name}</b> ${pfE(v)}${has ? `<em> / 목표 ${pfE(t)}</em>` : ''}</span>${has ? `<span class="pfbp" style="color:${rate >= 100 ? 'var(--green)' : 'var(--ink)'}">${pfP(rate, 1)}%</span>` : '<em>목표 미설정</em>'}</div>${has ? `<div class="pfbar sm"><i style="width:${Math.min(100, rate)}%;background:${color}"></i></div>` : ''}</div>`;
+}
 function pfKpi(cls, title, val, tgt, dPrev, dYear, hq, br, hqT, brT){
   const rate = tgt ? val / tgt * 100 : null, left = tgt ? tgt - val : null;
   const col = cls === 'b' ? ['#6f93ff', '#3563e9', '#9db8ff'] : ['#a78bfa', '#6d4df2', '#c4b5fd'];
@@ -120,8 +124,7 @@ function pfKpi(cls, title, val, tgt, dPrev, dYear, hq, br, hqT, brT){
     ${rate !== null ? `<div class="pfbar"><i style="width:${Math.min(100, rate)}%;background:linear-gradient(90deg,${col[0]},${col[1]})"></i></div>` : ''}
     <div class="pfrow"><span>${left !== null ? (left > 0 ? `목표까지 <b class="tg">${pfE(left)}</b>` : `목표 초과 <b class="gd">${pfE(-left)}</b>`) : '&nbsp;'}</span><span>${dPrev === null ? '' : `전 영업일 대비 <span class="${pfCls(dPrev)}">${pfSignedE(dPrev)} ${dPrev > 0 ? '증가' : dPrev < 0 ? '감소' : ''}</span>`}</span></div>
     <div class="pfrow"><span>${dYear === null ? '&nbsp;' : `${dYear.label} 대비`}</span>${dYear === null ? '' : `<b class="${pfCls(dYear.v)}">${pfSignedE(dYear.v)} ${dYear.v > 0 ? '증가' : dYear.v < 0 ? '감소' : ''} (${dYear.pct >= 0 ? '+' : ''}${pfP(dYear.pct, 1)}%)</b>`}</div>
-    <div class="pfsplit"><i style="width:${(hq + br) ? hq / (hq + br) * 100 : 50}%;background:${col[1]}"></i><i style="width:${(hq + br) ? br / (hq + br) * 100 : 50}%;background:${col[2]}"></i></div>
-    <div class="pfsl"><span>본점 ${pfE(hq)}</span><span>지점 ${pfE(br)}</span></div></div>`;
+    <div class="pfbrs">${pfBr('본점', hq, hqT, col[1])}${pfBr('지점', br, brT, col[1])}</div></div>`;
 }
 
 function pfChart(){
@@ -171,7 +174,6 @@ function renderPerf(){
   const dd = Number(r.delinq), dT = Y.delinq_t === null || Y.delinq_t === undefined ? null : Number(Y.delinq_t);
   const dPrevDq = prev ? dd - Number(prev.delinq) : null, dYearDq = Y.prev_delinq === null || Y.prev_delinq === undefined ? null : dd - Number(Y.prev_delinq);
   const ok = dT !== null && dd <= dT;
-  const goals = [['수신 본점', r.dep_hq, Y.dep_hq_t, '#3563e9'], ['수신 지점', r.dep_br, Y.dep_br_t, '#3563e9'], ['여신 본점', r.loan_hq, Y.loan_hq_t, '#6d4df2'], ['여신 지점', r.loan_br, Y.loan_br_t, '#6d4df2']];
   const has = (v) => v !== null && v !== undefined;
   const dif = (t, b) => !has(t) ? '' : (Number(t) - Number(b));
   const cell = (d) => d === '' ? '<td></td>' : `<td class="${d > 0 ? 'd' : 'g'}">${pfE(d)}</td>`;
@@ -189,8 +191,8 @@ function renderPerf(){
     <div class="pfh"><b>📊 여수신 현황</b><span class="pftag">${pfMd(r.base_date)}(${pfDow(r.base_date)}) 기준</span><span class="m" style="color:var(--muted);font-size:13px">단위: 억원, %</span><span class="sp"></span>
       <span class="pfnav"><button data-pf="prev" title="이전 영업일" ${c.i > 0 ? '' : 'disabled'}>◀</button><button data-pf="next" title="다음 영업일" ${c.i < perfRows.length - 1 ? '' : 'disabled'}>▶</button></span>${btns}</div>
     <div class="pfkpis">
-      ${pfKpi('b', '수신', c.dep, c.depT, c.pDep === null ? null : c.dep - c.pDep, yearVs(c.dep, Y.prev_dep, `전년말(${pfE(Y.prev_dep)})`), Number(r.dep_hq), Number(r.dep_br))}
-      ${pfKpi('p', '여신', c.loan, c.loanT, c.pLoan === null ? null : c.loan - c.pLoan, yearVs(c.loan, Y.prev_loan, `전년말(${pfE(Y.prev_loan)})`), Number(r.loan_hq), Number(r.loan_br))}
+      ${pfKpi('b', '수신', c.dep, c.depT, c.pDep === null ? null : c.dep - c.pDep, yearVs(c.dep, Y.prev_dep, `전년말(${pfE(Y.prev_dep)})`), Number(r.dep_hq), Number(r.dep_br), Y.dep_hq_t, Y.dep_br_t)}
+      ${pfKpi('p', '여신', c.loan, c.loanT, c.pLoan === null ? null : c.loan - c.pLoan, yearVs(c.loan, Y.prev_loan, `전년말(${pfE(Y.prev_loan)})`), Number(r.loan_hq), Number(r.loan_br), Y.loan_hq_t, Y.loan_br_t)}
       <div class="pfk r"><div class="t"><span>연체율</span>${dT !== null ? `<span class="pill ${ok ? 'ok' : ''}">${ok ? `목표 달성 −${pfP(dT - dd)}%p` : `목표 초과 +${pfP(dd - dT)}%p`}</span>` : '<span class="pill">목표 미설정</span>'}</div>
         <div class="big">${pfP(dd)}%${dT !== null ? `<small>/ 목표 ${pfP(dT)}%</small>` : ''}</div>
         ${dT !== null ? `<div class="pfbar"><i style="width:${ok ? 100 : Math.min(100, dT / dd * 100)}%;background:${ok ? 'linear-gradient(90deg,#86efac,#12a150)' : 'linear-gradient(90deg,#fca5a5,#e5484d)'}"></i></div>` : ''}
@@ -199,7 +201,6 @@ function renderPerf(){
     </div>
     <div class="pftwo">
       <div class="pfmini"><div class="pfh"><div class="tt">추이 (최근 ${Math.min(20, c.i + 1)}영업일)</div><span class="sp"></span><span class="pftabs">${[['dep', '수신'], ['loan', '여신'], ['delinq', '연체율']].map(([k, n]) => `<button data-pf="tab" data-t="${k}" class="${perfTab === k ? 'on' : ''}">${n}</button>`).join('')}</span></div>${pfChart()}</div>
-      <div class="pfmini"><div class="tt">본점 · 지점 달성률</div>${goals.map(([n, v, t, col]) => has(t) && Number(t) ? `<div class="pfgoal"><span>${n}</span><span>${pfP(Number(v) / Number(t) * 100, 1)}%</span></div><div class="pfgb"><i style="width:${Math.min(100, Number(v) / Number(t) * 100)}%;background:${col}"></i></div>` : `<div class="pfgoal"><span>${n}</span><span class="m" style="color:var(--muted)">목표 미설정</span></div>`).join('')}</div>
     </div>
     <div class="pfh" style="margin-top:18px"><b style="font-size:15px">상세표</b><span class="m" style="color:var(--muted);font-size:13px">보고용 양식</span><span class="sp"></span><button class="btn small" data-pf="table">${perfTable ? '접기 ▴' : '펼치기 ▾'}</button></div>
     ${perfTable ? tbl : ''}${note ? `<div class="pfnote">${esc(note)}</div>` : ''}${noGoal}</div>`;
