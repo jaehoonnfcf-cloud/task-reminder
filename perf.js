@@ -17,7 +17,8 @@ const pfDow = (iso) => ['일', '월', '화', '수', '목', '금', '토'][new Dat
 const pfMd = (iso) => `${+iso.slice(5, 7)}. ${+iso.slice(8, 10)}`;
 const pfSigned = (n, unit = '') => n === 0 ? `±0${unit}` : `${n > 0 ? '▲' : '▼'}${Math.abs(n).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}${unit}`;
 const pfSignedE = (n) => n === 0 ? '±0.00억원' : `${n > 0 ? '▲' : '▼'}${pfE(Math.abs(n))}`;
-const pfCls = (n) => n > 0 ? 'up' : n < 0 ? 'dn' : 'fl';
+// 좋아진 방향은 초록, 나빠진 방향은 빨강 (잔액은 증가가 좋음, 연체율은 감소가 좋음). 화살표는 실제 증감 방향 그대로
+const pfCls = (n, inv = false) => n === 0 ? 'fl' : (n > 0) !== inv ? 'gd' : 'bd';
 const pfAdd = (iso, n) => new Date(Date.parse(iso + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
 
 // 휴일(주말 + 조합 달력의 공휴일)을 건너뛴 직전 영업일
@@ -52,7 +53,7 @@ function pfPrevBizDay(from = kstToday()){
   .pfk .big small{ font-size:13px; font-weight:700; color:var(--muted); margin-left:6px; letter-spacing:0; white-space:nowrap; display:inline-block; }
   .pfbar{ height:10px; background:#fff; border-radius:99px; margin-top:10px; overflow:hidden; } .pfbar i{ display:block; height:100%; border-radius:99px; }
   .pfrow{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:#5a6172; margin-top:6px; font-weight:600; } .pfrow b{ color:var(--ink); }
-  .pfrow .up,.up{ color:#e5484d; font-weight:800; } .pfrow .dn,.dn{ color:#2f55c8; font-weight:800; } .pfrow .fl{ color:var(--muted); font-weight:700; }
+  .pfrow .gd{ color:var(--green); font-weight:800; } .pfrow .bd{ color:#e5484d; font-weight:800; } .pfrow .tg{ color:var(--accent); font-weight:800; } .pfrow .fl{ color:var(--muted); font-weight:700; }
   .pfsplit{ display:flex; height:8px; border-radius:99px; overflow:hidden; margin-top:12px; background:#fff; } .pfsplit i{ display:block; }
   .pfsl{ display:flex; justify-content:space-between; font-size:11.5px; color:#5a6172; margin-top:4px; font-weight:600; }
   .pftwo{ display:grid; grid-template-columns:1.7fr 1fr; gap:14px; margin-top:14px; }
@@ -116,8 +117,8 @@ function pfKpi(cls, title, val, tgt, dPrev, dYear, hq, br, hqT, brT){
   return `<div class="pfk ${cls}"><div class="t"><span>${title} (합산)</span>${rate !== null ? `<span class="pill ${rate >= 100 ? 'ok' : ''}">달성률 ${pfP(rate, 1)}%</span>` : '<span class="pill">목표 미설정</span>'}</div>
     <div class="big">${pfE(val)}${tgt ? `<small>/ 목표 ${pfE(tgt)}</small>` : ''}</div>
     ${rate !== null ? `<div class="pfbar"><i style="width:${Math.min(100, rate)}%;background:linear-gradient(90deg,${col[0]},${col[1]})"></i></div>` : ''}
-    <div class="pfrow"><span>${left !== null ? (left > 0 ? `목표까지 <b class="up">${pfE(left)}</b>` : `목표 초과 <b class="dn">${pfE(-left)}</b>`) : '&nbsp;'}</span><span>${dPrev === null ? '' : `전 영업일 대비 <span class="${pfCls(dPrev)}">${pfSignedE(dPrev)}</span>`}</span></div>
-    <div class="pfrow"><span>${dYear === null ? '&nbsp;' : `${dYear.label} 대비`}</span>${dYear === null ? '' : `<b class="${pfCls(dYear.v)}">${pfSignedE(dYear.v)} (${dYear.pct >= 0 ? '+' : ''}${pfP(dYear.pct, 1)}%)</b>`}</div>
+    <div class="pfrow"><span>${left !== null ? (left > 0 ? `목표까지 <b class="tg">${pfE(left)}</b>` : `목표 초과 <b class="gd">${pfE(-left)}</b>`) : '&nbsp;'}</span><span>${dPrev === null ? '' : `전 영업일 대비 <span class="${pfCls(dPrev)}">${pfSignedE(dPrev)} ${dPrev > 0 ? '증가' : dPrev < 0 ? '감소' : ''}</span>`}</span></div>
+    <div class="pfrow"><span>${dYear === null ? '&nbsp;' : `${dYear.label} 대비`}</span>${dYear === null ? '' : `<b class="${pfCls(dYear.v)}">${pfSignedE(dYear.v)} ${dYear.v > 0 ? '증가' : dYear.v < 0 ? '감소' : ''} (${dYear.pct >= 0 ? '+' : ''}${pfP(dYear.pct, 1)}%)</b>`}</div>
     <div class="pfsplit"><i style="width:${(hq + br) ? hq / (hq + br) * 100 : 50}%;background:${col[1]}"></i><i style="width:${(hq + br) ? br / (hq + br) * 100 : 50}%;background:${col[2]}"></i></div>
     <div class="pfsl"><span>본점 ${pfE(hq)}</span><span>지점 ${pfE(br)}</span></div></div>`;
 }
@@ -192,8 +193,8 @@ function renderPerf(){
       <div class="pfk r"><div class="t"><span>연체율</span>${dT !== null ? `<span class="pill ${ok ? 'ok' : ''}">${ok ? `목표 달성 −${pfP(dT - dd)}%p` : `목표 초과 +${pfP(dd - dT)}%p`}</span>` : '<span class="pill">목표 미설정</span>'}</div>
         <div class="big">${pfP(dd)}%${dT !== null ? `<small>/ 목표 ${pfP(dT)}%</small>` : ''}</div>
         ${dT !== null ? `<div class="pfbar"><i style="width:${ok ? 100 : Math.min(100, dT / dd * 100)}%;background:${ok ? 'linear-gradient(90deg,#86efac,#12a150)' : 'linear-gradient(90deg,#fca5a5,#e5484d)'}"></i></div>` : ''}
-        <div class="pfrow"><span>${dT !== null ? (ok ? '목표 이내' : `목표(낮을수록 좋음)까지 <b class="up">${pfP(dd - dT)}%p</b>`) : '&nbsp;'}</span><span>${dPrevDq === null ? '' : `전 영업일 <span class="${pfCls(dPrevDq)}">${pfSigned(dPrevDq, '%p')}</span>`}</span></div>
-        <div class="pfrow"><span>${dYearDq === null ? '&nbsp;' : `전년말(${pfP(Y.prev_delinq)}%) 대비`}</span>${dYearDq === null ? '' : `<b class="${pfCls(dYearDq)}">${pfSigned(dYearDq, '%p')} ${dYearDq < 0 ? '개선' : dYearDq > 0 ? '악화' : ''}</b>`}</div></div>
+        <div class="pfrow"><span>${dT !== null ? (ok ? '목표 이내' : `목표(낮을수록 좋음)까지 <b class="tg">${pfP(dd - dT)}%p</b>`) : '&nbsp;'}</span><span>${dPrevDq === null ? '' : `전 영업일 <span class="${pfCls(dPrevDq, true)}">${pfSigned(dPrevDq, '%p')} ${dPrevDq > 0 ? '상승' : dPrevDq < 0 ? '하락' : ''}</span>`}</span></div>
+        <div class="pfrow"><span>${dYearDq === null ? '&nbsp;' : `전년말(${pfP(Y.prev_delinq)}%) 대비`}</span>${dYearDq === null ? '' : `<b class="${pfCls(dYearDq, true)}">${pfSigned(dYearDq, '%p')} ${dYearDq < 0 ? '개선' : dYearDq > 0 ? '악화' : ''}</b>`}</div></div>
     </div>
     <div class="pftwo">
       <div class="pfmini"><div class="pfh"><div class="tt">추이 (최근 ${Math.min(20, c.i + 1)}영업일)</div><span class="sp"></span><span class="pftabs">${[['dep', '수신'], ['loan', '여신'], ['delinq', '연체율']].map(([k, n]) => `<button data-pf="tab" data-t="${k}" class="${perfTab === k ? 'on' : ''}">${n}</button>`).join('')}</span></div>${pfChart()}</div>
