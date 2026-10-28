@@ -380,3 +380,32 @@ create policy acm_del on public.appraisal_comments for delete to authenticated u
 grant select, insert, delete on public.appraisal_comments to authenticated;
 grant all on public.appraisal_comments to service_role;
 alter publication supabase_realtime add table public.appraisal_comments;
+
+-- 현황판(여수신 실적): perf_daily(일별 실적, 단위 백만원) / perf_year(연 목표 + 전년말 기준값).
+-- 조회는 팀원 전체, 입력·수정·삭제는 관리자만. 연체율은 본점·지점 합산 지표.
+create table if not exists public.perf_daily (
+  base_date date primary key,
+  dep_hq bigint not null check (dep_hq >= 0), dep_br bigint not null check (dep_br >= 0),
+  loan_hq bigint not null check (loan_hq >= 0), loan_br bigint not null check (loan_br >= 0),
+  delinq numeric(5,2) not null check (delinq >= 0),
+  entered_by text not null default auth.email(), updated_at timestamptz not null default now()
+);
+create table if not exists public.perf_year (
+  year int primary key check (year between 2000 and 2100),
+  dep_hq_t bigint, dep_br_t bigint, loan_hq_t bigint, loan_br_t bigint, delinq_t numeric(5,2),
+  prev_dep bigint, prev_loan bigint, prev_delinq numeric(5,2),
+  updated_by text not null default auth.email(), updated_at timestamptz not null default now()
+);
+alter table public.perf_daily enable row level security;
+alter table public.perf_year enable row level security;
+create policy pd_sel on public.perf_daily for select to authenticated using (is_member());
+create policy pd_ins on public.perf_daily for insert to authenticated with check (is_admin() and entered_by = auth.email());
+create policy pd_upd on public.perf_daily for update to authenticated using (is_admin()) with check (is_admin());
+create policy pd_del on public.perf_daily for delete to authenticated using (is_admin());
+create policy py_sel on public.perf_year for select to authenticated using (is_member());
+create policy py_ins on public.perf_year for insert to authenticated with check (is_admin() and updated_by = auth.email());
+create policy py_upd on public.perf_year for update to authenticated using (is_admin()) with check (is_admin());
+create policy py_del on public.perf_year for delete to authenticated using (is_admin());
+grant select, insert, update, delete on public.perf_daily, public.perf_year to authenticated;
+grant select on public.perf_daily, public.perf_year to service_role;
+alter publication supabase_realtime add table public.perf_daily, public.perf_year;

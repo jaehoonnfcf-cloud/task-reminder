@@ -159,7 +159,26 @@ async function handle(req: Request): Promise<Response> {
       } else { if (calBlk) parts.push(calBlk); if (cal.personal.has(email)) parts.push(cal.personal.get(email)!); }
       if (parts.length) await notify([email], parts.join("\n\n"));
     }
-    return ok({ users: everyone.size, calendar: !!calBlk, personal: cal.personal.size });
+    // 여수신 실적: 전 영업일 값이 입력되지 않았을 때만 관리자에게 알림 (실적 기능을 쓰기 시작한 뒤부터)
+    let perfMissing = false;
+    {
+      const { data: hol } = await db.from("calendar_events").select("start_date, end_date").eq("kind", "공휴일").gte("start_date", addDays(today, -40)).lte("start_date", today);
+      const isOff = (d: string) => { const w = new Date(d + "T12:00:00Z").getUTCDay(); return w === 0 || w === 6 || (hol ?? []).some((h: any) => h.start_date <= d && (h.end_date ?? h.start_date) >= d); };
+      if (!isOff(today)) {
+        let prev = addDays(today, -1);
+        for (let i = 0; i < 15 && isOff(prev); i++) prev = addDays(prev, -1);
+        const { data: row } = await db.from("perf_daily").select("base_date").eq("base_date", prev).maybeSingle();
+        const { count: n1 } = await db.from("perf_daily").select("base_date", { count: "exact", head: true });
+        const { count: n2 } = await db.from("perf_year").select("year", { count: "exact", head: true });
+        if (!row && ((n1 ?? 0) + (n2 ?? 0)) > 0) {
+          perfMissing = true;
+          const { data: adm } = await db.from("team_members").select("email").eq("is_admin", true);
+          const d = new Date(prev + "T12:00:00Z");
+          await notify((adm ?? []).map((r: any) => r.email), `📊 [실적] 전 영업일(${d.getUTCMonth() + 1}/${d.getUTCDate()} ${DOW[d.getUTCDay()]}) 여수신 실적이 아직 입력되지 않았어요\n현황판에서 “＋ 실적 입력”으로 입력해주세요.`);
+        }
+      }
+    }
+    return ok({ users: everyone.size, calendar: !!calBlk, personal: cal.personal.size, perfMissing });
   }
 
   // 3) 페이지에서 호출: 신규 등록 / 완료 이벤트 (로그인 JWT 로 본인 확인)
