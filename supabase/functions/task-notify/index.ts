@@ -130,7 +130,7 @@ async function handle(req: Request): Promise<Response> {
       if (!cur) continue;
       for (const a of (t as any).work_task_assignees) add(a.email, "여신", `• [대출]${sc(t.scope)} ${t.title} — ${cur.name} 진행중 (${cur.seq}/${steps.length})${dueTag(t.due_date)}`);
     }
-    // 개인업무 (본인에게만): 고정업무 다음 회차를 먼저 만들고, 알림 시작일(기한 - 알림 일수)이 된 미완료 건을 안내
+    // 개인업무 (본인에게만): 고정업무 다음 회차를 먼저 만들고, 미완료 개인 할 일은 매일(고정업무 회차는 알림 시작일부터) 안내
     await db.rpc("gen_personal_occurrences");
     const dayMs = 864e5, t0 = Date.parse(today);
     const { data: pers } = await db.from("personal_tasks")
@@ -138,7 +138,7 @@ async function handle(req: Request): Promise<Response> {
     for (const t of pers ?? []) {
       if (!t.due_date) { add(t.owner_email, "개인", `• ${t.title}`); continue; }   // 기한 없는 미완료 할 일도 완료할 때까지 매번 안내
       const diff = Math.round((Date.parse(t.due_date) - t0) / dayMs);   // 음수 = 기한 지남
-      if (diff > t.lead_days) continue;
+      if (t.recurring_id && diff > t.lead_days) continue;   // 고정업무 회차는 미리 만들어 두므로 알림 시작일부터만. 일반 개인 할 일은 등록한 날부터 매일
       const tag = diff < 0 ? ` 🔴기한초과(${t.due_date})` : diff === 0 ? " 🟠오늘마감" : ` (D-${diff})`;
       add(t.owner_email, "개인", `• ${t.recurring_id ? "[고정] " : ""}${t.title}${tag}`);
     }

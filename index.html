@@ -500,7 +500,7 @@
       <div class="list-panel">
         <div class="toolbar">
           <div class="seg" id="pSeg"><button data-pt="todo">할 일</button><button data-pt="rules">🔁 고정업무</button></div>
-          <span class="muted" style="margin-left:auto">🔒 나만 볼 수 있어요 · 알림도 나에게만 가요</span>
+          <span class="muted" style="margin-left:auto">🔒 나만 볼 수 있어요 · 알림도 나에게만 가요 (완료할 때까지 매일)</span>
         </div>
         <div id="pbody"></div>
       </div>
@@ -521,9 +521,8 @@
   <label>메모 (선택)</label><textarea id="pfDetail" rows="2"></textarea>
   <div class="row">
     <div><label>기한 (선택)</label><input id="pfDue" type="date" /></div>
-    <div><label>알림 시작</label><select id="pfLead"><option value="0">기한 당일부터</option><option value="1">1일 전부터</option><option value="2">2일 전부터</option><option value="3">3일 전부터</option><option value="7">7일 전부터</option></select></div>
   </div>
-  <p class="muted" style="margin:10px 0 0">기한이 있어야 알림이 와요. 기한이 지나도 완료할 때까지 계속 알려드려요.</p>
+  <p class="muted" style="margin:10px 0 0">등록한 날부터 완료할 때까지 평일 아침·오후에 매일 알려드려요. 기한이 지나도 계속 알려드려요.</p>
   <div class="acts" style="margin-top:18px"><button class="btn primary" id="pfSave" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" id="pfCancel" style="min-height:44px">취소</button></div>
 </div></div>
 
@@ -1416,7 +1415,6 @@
     pfId = id; const t = id ? ptasks.find(x => x.id === id) : null;
     $('pfHead').textContent = t ? '개인 할 일 수정' : '개인 할 일 추가';
     $('pfTitle').value = t ? t.title : ''; $('pfDetail').value = t ? (t.detail || '') : ''; $('pfDue').value = t ? (t.due_date || '') : '';
-    $('pfLead').value = String(t ? t.lead_days : 0); if (!$('pfLead').value) $('pfLead').value = '0';
     $('pfOv').style.display = 'block'; document.body.style.overflow = 'hidden';
     setTimeout(() => { try { $('pfTitle').focus(); } catch (e) {} }, 50);
   }
@@ -1426,7 +1424,7 @@
   $('pfSave').onclick = async () => {
     const title = $('pfTitle').value.trim();
     if (!title) return alert('할 일을 입력해주세요.');
-    const row = { title, detail: $('pfDetail').value.trim() || null, due_date: $('pfDue').value || null, lead_days: +$('pfLead').value };
+    const row = { title, detail: $('pfDetail').value.trim() || null, due_date: $('pfDue').value || null };
     const { error } = pfId ? await sb.from('personal_tasks').update(row).eq('id', pfId) : await sb.from('personal_tasks').insert(row);
     if (error) return alert('저장하지 못했어요: ' + error.message);
     closePf(); loadPersonal();
