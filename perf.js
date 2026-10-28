@@ -8,10 +8,10 @@ let perfFormDate = null;
 const pfNum = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); return d ? Number(d) : null; };
 const pfDec = (s) => { const t = String(s ?? '').replace(/[^0-9.]/g, ''); const n = parseFloat(t); return isNaN(n) ? null : n; };
 // 저장은 백만원 정수, 화면·입력은 억원 (1억원 = 100백만원, 소수 둘째 자리까지 = 백만원 단위 정확)
-const pfE = (n) => (n === null || n === undefined || isNaN(n)) ? '-' : (Number(n) / 100).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '억원';
-const pfEn = (n) => (n === null || n === undefined || isNaN(n)) ? '' : (Number(n) / 100).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });   // 입력칸용(단위 없음)
-const pfEin = (s) => { const t = String(s ?? '').replace(/,/g, '').trim(); if (!/^\d+(\.\d*)?$/.test(t)) return null; const n = Math.round(parseFloat(t) * 100); return isNaN(n) ? null : n; };   // 억원 문자열 → 백만원 정수
-const pfEfmt = (s) => { let t = String(s ?? '').replace(/[^0-9.]/g, ''); const k = t.indexOf('.'); let i = k < 0 ? t : t.slice(0, k), d = k < 0 ? null : t.slice(k + 1).replace(/\./g, '').slice(0, 2); i = i.replace(/^0+(?=\d)/, ''); return (i ? Number(i).toLocaleString('ko-KR') : (d !== null ? '0' : '')) + (d !== null ? '.' + d : ''); };   // 입력 중 콤마·소수 둘째 자리 제한
+const pfE = (n) => (n === null || n === undefined || isNaN(n)) ? '-' : Math.round(Number(n) / 100).toLocaleString('ko-KR') + '억원';
+const pfEn = (n) => (n === null || n === undefined || isNaN(n)) ? '' : Math.round(Number(n) / 100).toLocaleString('ko-KR');   // 입력칸용(단위 없음)
+const pfEin = (s) => { const t = String(s ?? '').replace(/,/g, '').trim(); return /^\d+$/.test(t) ? Number(t) * 100 : null; };   // 억원 정수 문자열 → 백만원 정수
+const pfEfmt = (s) => { const t = String(s ?? '').replace(/[^0-9.]/g, '').split('.')[0].replace(/^0+(?=\d)/, ''); return t ? Number(t).toLocaleString('ko-KR') : ''; };   // 입력 중 콤마만 (소수점 입력 불가)
 const pfP = (n, d = 2) => (n === null || n === undefined || isNaN(n)) ? '-' : Number(n).toFixed(d);
 const pfDow = (iso) => ['일', '월', '화', '수', '목', '금', '토'][new Date(iso + 'T12:00:00Z').getUTCDay()];
 const pfMd = (iso) => `${+iso.slice(5, 7)}. ${+iso.slice(8, 10)}`;
@@ -132,7 +132,7 @@ function pfChart(){
   if (lo === hi){ lo -= 1; hi += 1; }
   const padv = (hi - lo) * 0.12; lo -= padv; hi += padv;
   const W = window.innerWidth <= 760 ? 340 : 640, H = 170, l = 46, r = 10, t = 10, b = 22, x = (k) => rows.length === 1 ? (l + W - r) / 2 : l + (W - l - r) * k / (rows.length - 1), y = (a) => t + (H - t - b) * (1 - (a - lo) / (hi - lo));
-  const fmt = (a) => perfTab === 'delinq' ? a.toFixed(2) + '%' : (a / 100).toLocaleString('ko-KR', { maximumFractionDigits: (hi - lo) / 100 < 30 ? 1 : 0 }) + '억';
+  const fmt = (a) => perfTab === 'delinq' ? a.toFixed(2) + '%' : Math.round(a / 100).toLocaleString('ko-KR') + '억';
   let s = '';
   for (let g = 0; g <= 3; g++){ const a = lo + (hi - lo) * g / 3; s += `<line x1="${l}" x2="${W - r}" y1="${y(a)}" y2="${y(a)}" stroke="#e8ebf3"/><text x="0" y="${y(a) + 4}" font-size="10" fill="#8a90a0">${fmt(a)}</text>`; }
   if (tgt !== null && tgt !== undefined) s += `<line x1="${l}" x2="${W - r}" y1="${y(tgt)}" y2="${y(tgt)}" stroke="#e5484d" stroke-dasharray="5 4" opacity=".6"/><text x="${W - r}" y="${y(tgt) - 4}" font-size="10" fill="#e5484d" text-anchor="end">목표 ${fmt(tgt)}</text>`;
@@ -208,10 +208,10 @@ function pfOpenIn(date){
   if (!isAdmin()) return;
   const d = date || pfPrevBizDay();
   $('pfInPanel').innerHTML = `<div class="ph"><h2>여수신 실적 입력</h2><button class="x" data-f="close">✕</button></div>
-    <div class="pfsub">단위: 억원 · 소수 둘째 자리까지 (예: 990.79) · 같은 날짜를 다시 저장하면 덮어써요</div>
+    <div class="pfsub">단위: 억원 (소수점 없이 정수로, 예: 991) · 같은 날짜를 다시 저장하면 덮어써요</div>
     <label>기준일 <span style="color:var(--danger)">*</span> <span class="muted" style="font-weight:500">(기본값: 전 영업일)</span></label><input id="pfDate" type="date" />
-    <div class="pfform"><div><label>수신 · 본점 (억원)</label><input id="pfDepHq" inputmode="decimal" placeholder="0.00" /></div><div><label>수신 · 지점 (억원)</label><input id="pfDepBr" inputmode="decimal" placeholder="0.00" /></div>
-      <div><label>여신 · 본점 (억원)</label><input id="pfLoanHq" inputmode="decimal" placeholder="0.00" /></div><div><label>여신 · 지점 (억원)</label><input id="pfLoanBr" inputmode="decimal" placeholder="0.00" /></div></div>
+    <div class="pfform"><div><label>수신 · 본점 (억원)</label><input id="pfDepHq" inputmode="numeric" placeholder="0" /></div><div><label>수신 · 지점 (억원)</label><input id="pfDepBr" inputmode="numeric" placeholder="0" /></div>
+      <div><label>여신 · 본점 (억원)</label><input id="pfLoanHq" inputmode="numeric" placeholder="0" /></div><div><label>여신 · 지점 (억원)</label><input id="pfLoanBr" inputmode="numeric" placeholder="0" /></div></div>
     <label>연체율 현황 (%) — 본점·지점 합산</label><input id="pfDq" inputmode="decimal" placeholder="예: 2.88" style="max-width:200px;text-align:right;font-weight:700" />
     <div id="pfInfo" class="pfsub" style="margin-top:8px"></div>
     <div class="acts" style="margin-top:20px;justify-content:space-between"><div style="display:flex;gap:8px"><button class="btn primary" data-f="save" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" data-f="close" style="min-height:44px">취소</button></div><button class="btn danger" data-f="del" id="pfDel" style="display:none">이 날짜 삭제</button></div>`;
@@ -256,14 +256,14 @@ function pfOpenTg(year){
   if (!isAdmin()) return;
   const y = year || (perfSel ? +perfSel.slice(0, 4) : +kstToday().slice(0, 4));
   $('pfTgPanel').innerHTML = `<div class="ph"><h2>연 목표 · 전년말 기준값</h2><button class="x" data-g="close">✕</button></div>
-    <div class="pfsub">단위: 억원 · 소수 둘째 자리까지 (예: 1,040.00) · 연 1회 설정해요</div>
+    <div class="pfsub">단위: 억원 (소수점 없이 정수로, 예: 1,040) · 연 1회 설정해요</div>
     <label>연도</label><input id="pgYear" type="number" min="2000" max="2100" style="max-width:140px" />
     <div class="pfsub" style="margin-top:14px;font-weight:800;color:#44546f">연 목표 (A)</div>
-    <div class="pfform"><div><label>수신 · 본점 (억원)</label><input id="pgDepHq" inputmode="decimal" placeholder="0.00" /></div><div><label>수신 · 지점 (억원)</label><input id="pgDepBr" inputmode="decimal" placeholder="0.00" /></div>
-      <div><label>여신 · 본점 (억원)</label><input id="pgLoanHq" inputmode="decimal" placeholder="0.00" /></div><div><label>여신 · 지점 (억원)</label><input id="pgLoanBr" inputmode="decimal" placeholder="0.00" /></div></div>
+    <div class="pfform"><div><label>수신 · 본점 (억원)</label><input id="pgDepHq" inputmode="numeric" placeholder="0" /></div><div><label>수신 · 지점 (억원)</label><input id="pgDepBr" inputmode="numeric" placeholder="0" /></div>
+      <div><label>여신 · 본점 (억원)</label><input id="pgLoanHq" inputmode="numeric" placeholder="0" /></div><div><label>여신 · 지점 (억원)</label><input id="pgLoanBr" inputmode="numeric" placeholder="0" /></div></div>
     <label>연체율 목표 (%)</label><input id="pgDq" inputmode="decimal" placeholder="예: 1.50" style="max-width:200px;text-align:right;font-weight:700" />
     <div class="pfsub" style="margin-top:16px;font-weight:800;color:#44546f">전년말 기준값 (각주·전년말 대비에 사용)</div>
-    <div class="pfform"><div><label>전년말 수신 합계 (억원)</label><input id="pgPDep" inputmode="decimal" placeholder="0.00" /></div><div><label>전년말 여신 합계 (억원)</label><input id="pgPLoan" inputmode="decimal" placeholder="0.00" /></div></div>
+    <div class="pfform"><div><label>전년말 수신 합계 (억원)</label><input id="pgPDep" inputmode="numeric" placeholder="0" /></div><div><label>전년말 여신 합계 (억원)</label><input id="pgPLoan" inputmode="numeric" placeholder="0" /></div></div>
     <label>전년말 연체율 (%)</label><input id="pgPDq" inputmode="decimal" placeholder="예: 3.56" style="max-width:200px;text-align:right;font-weight:700" />
     <div class="acts" style="margin-top:20px"><button class="btn primary" data-g="save" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" data-g="close" style="min-height:44px">취소</button></div>`;
   $('pgYear').value = y;
