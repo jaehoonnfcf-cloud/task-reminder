@@ -382,7 +382,7 @@
   }
   .divs .ls{ display:none; }
   @media (max-width:760px){ .divs .lf{ display:none; } .divs .ls{ display:inline; } .divs button{ padding:8px 4px !important; font-size:14px !important; } .divs .n{ margin-left:2px !important; padding:0 5px !important; } }
-  @media (max-width:760px){ #wrap{ padding:4px 14px 36px; } .divs{ margin-left:0; } .divs button{ padding:8px 6px; } #adminBtn{ display:none !important; } }
+  @media (max-width:760px){ #wrap{ padding:4px 14px 36px; } .divs{ margin-left:0; } .divs button{ padding:8px 6px; } }
   /* 휴대폰: 글자·카드를 한 단계 작게 */
   @media (max-width:760px){
     .bar{ gap:8px; } .logo{ font-size:16px; } .btn{ font-size:13px; min-height:36px; padding:7px 14px; } .btn.small{ min-height:32px; padding:5px 12px; font-size:12.5px; }
@@ -470,7 +470,6 @@
     <span class="pill ro" id="roPill" style="display:none" title="이 업무구분에 대한 등록·수정 권한이 없습니다">👀 보기 전용</span>
     <button class="btn glass small" id="newBtn">＋ 새 업무</button>
     <button class="whoBtn" id="who" title="내 프로필 (사진·이름 변경)"></button>
-    <button class="btn glass small" id="adminBtn" style="display:none">⚙ 관리자</button>
   </div>
   <div id="wrap">
     <div id="main">
@@ -687,7 +686,7 @@
   $('loginBtn').onclick = doLogin;
   $('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   $('pLogout').onclick = () => { closeProfile(); sb.auth.signOut(); };
-  $('pAdmin').onclick = () => { closeProfile(); $('adminBtn').click(); };
+  $('pAdmin').onclick = () => { closeProfile(); openAdmin(); };
   sb.auth.onAuthStateChange((_e, session) => session ? start(session) : show(false));
   function show(on){
     $('login').style.display = on ? 'none' : 'flex'; $('app').style.display = on ? 'flex' : 'none';
@@ -851,7 +850,6 @@
     $('newBtn').style.display = w ? '' : 'none';
     $('newBtn').textContent = debt ? '＋ 채권 등록' : personal ? '＋ 개인 할 일' : appr ? '＋ 새 감정평가 의뢰' : '＋ 새 업무';
     $('roPill').style.display = w || home ? 'none' : '';
-    $('adminBtn').style.display = isAdmin() ? '' : 'none';
     $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
     renderRecentComments();
   }
@@ -1592,7 +1590,7 @@
         <div class="btns"><button class="btn small" data-act="name">이름 수정</button><button class="btn small" data-act="photo">사진</button>${m.avatar_v ? '<button class="btn small" data-act="rmphoto">사진 삭제</button>' : ''}<button class="btn small" data-act="pw">비밀번호</button>${self ? '' : '<button class="btn small danger" data-act="del">삭제</button>'}</div></div>`;
     }).join('') || '<div class="blk-empty">등록된 담당자가 없어요.</div>';
   }
-  $('adminBtn').onclick = () => { renderAdmin(); $('adminOv').style.display = 'block'; document.body.style.overflow = 'hidden'; };
+  function openAdmin(){ if (!isAdmin()) return; renderAdmin(); $('adminOv').style.display = 'block'; document.body.style.overflow = 'hidden'; }
   const closeAdmin = () => { $('adminOv').style.display = 'none'; document.body.style.overflow = ''; };
   $('aClose').onclick = closeAdmin;
   $('adminOv').addEventListener('click', (e) => { if (e.target === $('adminOv')) closeAdmin(); });
