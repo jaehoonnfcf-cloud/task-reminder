@@ -15,8 +15,9 @@ const pfEfmt = (s) => { const t = String(s ?? '').replace(/[^0-9.]/g, '').split(
 const pfP = (n, d = 2) => (n === null || n === undefined || isNaN(n)) ? '-' : Number(n).toFixed(d);
 const pfDow = (iso) => ['일', '월', '화', '수', '목', '금', '토'][new Date(iso + 'T12:00:00Z').getUTCDay()];
 const pfMd = (iso) => `${+iso.slice(5, 7)}. ${+iso.slice(8, 10)}`;
-const pfSigned = (n, unit = '') => n === 0 ? `±0${unit}` : `${n > 0 ? '▲' : '▼'}${Math.abs(n).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}${unit}`;
-const pfSignedE = (n) => n === 0 ? '±0.00억원' : `${n > 0 ? '▲' : '▼'}${pfE(Math.abs(n))}`;
+// 표기 관례: 감소는 ▲(우리 보고서 방식), 증가는 +
+const pfSigned = (n, unit = '') => n === 0 ? `±0${unit}` : `${n > 0 ? '+' : '▲'}${Math.abs(n).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}${unit}`;
+const pfSignedE = (n) => n === 0 ? '±0억원' : `${n > 0 ? '+' : '▲'}${pfE(Math.abs(n))}`;
 // 좋아진 방향은 초록, 나빠진 방향은 빨강 (잔액은 증가가 좋음, 연체율은 감소가 좋음). 화살표는 실제 증감 방향 그대로
 const pfCls = (n, inv = false) => n === 0 ? 'fl' : (n > 0) !== inv ? 'gd' : 'bd';
 const pfAdd = (iso, n) => new Date(Date.parse(iso + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
