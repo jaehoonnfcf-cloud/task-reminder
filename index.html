@@ -484,7 +484,8 @@
           <button data-type="all">전체</button><button data-type="loan">대출진행</button><button data-type="general">일반업무</button>
         </div>
         <select id="scopeSel"><option value="all">본점·지점·통합</option><option value="본점">본점</option><option value="지점">지점</option><option value="통합">통합</option></select>
-        <select id="status"><option value="open">미완료</option><option value="done">완료</option><option value="drop">미진행</option><option value="all">전체 상태</option></select>
+        <div class="seg" id="stSeg"><button data-st="open">진행중 <span id="nStOpen"></span></button><button data-st="closed">✅ 완료내역 <span id="nStClosed"></span></button></div>
+        <select id="status" style="display:none"><option value="open">미완료</option><option value="closed">완료내역</option><option value="done">완료</option><option value="drop">미진행</option><option value="all">전체 상태</option></select>
         <label class="chk"><input type="checkbox" id="mine" /> 내 업무만</label>
         <input id="q" class="search" type="search" placeholder="🔍 업무·고객명·요청자 검색" />
       </div>
@@ -826,7 +827,7 @@
   const curIdx = (t) => { const s = stepsOf(t); const i = s.findIndex(x => !x.done_at); return i < 0 ? s.length : i; };
   const isDropped = (t) => !!t.dropped_at;                       // 대출 미진행 (중간에 닫힘)
   const isOpen = (t) => !isDone(t) && !isDropped(t);
-  const statusOk = (t, st) => st === 'all' ? true : st === 'drop' ? isDropped(t) : st === 'done' ? (isDone(t) && !isDropped(t)) : isOpen(t);
+  const statusOk = (t, st) => st === 'all' ? true : st === 'closed' ? !isOpen(t) : st === 'drop' ? isDropped(t) : st === 'done' ? (isDone(t) && !isDropped(t)) : isOpen(t);
   const dueGrp = (t, today) => isDropped(t) ? 'drop' : isDone(t) ? 'done' : (t.due_date && t.due_date < today) ? 'over' : (t.due_date === today) ? 'today' : 'prog';
   const canAct = (t) => canWrite(taskDiv(t));                       // 등록·수정·단계수정 권한
   const ownerOrAdmin = (t) => t.created_by === me || isAdmin();     // 담당자 구성 변경 / 삭제
@@ -878,6 +879,24 @@
     }).join('');
     document.querySelectorAll('#typeSeg button').forEach(b => b.classList.toggle('on', b.dataset.type === fType));
 
+    // 진행중 / 완료내역 전환 (완료내역 = 완료 + 미진행, 최근 완료순)
+    const nClosed = divTasks.filter(t => !isOpen(t)).length;
+    $('nStOpen').textContent = open.length; $('nStClosed').textContent = nClosed;
+    document.querySelectorAll('#stSeg button').forEach(b => b.classList.toggle('on', b.dataset.st === (status === 'closed' ? 'closed' : 'open')));
+    const closedView = status === 'closed';
+    $('tiles').style.display = closedView ? 'none' : '';
+    const thSpans = document.querySelectorAll('#shared .thead span'); if (thSpans[4]) thSpans[4].textContent = closedView ? '완료일' : '기한';
+    if (closedView){
+      const rows = divTasks.filter(t => !isOpen(t) && (effType === 'all' || (effType === 'loan') === (t.task_type === 'loan')) && (fScope === 'all' || t.scope === fScope) && (!mine || isMine(t))
+        && (!q || [t.title, t.detail, t.directed_by].some(v => (v || '').toLowerCase().includes(q)))).sort((a, b) => doneAtOf(b).localeCompare(doneAtOf(a)) || b.id - a.id);
+      const view = closedAll ? rows : rows.slice(0, 100);
+      let cur = '', html = '';
+      view.forEach(t => { const d = kstDay(doneAtOf(t)), m = d ? `${d.slice(0, 4)}년 ${+d.slice(5, 7)}월` : '완료일 없음'; if (m !== cur){ cur = m; html += `<div class="sec-h done">📅 ${m}<span class="n">${rows.filter(r => { const x = kstDay(doneAtOf(r)); return (x ? `${x.slice(0, 4)}년 ${+x.slice(5, 7)}월` : '완료일 없음') === m; }).length}</span></div>`; } html += rowHtml(t, true); });
+      if (!closedAll && rows.length > 100) html += `<button class="btn" id="closedMore" style="margin:14px auto;display:block">더 보기 (${rows.length - 100}건 남음)</button>`;
+      $('list').innerHTML = html || `<div class="blk-empty">${q || mine || fScope !== 'all' ? '조건에 맞는 완료 내역이 없어요.' : '아직 완료된 업무가 없어요. 업무를 완료하면 여기에 쌓여요.'}</div>`;
+      return;
+    }
+
     // 필터
     const shown = divTasks.filter(t =>
       (effType === 'all' || (effType === 'loan') === (t.task_type === 'loan'))
@@ -901,7 +920,11 @@
     $('list').innerHTML = html;
   }
 
-  function rowHtml(t){
+  // 완료일: 일반업무 = 담당자 중 가장 늦은 완료, 대출진행 = 마지막 단계 완료, 미진행 = 미진행 처리일
+  const doneAtOf = (t) => isDropped(t) ? (t.dropped_at || '') : (t.task_type === 'loan' ? t.work_task_steps.map(s => s.done_at || '') : t.work_task_assignees.map(a => a.done_at || '')).reduce((m, v) => v > m ? v : m, '');
+  const kstDay = (iso) => iso ? new Date(new Date(iso).getTime() + 9 * 3600e3).toISOString().slice(0, 10) : '';
+  let closedAll = false;
+  function rowHtml(t, doneMode){
     const today = kstToday(), g = dueGrp(t, today), loan = t.task_type === 'loan', steps = stepsOf(t), asg = t.work_task_assignees;
     const sub = [t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
     let prog, act = '';
@@ -919,7 +942,8 @@
       prog = pend.length ? `<span class="pl">${asg.length - pend.length}/${asg.length} 완료 · <b>${esc(pend.map(a => nameOf(a.email)).join(', '))}</b> 대기</span>` : `<span class="pl ok">전원 완료</span>`;
       if (canAct(t) && asg.some(a => a.email === me && !a.done_at)) act = `<button class="go" data-go="mine:${t.id}">✔ 내 일 완료</button>`;
     }
-    const due = t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '<span class="muted">-</span>';
+    const dd = doneMode ? kstDay(doneAtOf(t)) : '';
+    const due = doneMode ? (dd ? `<span class="chip ok">${isDropped(t) ? '⛔' : '✅'} ${fmtMD(dd)}</span>${t.due_date ? `<div class="ts" style="margin-top:3px">기한 ${fmtMD(t.due_date)}</div>` : ''}` : '<span class="muted">-</span>') : t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '<span class="muted">-</span>';
     const avs = `<div class="avs">${asg.map(a => avHtml(a.email, !loan && a.done_at ? 'done' : '')).join('')}</div>`;
     return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}" data-id="${t.id}">
       <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}">${esc(t.scope)}</span>` : ''}</div>
@@ -1028,6 +1052,8 @@
   $('scopeSel').onchange = () => { fScope = $('scopeSel').value; fGrp = null; render(); };
   $('typeSeg').onclick = (e) => { const b = e.target.closest('[data-type]'); if (!b) return; fType = b.dataset.type; fGrp = null; try { localStorage.setItem('fType', fType); } catch (x) {} render(); };
   $('status').onchange = () => { fGrp = null; render(); };
+  $('stSeg').onclick = (e) => { const b = e.target.closest('[data-st]'); if (!b) return; $('status').value = b.dataset.st; fGrp = null; closedAll = false; render(); };
+  $('list').addEventListener('click', (e) => { if (e.target.closest('#closedMore')){ closedAll = true; render(); } });
   $('mine').onchange = render;
   let qTimer; $('q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(render, 200); };
   $('tiles').onclick = (e) => {
