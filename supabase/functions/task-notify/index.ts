@@ -134,8 +134,9 @@ async function handle(req: Request): Promise<Response> {
     await db.rpc("gen_personal_occurrences");
     const dayMs = 864e5, t0 = Date.parse(today);
     const { data: pers } = await db.from("personal_tasks")
-      .select("owner_email, title, due_date, lead_days, recurring_id").is("done_at", null).not("due_date", "is", null);
+      .select("owner_email, title, due_date, lead_days, recurring_id").is("done_at", null);
     for (const t of pers ?? []) {
+      if (!t.due_date) { add(t.owner_email, "개인", `• ${t.title}`); continue; }   // 기한 없는 미완료 할 일도 완료할 때까지 매번 안내
       const diff = Math.round((Date.parse(t.due_date) - t0) / dayMs);   // 음수 = 기한 지남
       if (diff > t.lead_days) continue;
       const tag = diff < 0 ? ` 🔴기한초과(${t.due_date})` : diff === 0 ? " 🟠오늘마감" : ` (D-${diff})`;
