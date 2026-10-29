@@ -179,7 +179,36 @@ async function handle(req: Request): Promise<Response> {
         }
       }
     }
-    return ok({ users: everyone.size, calendar: !!calBlk, personal: cal.personal.size, perfMissing });
+    // 화재보험: 보험 종료일 1개월 전 · 1주 전 · 당일, 갱신이 없으면 만기 후에도 매일 담당자(없으면 등록자)에게
+    let fireSent = 0;
+    {
+      const { data: fi } = await db.from("fire_insurance").select("*").eq("status", "유효");
+      const { data: lk } = await db.from("telegram_links").select("email").not("chat_id", "is", null);
+      const linked = new Set((lk ?? []).map((r: any) => r.email));
+      const byTo = new Map<string, string[]>(), patches: { id: number; patch: Record<string, unknown> }[] = [];
+      const money = (n: unknown) => n === null || n === undefined ? "-" : `${Number(n).toLocaleString("ko-KR")}원`;
+      for (const r of fi ?? []) {
+        const left = Math.round((Date.parse(r.ins_end) - Date.parse(today)) / dayMs), stage = r.alert_stage ?? 0, to = r.assignee_email ?? r.created_by;
+        if (left > 30 || !to || !linked.has(to)) continue;
+        let label = "", patch: Record<string, unknown> | null = null;
+        if (left <= 0) {
+          if (stage < 3) { label = left === 0 ? "🔴 오늘 만기예요" : `🔴 만기가 지났어요 (D+${-left})`; patch = { alert_stage: 3, overdue_alert_on: today }; }
+          else if (left < 0 && r.overdue_alert_on !== today) { label = `🚨 갱신이 필요해요 — 만기 D+${-left}`; patch = { overdue_alert_on: today }; }
+        } else {
+          const target = left <= 7 ? 2 : 1;
+          if (target > stage) { label = target === 2 ? `⚠️ 만기 1주 전 (D-${left})` : `⏳ 만기 1개월 전 (D-${left})`; patch = { alert_stage: target }; }
+        }
+        if (!label || !patch) continue;
+        const lines = [label, `채무자: ${r.debtor_name} (${r.scope})`, `보험기간: ${r.ins_start} ~ ${r.ins_end}`, `대출계좌: ${r.loan_account} · 질권설정액 ${money(r.pledge_amount)}`];
+        if (r.address) lines.push(`소재지: ${r.address}`);
+        (byTo.get(to) ?? byTo.set(to, []).get(to)!).push(lines.join("\n"));
+        patches.push({ id: r.id, patch });
+      }
+      for (const [to, blocks] of byTo) await notify([to], `🔥 [사후관리] 화재보험 만기 알림 (${blocks.length}건)\n\n${blocks.join("\n\n")}\n\n갱신했다면 사후관리 > 화재보험관리에서 “갱신”을 눌러주세요.`);
+      for (const p of patches) await db.from("fire_insurance").update(p.patch).eq("id", p.id);
+      fireSent = patches.length;
+    }
+    return ok({ users: everyone.size, calendar: !!calBlk, personal: cal.personal.size, perfMissing, fireSent });
   }
 
   // 3) 페이지에서 호출: 신규 등록 / 완료 이벤트 (로그인 JWT 로 본인 확인)

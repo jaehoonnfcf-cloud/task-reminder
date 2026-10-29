@@ -463,7 +463,7 @@
       <button data-div="deposit"><span class="lf">수신/기타</span><span class="ls">수신</span><span class="n" id="nDeposit"></span></button>
       <button data-div="credit"><span class="lf">여신업무</span><span class="ls">여신</span><span class="n" id="nCredit"></span></button>
       <button data-div="appraisal"><span class="lf">🏛 감정평가</span><span class="ls">감정</span><span class="n" id="nAppraisal"></span></button>
-      <button data-div="debt" id="debtBtn" style="display:none"><span class="lf">📞 채권관리</span><span class="ls">채권</span><span class="n" id="nDebt"></span></button>
+      <button data-div="debt" id="debtBtn" style="display:none"><span class="lf">🛠 사후관리</span><span class="ls">사후</span><span class="n" id="nDebt"></span></button>
       <button data-div="personal"><span class="lf">🔒 개인업무</span><span class="ls">개인</span><span class="n" id="nPersonal"></span></button>
     </div>
     <span class="spacer"></span>
@@ -493,7 +493,7 @@
     </div>
     </div>
     <div id="appraisal"></div>
-    <div id="debt"></div>
+    <div id="debt"><div id="debtMain"></div><div id="fire"></div></div>
     <div id="personal" style="display:none">
       <div id="pcal"></div>
       <div id="ptiles"></div>
@@ -838,7 +838,7 @@
     const personal = divn === 'personal', appr = divn === 'appraisal', debt = divn === 'debt', home = divn === 'home';
     $('app').dataset.div = divn;
     const nm = (nameOf(me) || '').trim() || '담당자';
-    $('helloT').innerHTML = home ? `안녕하세요, ${esc(nm)}님 👋<br><span>오늘의 조합 현황이에요</span>` : debt ? '연체 채권 현황이에요 📞<br><span>오늘 챙길 조치부터 확인해요</span>' : appr ? '새 의뢰 전에,<br><span>기존 기록부터 찾아볼까요? 🔍</span>' : personal ? '나만 보는 업무예요 🔒<br><span>오늘 할 일부터 확인해요</span>' : `안녕하세요, ${esc(nm)}님 👋<br><span>오늘 챙겨야 할 업무예요</span>`;
+    $('helloT').innerHTML = home ? `안녕하세요, ${esc(nm)}님 👋<br><span>오늘의 조합 현황이에요</span>` : debt ? '사후관리 현황이에요 🛠<br><span>오늘 챙길 조치부터 확인해요</span>' : appr ? '새 의뢰 전에,<br><span>기존 기록부터 찾아볼까요? 🔍</span>' : personal ? '나만 보는 업무예요 🔒<br><span>오늘 할 일부터 확인해요</span>' : `안녕하세요, ${esc(nm)}님 👋<br><span>오늘 챙겨야 할 업무예요</span>`;
     $('home').style.display = home ? 'flex' : 'none'; $('shared').style.display = personal || appr || debt || home ? 'none' : 'flex'; $('debt').style.display = debt ? 'flex' : 'none'; $('debtBtn').style.display = canWrite('debt') ? '' : 'none'; $('personal').style.display = personal ? 'flex' : 'none'; $('appraisal').style.display = appr ? 'flex' : 'none';
     document.querySelectorAll('#divBtns button').forEach(b => b.classList.toggle('on', b.dataset.div === divn));
     const pToday = kstToday(), pDue = ptasks.filter(t => !t.done_at && t.due_date && t.due_date <= pToday).length;
@@ -848,7 +848,7 @@
     $('nCredit').style.display = myOpen('credit') ? '' : 'none'; $('nDeposit').style.display = myOpen('deposit') ? '' : 'none';
     const w = !home && (personal || canWrite(divn));   // debt 도 canWrite('debt'), 현황판에는 새 업무 버튼 없음
     $('newBtn').style.display = w ? '' : 'none';
-    $('newBtn').textContent = debt ? '＋ 채권 등록' : personal ? '＋ 개인 할 일' : appr ? '＋ 새 감정평가 의뢰' : '＋ 새 업무';
+    $('newBtn').textContent = debt ? '＋ 연체채권 등록' : personal ? '＋ 개인 할 일' : appr ? '＋ 새 감정평가 의뢰' : '＋ 새 업무';
     $('roPill').style.display = w || home ? 'none' : '';
     $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
     renderRecentComments();
@@ -1012,6 +1012,8 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'perf_daily' }, () => { if (typeof schedulePerf === 'function') schedulePerf(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'perf_year' }, () => { if (typeof schedulePerf === 'function') schedulePerf(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personal_events' }, () => { if (typeof schedulePcal === 'function') schedulePcal(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'fire_insurance' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'fire_insurance_history' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_logs' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_cases' }, scheduleAp)
@@ -1586,7 +1588,7 @@
         <label class="chk"><input type="checkbox" data-p="perm_credit" ${m.perm_credit ? 'checked' : ''}/> 여신</label>
         <label class="chk"><input type="checkbox" data-p="perm_deposit" ${m.perm_deposit ? 'checked' : ''}/> 수신/기타</label>
         <label class="chk"><input type="checkbox" data-p="perm_appraisal" ${m.perm_appraisal ? 'checked' : ''}/> 감정평가</label>
-        <label class="chk"><input type="checkbox" data-p="perm_debt" ${m.perm_debt ? 'checked' : ''}/> 채권관리</label>
+        <label class="chk"><input type="checkbox" data-p="perm_debt" ${m.perm_debt ? 'checked' : ''}/> 사후관리</label>
         <label class="chk"><input type="checkbox" data-p="is_admin" ${m.is_admin ? 'checked' : ''} ${self ? 'disabled title="본인의 관리자 권한은 해제할 수 없어요"' : ''}/> 관리자</label>
         <div class="btns"><button class="btn small" data-act="name">이름 수정</button><button class="btn small" data-act="photo">사진</button>${m.avatar_v ? '<button class="btn small" data-act="rmphoto">사진 삭제</button>' : ''}<button class="btn small" data-act="pw">비밀번호</button>${self ? '' : '<button class="btn small danger" data-act="del">삭제</button>'}</div></div>`;
     }).join('') || '<div class="blk-empty">등록된 담당자가 없어요.</div>';
@@ -1654,5 +1656,6 @@
 <script src="debt.js?v=4"></script>
 <script src="perf.js?v=8"></script>
 <script src="cover.js?v=1"></script>
+<script src="fire.js?v=2"></script>
 </body>
 </html>

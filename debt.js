@@ -1,4 +1,4 @@
-// 채권관리 — 연체 채무자별 연체일수 · 연락/방문 이력 · 다음 조치 예정일. 별도 권한(perm_debt) 또는 관리자만 보고 입력한다.
+// 사후관리 > 연체채권관리 — 연체 채무자별 연체일수 · 연락/방문 이력 · 다음 조치 예정일. 별도 권한(perm_debt) 또는 관리자만 보고 입력한다.
 // index.html 의 전역(sb, $, esc, me, meRow, members, nameOf, kstToday, toast, divn)을 함께 쓴다.
 
 const DEBT_KINDS = ['전화', '문자', '방문', '면담', '우편', '기타'];
@@ -37,7 +37,8 @@ function dbNext(c){
 (function(){
   const st = document.createElement('style');
   st.textContent = `
-  #debt{ display:none; flex-direction:column; gap:14px; min-width:0; }
+  #debt{ display:none; flex-direction:column; gap:18px; min-width:0; }
+  #debtMain{ display:flex; flex-direction:column; gap:10px; min-width:0; } .dbsecT{ font-size:19px; font-weight:800; letter-spacing:-.03em; padding:2px 6px; }
   .dbsum{ padding:12px 18px; font-size:13.5px; color:#44546f; display:flex; gap:6px 16px; flex-wrap:wrap; border-bottom:1px solid var(--line); }
   .dbsum b{ color:var(--ink); } .dbsum .r{ color:var(--danger); font-weight:700; } .dbsum .o{ color:var(--warn); font-weight:700; }
   .dbhead,.dbrow{ display:grid; grid-template-columns:minmax(120px,.8fr) 108px 118px minmax(150px,1.7fr) minmax(130px,1fr); gap:10px; align-items:center; padding:0 22px; }
@@ -91,6 +92,7 @@ async function loadDebt(){
   debtCases = data || [];
   dbBadge();
   if (divn === 'debt') renderDebt();
+  if (typeof loadFire === 'function') loadFire();
   const ae = document.activeElement;
   if (debtOpenId && !(ae && $('dbDetailOv').contains(ae) && /INPUT|TEXTAREA|SELECT/.test(ae.tagName))) renderDbDetail();
 }
@@ -103,10 +105,10 @@ function dbBadge(){   // 오늘 조치 + 지연된 조치 건수
 
 // ---------- 목록 ----------
 function renderDebt(){
-  const el = $('debt');
+  const el = $('debtMain');
   if (!el.dataset.ready){
     el.dataset.ready = '1';
-    el.innerHTML = `<div class="list-panel">
+    el.innerHTML = `<div class="dbsecT">📞 연체채권관리</div><div class="list-panel">
       <div class="toolbar">
         <div class="seg" id="dbViewSeg"><button data-v="active">진행중 <span id="dbNA"></span></button><button data-v="closed">종결 <span id="dbNB"></span></button></div>
         <select id="dbScope"><option value="all">본점·지점</option><option value="본점">본점</option><option value="지점">지점</option></select>

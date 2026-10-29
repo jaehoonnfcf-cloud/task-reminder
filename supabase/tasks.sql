@@ -409,3 +409,59 @@ create policy py_del on public.perf_year for delete to authenticated using (is_a
 grant select, insert, update, delete on public.perf_daily, public.perf_year to authenticated;
 grant select on public.perf_daily, public.perf_year to service_role;
 alter publication supabase_realtime add table public.perf_daily, public.perf_year;
+
+-- 사후관리 > 화재보험관리: fire_insurance(담보물 화재보험·질권설정 현황) / fire_insurance_history(갱신 이력) + renew_fire_insurance() 갱신 함수.
+-- 사후관리 권한자(has_debt = perm_debt 또는 관리자)만 조회·입력. 알림(보험 종료 1개월 전·1주 전·당일, 이후 매일)은 Edge Function task-notify 정기 알림에서 발송.
+create table if not exists public.fire_insurance (
+  id bigint generated always as identity primary key,
+  scope text not null check (scope in ('본점','지점')),
+  debtor_name text not null check (char_length(debtor_name) between 1 and 100),
+  loan_account text not null check (loan_account ~ '^[0-9]{3}-[0-9]{2}-[0-9]{7}$'),
+  loan_amount bigint not null check (loan_amount >= 0),
+  loan_maturity date,
+  ins_start date not null, ins_end date not null,
+  pledge_amount bigint check (pledge_amount is null or pledge_amount >= 0),
+  address text, pnu text, lat double precision, lng double precision,
+  memo text check (memo is null or char_length(memo) <= 500),
+  assignee_email text,
+  status text not null default '유효' check (status in ('유효','종료')),
+  closed_at timestamptz,
+  alert_stage smallint not null default 0,      -- 0 없음 / 1 1개월 전 발송 / 2 1주 전 발송 / 3 당일(또는 만기 후 첫) 발송
+  overdue_alert_on date,                        -- 만기 후 매일 알림의 마지막 발송일
+  created_by text not null default auth.email(), created_at timestamptz not null default now(),
+  check (ins_end >= ins_start)
+);
+create index if not exists fire_insurance_status_end_idx on public.fire_insurance (status, ins_end);
+create table if not exists public.fire_insurance_history (
+  id bigint generated always as identity primary key,
+  ins_id bigint not null references public.fire_insurance(id) on delete cascade,
+  old_start date not null, old_end date not null, new_start date not null, new_end date not null,
+  note text check (note is null or char_length(note) <= 300),
+  renewed_by text not null default auth.email(), renewed_at timestamptz not null default now()
+);
+alter table public.fire_insurance enable row level security;
+alter table public.fire_insurance_history enable row level security;
+create policy fi_sel on public.fire_insurance for select to authenticated using (has_debt());
+create policy fi_ins on public.fire_insurance for insert to authenticated with check (has_debt() and created_by = auth.email());
+create policy fi_upd on public.fire_insurance for update to authenticated using (has_debt()) with check (has_debt());
+create policy fi_del on public.fire_insurance for delete to authenticated using (has_debt());
+create policy fh_sel on public.fire_insurance_history for select to authenticated using (has_debt());
+create policy fh_ins on public.fire_insurance_history for insert to authenticated with check (has_debt() and renewed_by = auth.email());
+grant select, insert, update, delete on public.fire_insurance to authenticated;
+grant select, insert on public.fire_insurance_history to authenticated;
+grant select, update on public.fire_insurance to service_role;
+grant select on public.fire_insurance_history to service_role;
+create or replace function public.renew_fire_insurance(p_id bigint, p_start date, p_end date, p_note text)
+returns void language plpgsql security definer set search_path = public as $$
+declare r public.fire_insurance;
+begin
+  if not has_debt() then raise exception '권한이 없어요'; end if;
+  if p_end < p_start then raise exception '종료일이 시작일보다 앞이에요'; end if;
+  select * into r from public.fire_insurance where id = p_id for update;
+  if not found then raise exception '대상을 찾을 수 없어요'; end if;
+  insert into public.fire_insurance_history (ins_id, old_start, old_end, new_start, new_end, note, renewed_by)
+    values (p_id, r.ins_start, r.ins_end, p_start, p_end, nullif(p_note,''), auth.email());
+  update public.fire_insurance set ins_start = p_start, ins_end = p_end, alert_stage = 0, overdue_alert_on = null, status = '유효', closed_at = null where id = p_id;
+end $$;
+grant execute on function public.renew_fire_insurance(bigint, date, date, text) to authenticated;
+alter publication supabase_realtime add table public.fire_insurance, public.fire_insurance_history;
