@@ -465,3 +465,11 @@ begin
 end $$;
 grant execute on function public.renew_fire_insurance(bigint, date, date, text) to authenticated;
 alter publication supabase_realtime add table public.fire_insurance, public.fire_insurance_history;
+
+-- 전일 실적 미입력 알림은 오전 9시(KST) 전용 크론으로 분리 (08:30/15:30 정기 알림에서는 제외). 평일 00:00 UTC = 09:00 KST
+select cron.schedule('task-remind-perf', '0 0 * * 1-5', $$
+  select net.http_post(
+    url := 'https://<프로젝트>.supabase.co/functions/v1/task-notify',
+    headers := jsonb_build_object('x-cron-secret', '<CRON_SECRET>', 'Content-Type', 'application/json'),
+    body := '{"mode":"perf"}'::jsonb);
+$$);

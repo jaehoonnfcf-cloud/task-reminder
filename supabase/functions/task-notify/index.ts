@@ -88,6 +88,29 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// 여수신 실적: 전 영업일 값이 입력되지 않았을 때만 관리자에게 알림 (실적 기능을 쓰기 시작한 뒤부터). 오전 9시 전용 크론(mode:"perf")에서만 호출
+async function perfCheck(today: string): Promise<boolean> {
+  let perfMissing = false;
+    {
+      const { data: hol } = await db.from("calendar_events").select("start_date, end_date").eq("kind", "공휴일").gte("start_date", addDays(today, -40)).lte("start_date", today);
+      const isOff = (d: string) => { const w = new Date(d + "T12:00:00Z").getUTCDay(); return w === 0 || w === 6 || (hol ?? []).some((h: any) => h.start_date <= d && (h.end_date ?? h.start_date) >= d); };
+      if (!isOff(today)) {
+        let prev = addDays(today, -1);
+        for (let i = 0; i < 15 && isOff(prev); i++) prev = addDays(prev, -1);
+        const { data: row } = await db.from("perf_daily").select("base_date").eq("base_date", prev).maybeSingle();
+        const { count: n1 } = await db.from("perf_daily").select("base_date", { count: "exact", head: true });
+        const { count: n2 } = await db.from("perf_year").select("year", { count: "exact", head: true });
+        if (!row && ((n1 ?? 0) + (n2 ?? 0)) > 0) {
+          perfMissing = true;
+          const { data: adm } = await db.from("team_members").select("email").eq("is_admin", true);
+          const d = new Date(prev + "T12:00:00Z");
+          await notify((adm ?? []).map((r: any) => r.email), `📊 [실적] 전 영업일(${d.getUTCMonth() + 1}/${d.getUTCDate()} ${DOW[d.getUTCDay()]}) 여수신 실적이 아직 입력되지 않았어요\n현황판에서 “＋ 실적 입력”으로 입력해주세요.`);
+        }
+      }
+    }
+  return perfMissing;
+}
+
 async function handle(req: Request): Promise<Response> {
   // 1) 텔레그램 웹훅: 사용자가 봇에 /start <코드> 를 보내면 chat_id 연결
   if (req.headers.get("x-telegram-bot-api-secret-token")) {
@@ -106,6 +129,8 @@ async function handle(req: Request): Promise<Response> {
   if (req.headers.get("x-cron-secret")) {
     if (req.headers.get("x-cron-secret") !== Deno.env.get("CRON_SECRET")) return new Response("forbidden", { status: 403 });
     const today = kstToday();
+    const mode = (await req.json().catch(() => ({})))?.mode;
+    if (mode === "perf") return ok({ perfMissing: await perfCheck(today) });
     const dueTag = (d: string | null) => !d ? "" : d < today ? ` 🔴기한초과(${d})` : d === today ? " 🟠오늘마감" : ` (~${d})`;
     const SECTIONS = ["수신/기타", "여신", "개인"];   // 메뉴 순서(수신/기타 → 여신 → 감정평가 → 채권관리 → 개인업무)와 같게. 일정은 맨 위
     const byUser = new Map<string, Record<string, string[]>>();
@@ -160,25 +185,6 @@ async function handle(req: Request): Promise<Response> {
       } else { if (calBlk) parts.push(calBlk); if (cal.personal.has(email)) parts.push(cal.personal.get(email)!); }
       if (parts.length) await notify([email], parts.join("\n\n"));
     }
-    // 여수신 실적: 전 영업일 값이 입력되지 않았을 때만 관리자에게 알림 (실적 기능을 쓰기 시작한 뒤부터)
-    let perfMissing = false;
-    {
-      const { data: hol } = await db.from("calendar_events").select("start_date, end_date").eq("kind", "공휴일").gte("start_date", addDays(today, -40)).lte("start_date", today);
-      const isOff = (d: string) => { const w = new Date(d + "T12:00:00Z").getUTCDay(); return w === 0 || w === 6 || (hol ?? []).some((h: any) => h.start_date <= d && (h.end_date ?? h.start_date) >= d); };
-      if (!isOff(today)) {
-        let prev = addDays(today, -1);
-        for (let i = 0; i < 15 && isOff(prev); i++) prev = addDays(prev, -1);
-        const { data: row } = await db.from("perf_daily").select("base_date").eq("base_date", prev).maybeSingle();
-        const { count: n1 } = await db.from("perf_daily").select("base_date", { count: "exact", head: true });
-        const { count: n2 } = await db.from("perf_year").select("year", { count: "exact", head: true });
-        if (!row && ((n1 ?? 0) + (n2 ?? 0)) > 0) {
-          perfMissing = true;
-          const { data: adm } = await db.from("team_members").select("email").eq("is_admin", true);
-          const d = new Date(prev + "T12:00:00Z");
-          await notify((adm ?? []).map((r: any) => r.email), `📊 [실적] 전 영업일(${d.getUTCMonth() + 1}/${d.getUTCDate()} ${DOW[d.getUTCDay()]}) 여수신 실적이 아직 입력되지 않았어요\n현황판에서 “＋ 실적 입력”으로 입력해주세요.`);
-        }
-      }
-    }
     // 화재보험: 보험 종료일 1개월 전 · 1주 전 · 당일, 갱신이 없으면 만기 후에도 매일 담당자(없으면 등록자)에게
     let fireSent = 0;
     {
@@ -208,7 +214,7 @@ async function handle(req: Request): Promise<Response> {
       for (const p of patches) await db.from("fire_insurance").update(p.patch).eq("id", p.id);
       fireSent = patches.length;
     }
-    return ok({ users: everyone.size, calendar: !!calBlk, personal: cal.personal.size, perfMissing, fireSent });
+    return ok({ users: everyone.size, calendar: !!calBlk, personal: cal.personal.size, fireSent });
   }
 
   // 3) 페이지에서 호출: 신규 등록 / 완료 이벤트 (로그인 JWT 로 본인 확인)
