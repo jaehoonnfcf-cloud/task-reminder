@@ -1103,7 +1103,7 @@
       if (dropped){
         const ds = steps.find(s => s.seq === t.dropped_step);
         body += `<div class="kv"><div class="k">미진행</div><div class="v">⛔ <b>${esc(ds ? ds.name : '')}</b> 단계에서 미진행 처리됐어요<br><span class="muted">${esc(nameOf(t.dropped_by))} · ${fmtTs(t.dropped_at)}${t.drop_reason ? ' · 사유: ' + esc(t.drop_reason) : ''}</span></div>
-          ${canAct(t) ? `<div class="acts"><button class="btn" data-d="resume">↩ 진행 재개</button></div>` : ''}</div>`;
+          <div class="acts"><button class="btn primary" data-d="cover">📄 커버페이지 출력</button>${canAct(t) ? `<button class="btn" data-d="resume">↩ 진행 재개</button>` : ''}</div></div>`;
       }
       body += `<div class="kv"><div class="k">진행 단계</div><div class="steps">${steps.map(s => `<div class="step ${s.done_at ? 'ok' : dropped ? (s.seq === t.dropped_step ? 'stop' : '') : (cur && cur.seq === s.seq ? 'cur' : '')}">
         <span>${s.done_at ? '✓' : s.seq}</span><span>${esc(s.name)}</span>${s.done_at && s.done_by ? `<small>${esc(nameOf(s.done_by))} ${fmtTs(s.done_at)}</small>` : ''}</div>`).join('')}</div>
@@ -1163,6 +1163,7 @@
     if (kind === 'close') return closeDetail();
     if (kind === 'edit') return openForm('edit', t.id);
     if (kind === 'drop') return openDrop(t);
+    if (kind === 'cover') return typeof loanCoverPrint === 'function' ? loanCoverPrint(t) : undefined;
     if (kind === 'resume'){
       if (!confirm('미진행을 해제하고 진행을 재개할까요?')) return;
       const { error } = await sb.rpc('set_loan_dropped', { p_task: t.id, p_drop: false });
@@ -1652,5 +1653,6 @@
 <script src="calendar.js?v=6"></script>
 <script src="debt.js?v=4"></script>
 <script src="perf.js?v=8"></script>
+<script src="cover.js?v=1"></script>
 </body>
 </html>
