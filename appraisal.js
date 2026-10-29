@@ -613,11 +613,12 @@ async function apSaveForm(){
     if (!addr || b.dataset.verified !== '1') return alert(`물건 ${i + 1}: 소재지를 검색해서 확인된 주소를 선택해주세요.`);
     if (kind === '토지' && !jimok) return alert(`물건 ${i + 1}: 지목을 입력해주세요.`);
     const area = areaS === '' ? null : Number(areaS.replace(/,/g, ''));
-    if (area === null || isNaN(area) || area <= 0) return alert(`물건 ${i + 1}: ${kind === '건물' ? '건물면적' : '면적'}(㎡)을 숫자로 입력해주세요.`);
+    if (area !== null && (isNaN(area) || area <= 0)) return alert(`물건 ${i + 1}: ${kind === '건물' ? '건물면적' : '면적'}(㎡)은 0보다 큰 숫자로 입력하거나, 모르면 비워두세요.`);   // 면적은 필수가 아님 (값이 없는 경우가 있음)
     let landArea = null;
     if (kind === '건물'){
-      landArea = Number(b.querySelector('.pl').value.trim().replace(/,/g, ''));
-      if (!landArea || isNaN(landArea) || landArea <= 0) return alert(`물건 ${i + 1}: 대지면적(㎡)을 숫자로 입력해주세요.`);
+      const laS = b.querySelector('.pl').value.trim();
+      landArea = laS === '' ? null : Number(laS.replace(/,/g, ''));
+      if (landArea !== null && (isNaN(landArea) || landArea <= 0)) return alert(`물건 ${i + 1}: 대지면적(㎡)은 0보다 큰 숫자로 입력하거나, 모르면 비워두세요.`);
     }
     props.push({ id: b.dataset.id ? +b.dataset.id : null, seq: i + 1, kind, address: addr, pnu: b.dataset.pnu || null, lat: b.dataset.lat ? Number(b.dataset.lat) : null, lng: b.dataset.lng ? Number(b.dataset.lng) : null, jimok: jimok || null, area, land_area: landArea, detail: b.querySelector('.pd').value.trim() || null });
   }
@@ -706,6 +707,7 @@ function apReportHtml(c){
   const num = (v) => (v === null || v === undefined || v === '') ? '-' : n(v);
   const numPy = (v) => (v === null || v === undefined || v === '') ? '-' : `${n(v)}${apPy(v) ? `<br><span class="m">(${apPy(v)})</span>` : ''}`;   // ㎡ 아래에 평 병기
   const nameOfFirm = (r) => apFirmName(r.firm_id);
+  const cmts = apCmts(c);   // 담당자 의견(대출가능액 등)도 보고서에 기재
   const propRows = props.map((p, i) => `<tr><td class="c nw">${i + 1}</td><td class="c nw">${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? ` <span class="m">(${esc(p.detail)})</span>` : ''}</td><td class="c nw">${esc(p.jimok || '-')}</td>
     <td class="r nw">${p.kind === '건물' ? numPy(p.land_area) : (p.kind === '토지' ? numPy(p.area) : '-')}</td><td class="r nw">${p.kind === '토지' ? '-' : numPy(p.area)}</td></tr>`).join('');
   const many = reqs.length > 4;
@@ -749,6 +751,7 @@ function apReportHtml(c){
   <table class="t"><thead><tr><th class="nw">번호</th><th class="nw">구분</th><th>소재지</th><th class="nw">지목</th><th class="nw">대지·토지(㎡)</th><th class="nw">건물·전용(㎡)</th></tr></thead><tbody>${propRows}</tbody></table>
   <h2 class="h2u"><span>2. 평가기관별 평가금액</span><span class="unit">(단위: 원)</span></h2>
   ${reqs.length ? `<table class="t price"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td class="b">합계</td>${total}</tr><tr><td class="b nw">가격 수령일</td>${recv}</tr>${hasNote ? `<tr><td class="b nw">특이사항</td>${notes}</tr>` : ''}</tbody></table>${foot ? `<div class="note">${foot}</div>` : ''}` : '<div>의뢰한 평가기관이 없습니다.</div>'}
+  ${cmts.length ? `<h2>3. 담당자 의견</h2><table class="t cmt"><thead><tr><th style="width:13%">작성자</th><th style="width:15%">작성일</th><th>의견</th></tr></thead><tbody>${cmts.map(m => `<tr><td class="c nw">${esc(nameOf(m.author_email))}</td><td class="c nw">${esc(new Date(new Date(m.created_at).getTime() + 9 * 3600e3).toISOString().slice(0, 10))}</td><td style="white-space:pre-wrap;word-break:break-word">${esc(m.body)}</td></tr>`).join('')}</tbody></table>` : ''}
   <div class="box">${summary}</div>
   </body></html>`;
 }
