@@ -506,7 +506,10 @@ function apTypeSync(){
   $('apfTypeNote').style.display = t && t.value === '기타' ? 'block' : 'none';
 }
 function apCloseForm(){ $('apFormOv').style.display = 'none'; apFormId = null; document.body.style.overflow = $('apDetailOv').style.display === 'block' ? 'hidden' : ''; }
-function apRenumber(){ document.querySelectorAll('#apfProps .apblock').forEach((b, i) => { b.querySelector('.bn').textContent = `물건 ${i + 1}`; }); }
+function apRenumber(){
+  const bl = [...document.querySelectorAll('#apfProps .apblock')];
+  bl.forEach((b, i) => { b.querySelector('.bn').textContent = `물건 ${i + 1}`; b.querySelector('[data-pa=up]').disabled = i === 0; b.querySelector('[data-pa=down]').disabled = i === bl.length - 1; });
+}
 function apPySync(blk){
   [['.pl', '.pyl'], ['.pr', '.pyr']].forEach(([i, h]) => { const t = apPy(blk.querySelector(i).value); blk.querySelector(h).textContent = t ? `≈ ${t}` : ''; });
 }
@@ -520,7 +523,7 @@ function apKindSync(blk){
 function apAddPropBlock(p){
   const blk = document.createElement('div'); blk.className = 'apblock';
   if (p) blk.dataset.id = p.id;
-  blk.innerHTML = `<div class="bh"><span class="bn"></span><button class="btn danger small" type="button" data-pa="del">삭제</button></div>
+  blk.innerHTML = `<div class="bh"><span class="bn"></span><span style="display:flex;gap:6px"><button class="btn small" type="button" data-pa="up" title="위로">▲</button><button class="btn small" type="button" data-pa="down" title="아래로">▼</button><button class="btn danger small" type="button" data-pa="del">삭제</button></span></div>
     <div class="grid"><div><label>구분</label><select class="pk"><option>토지</option><option>건물</option><option>집합건물</option></select></div>
       <div><label>소재지 (지번) <span style="color:var(--danger)">*</span></label>
         <div style="display:flex;gap:6px"><input class="pq" placeholder="예: 제주시 연동 312, 또는 동 이름 + 번지" style="flex:1" /><button class="btn small" type="button" data-pa="search">검색</button></div>
@@ -549,6 +552,12 @@ $('apFormPanel').addEventListener('click', async (e) => {
   if (el.dataset.pa === 'del'){
     if (document.querySelectorAll('#apfProps .apblock').length <= 1) return alert('물건은 최소 1개가 필요해요.');
     blk.remove(); return apRenumber();
+  }
+  if (el.dataset.pa === 'up' || el.dataset.pa === 'down'){
+    const up = el.dataset.pa === 'up', sib = up ? blk.previousElementSibling : blk.nextElementSibling;
+    if (!sib) return;
+    if (up) sib.before(blk); else sib.after(blk);
+    apRenumber(); return blk.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
   if (el.dataset.pa === 'search') return apDoSearch(blk);
   if (el.classList.contains('it')){
