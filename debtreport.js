@@ -22,7 +22,7 @@ function dbrReportHtml(opt){
   const periodTxt = opt.detail && (opt.from || opt.to) ? ` · 이력 기간 ${opt.from || '처음'} ~ ${opt.to || '현재'}` : '';
 
   const head = (title, sub) => `<div class="top"><div class="org">${esc(org)}</div>
-    <table class="sign"><tr><th>담당</th><th>과장</th><th>상무</th></tr><tr><td></td><td></td><td></td></tr></table></div>
+    <table class="sign"><tr><th>담당</th><th>과장</th><th>상무</th><th>전무</th><th>조합장</th></tr><tr><td></td><td></td><td></td><td></td><td></td></tr></table></div>
     <div class="title"><h1>${title}</h1><div class="sub">${sub}</div></div>`;
 
   // ---- 1) 대장 요약표 ----
@@ -68,7 +68,7 @@ function dbrReportHtml(opt){
   const css = `@page{size:A4;margin:14mm 12mm}*{box-sizing:border-box}body{font-family:${font};color:#111;margin:0;font-size:12px;line-height:1.4}
   .brk,.page+.page{page-break-before:always}
   .top{display:flex;justify-content:space-between;align-items:flex-start}.org{font-size:14px;font-weight:700;letter-spacing:6px;color:#444;padding-top:4px}
-  .sign{border-collapse:collapse;width:190px;table-layout:fixed}.sign td,.sign th{border:1px solid #333;text-align:center;font-size:11px;padding:0}.sign th{height:20px;background:#f3f3f3}.sign td{height:44px}
+  .sign{border-collapse:collapse;width:300px;table-layout:fixed}.sign td,.sign th{border:1px solid #333;text-align:center;font-size:11px;padding:0}.sign th{height:20px;background:#f3f3f3}.sign td{height:44px}
   .title{margin-top:14px;border-top:5px solid #111;border-bottom:1px solid #111;padding:12px 0 9px;text-align:center}
   .title h1{font-size:25px;margin:0;letter-spacing:4px}.title .sub{margin-top:6px;color:#555;font-size:12px}
   .sumbar{display:flex;flex-wrap:wrap;gap:4px 18px;margin:10px 0 8px;padding:7px 12px;border:1px solid #444;background:#f7f7f7;font-size:12px}.sumbar b{font-size:13px}
