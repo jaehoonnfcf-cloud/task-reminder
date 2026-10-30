@@ -115,6 +115,7 @@ function renderDebt(){
         <select id="dbSort"><option value="next">다음 조치 임박순</option><option value="days">연체일수 많은순</option><option value="new">최근 등록순</option></select>
         <label class="chk"><input type="checkbox" id="dbMine" /> 내 담당만</label>
         <input id="dbQ" class="search" type="search" placeholder="🔍 채무자 검색" />
+        <button class="btn small" id="dbRpBtn" type="button" title="사후관리대장 보고서 출력">🖨 사후관리대장</button>
       </div>
       <div class="dbsum" id="dbSum"></div>
       <div class="dbhead"><span>채무자</span><span>연체일수</span><span>연체 원금</span><span>최근 연락·방문</span><span>다음 조치</span></div>
@@ -124,6 +125,7 @@ function renderDebt(){
     $('dbSort').onchange = () => { dbSort = $('dbSort').value; renderDebt(); };
     $('dbMine').onchange = () => { dbMine = $('dbMine').checked; renderDebt(); };
     $('dbQ').oninput = () => { dbQ = $('dbQ').value.trim().toLowerCase(); renderDebt(); };
+    $('dbRpBtn').onclick = () => dbrOpenDialog();
     $('dbList').addEventListener('click', (e) => { const r = e.target.closest('[data-db]'); if (r) dbOpenDetail(+r.dataset.db); });
   }
   const nEnd = debtCases.filter(c => c.status === '종결').length;
@@ -181,7 +183,7 @@ function renderDbDetail(){
       ${editing ? `<div class="muted" style="font-size:13px;margin-top:8px">✏️ ${esc(editing.log_date)} 이력을 수정하는 중이에요</div>` : ''}
       <div class="dbline" style="margin-top:8px">${editing ? '' : '<span class="muted" style="font-size:13px">다음 조치일도 같이 정하기</span><input type="date" id="dbLogNext" />'}<span style="flex:1"></span>${editing ? '<button class="btn" data-d="canceledit">취소</button>' : ''}<button class="btn primary" data-d="addlog">${editing ? '수정 저장' : '이력 추가'}</button></div>
       <div style="margin-top:10px">${logs.map(l => `<div class="dblog"><div class="ic">${DEBT_ICON[l.kind] || '📝'}</div><div class="bd"><div class="hd">${esc(l.log_date)} · ${esc(l.kind)} · ${esc(nameOf(l.created_by))}</div><div class="tx">${esc(l.body)}</div></div>${l.created_by === me || isAdmin() ? `<button class="del" data-ledit="${l.id}" title="이 이력 수정">✏️</button><button class="del" data-ldel="${l.id}" title="이 이력 삭제">✕</button>` : ''}</div>`).join('') || '<div class="muted" style="padding:6px 2px">아직 이력이 없어요.</div>'}</div></div>
-    <div class="acts" style="margin-top:20px;justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-d="edit">수정</button><button class="btn" data-d="${closed ? 'reopen' : 'close2'}">${closed ? '↩ 진행중으로 되돌리기' : '✅ 종결 처리'}</button></div>${c.created_by === me || isAdmin() ? '<button class="btn danger" data-d="del">삭제</button>' : ''}</div>`;
+    <div class="acts" style="margin-top:20px;justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-d="edit">수정</button><button class="btn" data-d="print">🖨 기록 출력</button><button class="btn" data-d="${closed ? 'reopen' : 'close2'}">${closed ? '↩ 진행중으로 되돌리기' : '✅ 종결 처리'}</button></div>${c.created_by === me || isAdmin() ? '<button class="btn danger" data-d="del">삭제</button>' : ''}</div>`;
 }
 $('dbDetailPanel').addEventListener('click', async (ev) => {
   const c = debtCases.find(x => x.id === debtOpenId); if (!c) return;
@@ -198,6 +200,7 @@ $('dbDetailPanel').addEventListener('click', async (ev) => {
   const act = b.dataset.d;
   if (act === 'close') return dbCloseDetail();
   if (act === 'edit') return dbOpenForm(c.id);
+  if (act === 'print') return dbrPrint({ status: 'all', scope: 'all', summary: false, detail: true, from: '', to: '', ids: [c.id] });
   const upd = async (patch, msg) => { const { error } = await sb.from('debt_cases').update(patch).eq('id', c.id); if (error) return alert(error.message); if (msg) toast(msg); await loadDebt(); };
   if (act === 'savenext') return upd({ next_action_date: $('dbNxD').value || null, next_action_note: $('dbNxN').value.trim() || null }, '📅 다음 조치를 저장했어요');
   if (act === 'clearnext') return upd({ next_action_date: null, next_action_note: null }, '다음 조치를 비웠어요');
