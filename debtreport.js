@@ -1,4 +1,4 @@
-// 사후관리 > 연체채권관리 — 「연체채권 사후관리대장」 보고서 출력 (A4)
+// 사후관리 > 연체채권관리 — 「연체채권사후관리기록부」 보고서 출력 (A4)
 // 1) 대장 요약표(전 건 한눈에)  2) 채무자별 상세(기본정보 + 연락·방문 이력 전체 + 다음 조치)  — 둘 중 선택 / 둘 다.
 // debt.js 의 전역(debtCases, dbDays, dbLogs, dbNext, nameOf, esc, kstToday, DEBT_ICON)과 appraisal.js 의 apPreview / apSettings / AP_FONT 를 함께 쓴다.
 
@@ -38,7 +38,7 @@ function dbrReportHtml(opt){
         <td>${lg ? `<b>${esc(lg.log_date.slice(5).replace('-', '/'))}</b> ${esc(lg.kind)}<div class="sm">${esc(lg.body)}</div>` : '<span class="mu">-</span>'}</td>
         <td>${c.status === '종결' ? `<span class="mu">종결${c.closed_at ? ' ' + esc(String(c.closed_at).slice(0, 10)) : ''}</span>` : nx ? `<b${nx < today ? ' class="lt"' : ''}>${esc(nx.slice(5).replace('-', '/'))}</b>${nx < today ? ' (지연)' : ''}${c.next_action_note ? `<div class="sm">${esc(c.next_action_note)}</div>` : ''}` : '<span class="mu">미정</span>'}</td></tr>`;
     }).join('');
-    summary = `<div class="page">${head('연체채권 사후관리대장', `기준일 ${esc(today)} (${dbrDow(today)}) · ${esc(condTxt)}`)}
+    summary = `<div class="page">${head('연체채권사후관리기록부', `기준일 ${esc(today)} (${dbrDow(today)}) · ${esc(condTxt)}`)}
       <div class="sumbar"><span>대상 <b>${cases.length}건</b></span><span>진행중 <b>${act.length}건</b></span><span>연체원금 합계 <b>${esc(dbrNum(sum))}원</b></span><span>30일 이상 <b>${n30}건</b></span><span>90일 이상 <b>${n90}건</b></span><span>조치 지연 <b>${late}건</b></span></div>
       <table class="t led"><thead><tr><th style="width:5.5%;white-space:nowrap">번호</th><th style="width:6%">구분</th><th style="width:12%">채무자</th><th style="width:11%">연체기준일</th><th style="width:9%;white-space:nowrap">연체일수</th><th style="width:13%">연체원금(원)</th><th style="width:8%">담당자</th><th style="width:18%">최근 연락·방문</th><th style="width:17.5%">다음 조치 예정</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="9" class="c">해당하는 채권이 없습니다.</td></tr>'}</tbody></table>
@@ -51,7 +51,7 @@ function dbrReportHtml(opt){
     detail = cases.map(c => {
       const logs = logsOf(c), closed = c.status === '종결', nx = closed ? null : dbNext(c);
       const lrows = logs.map((l, i) => `<tr><td class="c">${i + 1}</td><td class="c" style="white-space:nowrap">${esc(l.log_date)} (${dbrDow(l.log_date)})</td><td class="c">${esc(l.kind)}</td><td class="bd">${esc(l.body)}</td><td class="c">${esc(nameOf(l.created_by))}</td></tr>`).join('');
-      return `<div class="page brk">${head('연체채권 사후관리 기록', `관리번호 <b>${esc(dbrNo(c))}</b> · 기준일 ${esc(today)} (${dbrDow(today)})`)}
+      return `<div class="page brk">${head('연체채권사후관리기록부', `관리번호 <b>${esc(dbrNo(c))}</b> · 기준일 ${esc(today)} (${dbrDow(today)})`)}
         <div class="cust"><div><div class="l">채무자</div><div class="n">${esc(c.debtor_name)}</div></div><div class="tag">${esc(c.scope)} · ${closed ? '종결' : '진행중'}</div></div>
         <h2>기본 사항</h2>
         <table class="t"><tr><td class="k">연체기준일</td><td>${esc(dbrDate(c.overdue_since))}</td><td class="k">연체일수</td><td>${esc(dbrDays(c))}</td></tr>
@@ -65,14 +65,14 @@ function dbrReportHtml(opt){
     }).join('');
   }
 
-  const css = `@page{size:A4;margin:14mm 12mm}*{box-sizing:border-box}body{font-family:${font};color:#111;margin:0;font-size:12px;line-height:1.4}
+  const css = `@page{size:A4;margin:14mm 15mm}*{box-sizing:border-box}body{font-family:${font};color:#111;margin:0;padding:0 1px;font-size:12px;line-height:1.4}
   .brk,.page+.page{page-break-before:always}
   .top{display:flex;justify-content:space-between;align-items:flex-start}.org{font-size:14px;font-weight:700;letter-spacing:6px;color:#444;padding-top:4px}
   .sign{border-collapse:collapse;width:300px;table-layout:fixed}.sign td,.sign th{border:1px solid #333;text-align:center;font-size:11px;padding:0}.sign th{height:20px;background:#f3f3f3}.sign td{height:44px}
   .title{margin-top:14px;border-top:5px solid #111;border-bottom:1px solid #111;padding:12px 0 9px;text-align:center}
   .title h1{font-size:25px;margin:0;letter-spacing:4px}.title .sub{margin-top:6px;color:#555;font-size:12px}
   .sumbar{display:flex;flex-wrap:wrap;gap:4px 18px;margin:10px 0 8px;padding:7px 12px;border:1px solid #444;background:#f7f7f7;font-size:12px}.sumbar b{font-size:13px}
-  table.t{width:100%;border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:4px 7px;vertical-align:middle}
+  table.t{width:calc(100% - 1px);border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:4px 7px;vertical-align:middle}
   table.t th{background:#eee;text-align:center;font-weight:700;font-size:11.5px}table.t td.k{background:#f3f3f3;font-weight:700;text-align:center;white-space:nowrap;width:15%;font-size:12px}
   table.led td{font-size:11.5px}table.led td.nm{font-weight:700}.c{text-align:center}.r{text-align:right}tr{page-break-inside:avoid}thead{display:table-header-group}
   tr.end td{background:#f4f4f4;color:#666}.sm{font-size:10.5px;color:#444;margin-top:1px;word-break:break-all}.mu{color:#888}.lt{color:#b42318}
@@ -83,12 +83,12 @@ function dbrReportHtml(opt){
   .memo{border:1px solid #444;padding:6px 10px;white-space:pre-wrap;min-height:26px}
   table.log td.bd{white-space:pre-wrap;word-break:break-all}
   .foot{margin-top:10px;font-size:11px;color:#666;text-align:center}`;
-  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>연체채권 사후관리대장</title>${link}<style>${css}</style></head><body>${summary}${detail}</body></html>`;
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>연체채권사후관리기록부</title>${link}<style>${css}</style></head><body>${summary}${detail}</body></html>`;
 }
 
 function dbrPrint(opt){
   const html = dbrReportHtml(opt);
-  apPreview(html, opt.ids ? '연체채권 사후관리 기록' : '연체채권 사후관리대장', opt.ids ? `사후관리_${(debtCases.find(c => c.id === opt.ids[0]) || {}).debtor_name || ''}` : `사후관리대장_${kstToday()}`);
+  apPreview(html, '연체채권사후관리기록부', opt.ids ? `사후관리기록부_${(debtCases.find(c => c.id === opt.ids[0]) || {}).debtor_name || ''}` : `사후관리기록부_${kstToday()}`);
 }
 
 // ---------- 출력 옵션 창 ----------
@@ -96,7 +96,7 @@ function dbrOpenDialog(){
   let ov = document.getElementById('dbrOv');
   if (!ov){
     ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'dbrOv'; ov.style.zIndex = '35';
-    ov.innerHTML = `<div class="panel" style="max-width:480px"><div class="ph"><h2>🖨 사후관리대장 출력</h2><button class="x" data-r="close">✕</button></div>
+    ov.innerHTML = `<div class="panel" style="max-width:480px"><div class="ph"><h2>🖨 연체채권사후관리기록부 출력</h2><button class="x" data-r="close">✕</button></div>
       <label>대상</label><div class="checks"><label><input type="radio" name="dbrSt" value="active" checked /> 진행중</label><label><input type="radio" name="dbrSt" value="closed" /> 종결</label><label><input type="radio" name="dbrSt" value="all" /> 전체</label></div>
       <label style="margin-top:10px">구분</label><div class="checks"><label><input type="radio" name="dbrSc" value="all" checked /> 본점·지점</label><label><input type="radio" name="dbrSc" value="본점" /> 본점</label><label><input type="radio" name="dbrSc" value="지점" /> 지점</label></div>
       <label style="margin-top:10px">출력 내용</label><div class="checks"><label><input type="checkbox" id="dbrSum" checked /> 대장 요약표</label><label><input type="checkbox" id="dbrDet" checked /> 채무자별 상세 (연락·방문 이력)</label></div>

@@ -115,7 +115,7 @@ function renderDebt(){
         <select id="dbSort"><option value="next">다음 조치 임박순</option><option value="days">연체일수 많은순</option><option value="new">최근 등록순</option></select>
         <label class="chk"><input type="checkbox" id="dbMine" /> 내 담당만</label>
         <input id="dbQ" class="search" type="search" placeholder="🔍 채무자 검색" />
-        <button class="btn small" id="dbRpBtn" type="button" title="사후관리대장 보고서 출력">🖨 사후관리대장</button>
+        <button class="btn small" id="dbRpBtn" type="button" title="연체채권사후관리기록부 출력">🖨 사후관리기록부</button>
       </div>
       <div class="dbsum" id="dbSum"></div>
       <div class="dbhead"><span>채무자</span><span>연체일수</span><span>연체 원금</span><span>최근 연락·방문</span><span>다음 조치</span></div>
