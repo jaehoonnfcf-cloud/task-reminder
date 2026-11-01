@@ -32,6 +32,7 @@ const svCsvCell = (v) => /[,"\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"`
   .svgrp .gm{ font-size:12.5px; color:var(--muted); margin:3px 0 6px 34px; }
   .svgrp ol{ margin:0; padding-left:34px; font-size:13.5px; line-height:1.55; } .svgrp li small{ color:var(--muted); }
   .svgrp.unk{ background:#fff7ec; }
+  .svmap{ height:380px; margin-top:12px; border-radius:16px; overflow:hidden; background:#e9edf3; z-index:0; } @media (max-width:760px){ .svmap{ height:300px; } }
   @media (max-width:900px){
     .svhead{ display:none; }
     .svrow{ grid-template-columns:1fr auto; gap:6px 10px; padding:14px 16px; border-radius:20px; }
@@ -352,6 +353,7 @@ $('svGpPanel').addEventListener('click', async (ev) => {
     const targets = svRows.filter(r => !svDone(r)); svGroups = { list: svBuildGroups(targets, km, n, asg), km, n };
     return svShowGroups();
   }
+  if (a === 'focus') return svMapFocus(+b.dataset.i);
   if (a === 'print') return svPrintGroups(b.dataset.i === undefined ? null : +b.dataset.i);
   if (a === 'finish'){
     const gi = +b.dataset.i, g = svGroups.list[gi], inp = $(`svgDate${gi}`), d = inp && inp.value;
@@ -380,14 +382,50 @@ async function svRunGeo(retry){
   await Promise.all([worker(), worker(), worker()]);
   svBusy = false; if (msg) msg.textContent = `위치 확인 끝 — 성공 ${ok}건${fail ? ` · 못 찾음 ${fail}건 (주소를 고치면 다시 시도할 수 있어요)` : ''}`; svGeoLabel();
 }
+const SV_COLORS = ['#e4572e', '#2e86de', '#16a34a', '#a855f7', '#f59e0b', '#0891b2', '#db2777', '#65a30d', '#7c3aed', '#ea580c', '#0d9488', '#4b5563'];
+const svColor = (i) => SV_COLORS[i % SV_COLORS.length];
+let svMap = null, svMapGroups = [];
+async function svMapDraw(){
+  const box = $('svMapEl'); if (!box) return;
+  try { await apLoadLeaflet(); } catch (e) { box.innerHTML = `<div class="muted" style="padding:14px">${esc(e.message)} — 지도를 불러오지 못했어요.</div>`; return; }
+  if (svMap){ svMap.remove(); svMap = null; }
+  svMapGroups = [];
+  box.innerHTML = '';
+  svMap = L.map('svMapEl', { zoomControl: true, preferCanvas: false }).setView([37.88, 127.73], 11);
+  const opt = { maxZoom: 19, maxNativeZoom: 18, attribution: '© 브이월드(국토교통부)' };
+  const base = L.tileLayer(`https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/Base/{z}/{y}/{x}.png`, opt).addTo(svMap);
+  let ok = 0, err = 0, fb = null;
+  base.on('tileload', () => { ok++; }); base.on('tileerror', () => { err++; if (err >= 6 && !ok && !fb){ fb = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(svMap); fb.bringToBack(); } });
+  const all = [];
+  svGroups.list.forEach((g, gi) => {
+    const pts = g.items.filter(r => r.lat != null && r.lng != null); if (!pts.length) return;
+    const col = svColor(gi), layer = L.layerGroup().addTo(svMap), ll = pts.map(r => [r.lat, r.lng]);
+    if (pts.length > 1) L.polyline(ll, { color: col, weight: 3, opacity: .75, dashArray: '6 6' }).addTo(layer);
+    pts.forEach((r, k) => {
+      const icon = L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: `<div style="width:30px;height:30px;border-radius:50%;background:${col};color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)">${gi + 1}</div>` });
+      L.marker([r.lat, r.lng], { icon }).bindPopup(`<b>${gi + 1}번 묶음 · ${k + 1}번째</b><br>${esc(r.name)} ${r.balance !== null ? '· ' + svComma(r.balance) + '원' : ''}<br><span style="color:#667">${esc(r.address)}</span>`).addTo(layer);
+    });
+    svMapGroups[gi] = L.latLngBounds(ll); all.push(...ll);
+  });
+  if (all.length) svMap.fitBounds(L.latLngBounds(all).pad(0.15), { maxZoom: 15 });
+  setTimeout(() => svMap && svMap.invalidateSize(), 150);
+}
+function svMapFocus(gi){
+  if (!svMap || !svMapGroups[gi]) return;
+  $('svMapEl').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  svMap.fitBounds(svMapGroups[gi].pad(0.3), { maxZoom: 16 });
+}
 function svShowGroups(){
   const gs = svGroups.list, tot = gs.reduce((s, g) => s + g.items.length, 0), unk = gs.filter(g => g.unk).reduce((s, g) => s + g.items.length, 0), today = kstToday();
   const need = svRows.filter(r => !svDone(r) && r.lat == null && r.geo_status !== 'fail').length;
   $('svgOut').innerHTML = `<div class="dbsum" style="margin-top:12px;border-radius:12px;background:var(--field)"><span><b>${gs.length}개 묶음</b> · ${tot}곳</span><span>묶음당 평균 ${(tot / Math.max(1, gs.length)).toFixed(1)}곳</span>${unk ? `<span class="o">위치 미확인 ${unk}곳 (주소 기준으로 묶음)</span>` : ''}${need ? `<span class="r">위치 확인 안 한 건 ${need}곳 — 먼저 “위치 확인”을 눌러주세요</span>` : ''}<span style="flex:1"></span><button class="btn small" data-g="print">🖨 전체 인쇄</button></div>
-    ${gs.map((g, i) => `<div class="svgrp ${g.unk ? 'unk' : ''}"><div class="gh"><span class="gn">${i + 1}</span><b>${esc(g.name)}</b><span class="muted">${g.items.length}곳</span><span style="flex:1"></span><button class="btn small" data-g="print" data-i="${i}">🖨 인쇄</button></div>
+    <div id="svMapEl" class="svmap"><div class="muted" style="padding:14px">지도를 불러오는 중…</div></div>
+    <div class="muted" style="font-size:12.5px;margin-top:6px">원 안의 숫자 = 묶음 번호, 점선 = 추천 방문 순서. 묶음의 “🗺 지도에서 보기”를 누르면 그 묶음으로 확대돼요.${gs.some(g => g.unk) ? ' (위치 미확인 묶음은 지도에 나오지 않아요)' : ''}</div>
+    ${gs.map((g, i) => `<div class="svgrp ${g.unk ? 'unk' : ''}"><div class="gh"><span class="gn" style="background:${g.unk ? '#9aa3b2' : svColor(i)}">${i + 1}</span><b>${esc(g.name)}</b><span class="muted">${g.items.length}곳</span><span style="flex:1"></span>${g.unk ? '' : `<button class="btn small" data-g="focus" data-i="${i}">🗺 지도에서 보기</button>`}<button class="btn small" data-g="print" data-i="${i}">🖨 인쇄</button></div>
       <div class="gm">대출잔액 ${esc(dbWon(g.sum))}${g.diam !== null && g.items.length > 1 ? ` · 가장 먼 두 곳 약 ${g.diam.toFixed(1)}km` : ''}${g.unk ? ' · 좌표 없음(주소 기준)' : ''}${g.asg ? ` · 담당 ${esc(g.asg)}` : ''}</div>
       <ol>${g.items.map(r => `<li><b>${esc(r.name)}</b> <small>${esc(r.biz_type || '')}${r.balance !== null ? ' · ' + svComma(r.balance) + '원' : ''}${!g.asg && svAsgName(r) ? ' · ' + esc(svAsgName(r)) : ''}</small><br><small>${esc(r.address)}</small></li>`).join('')}</ol>
       <div class="dbline" style="margin:8px 0 0 34px"><span class="muted" style="font-size:13px">이 묶음을 같이 조사했다면</span><input type="date" id="svgDate${i}" value="${today}" /><button class="btn small primary" data-g="finish" data-i="${i}">✅ 조사일 입력·완료</button></div></div>`).join('')}`;
+  svMapDraw();
 }
 function svPrintGroups(only){
   if (!svGroups) return;
