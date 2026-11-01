@@ -427,8 +427,50 @@ function svShowGroups(){
       <div class="dbline" style="margin:8px 0 0 34px"><span class="muted" style="font-size:13px">이 묶음을 같이 조사했다면</span><input type="date" id="svgDate${i}" value="${today}" /><button class="btn small primary" data-g="finish" data-i="${i}">✅ 조사일 입력·완료</button></div></div>`).join('')}`;
   svMapDraw();
 }
-function svPrintGroups(only){
+// 인쇄용 지도 그림: 브이월드(안 되면 OpenStreetMap) 타일을 캔버스에 이어 붙이고 마커·방문 순서선을 그려 PNG 로 만든다.
+// 타일을 가져올 수 없거나 캔버스가 막히면(CORS) 배경 없는 위치 개략도로 대신한다.
+const svLoadImg = (src) => new Promise((res) => { const im = new Image(); im.crossOrigin = 'anonymous'; const t = setTimeout(() => res(null), 9000); im.onload = () => { clearTimeout(t); res(im); }; im.onerror = () => { clearTimeout(t); res(null); }; im.src = src; });
+async function svMapImage(sets, W = 1400, H = 560){   // sets: [{ items, color, label: (k, item) => text }]
+  const pts = sets.flatMap(g => g.items.filter(r => r.lat != null && r.lng != null)); if (!pts.length) return null;
+  const mx = (lng, z) => (lng + 180) / 360 * 2 ** z * 256, my = (lat, z) => (1 - Math.log(Math.tan(svRad(lat)) + 1 / Math.cos(svRad(lat))) / Math.PI) / 2 * 2 ** z * 256;
+  const la = pts.map(r => r.lat), lo = pts.map(r => r.lng), pad = 90;
+  let z = 17; for (; z > 8; z--){ const w = mx(Math.max(...lo), z) - mx(Math.min(...lo), z), h = my(Math.min(...la), z) - my(Math.max(...la), z); if (w <= (W - pad * 2) / 2 && h <= (H - pad * 2) / 2) break; }
+  const cx = mx((Math.min(...lo) + Math.max(...lo)) / 2, z), cy = my((Math.min(...la) + Math.max(...la)) / 2, z), S = 2;   // 타일 1장 = 512px (선명하게)
+  const ox = cx * S - W / 2, oy = cy * S - H / 2, tx0 = Math.floor(ox / (256 * S)), tx1 = Math.floor((ox + W) / (256 * S)), ty0 = Math.floor(oy / (256 * S)), ty1 = Math.floor((oy + H) / (256 * S));
+  const px = (r) => [mx(r.lng, z) * S - ox, my(r.lat, z) * S - oy];
+  const draw = (tiles, credit) => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+    g.fillStyle = '#eef1f5'; g.fillRect(0, 0, W, H);
+    tiles.forEach(t => { if (t.im) g.drawImage(t.im, t.x * 256 * S - ox, t.y * 256 * S - oy, 256 * S, 256 * S); });
+    if (!tiles.some(t => t.im)){ g.strokeStyle = '#dde2ea'; g.lineWidth = 1; for (let x = 0; x < W; x += 100){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y = 0; y < H; y += 100){ g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } }
+    sets.forEach(set => {
+      const p = set.items.filter(r => r.lat != null && r.lng != null).map(px);
+      if (p.length > 1){ g.strokeStyle = set.color; g.lineWidth = 5; g.globalAlpha = .8; g.setLineDash([16, 12]); g.beginPath(); p.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
+    });
+    sets.forEach(set => set.items.filter(r => r.lat != null && r.lng != null).forEach((r, k) => {
+      const [x, y] = px(r); g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, 25, 0, 7); g.fill(); g.fillStyle = set.color; g.beginPath(); g.arc(x, y, 21, 0, 7); g.fill();
+      g.fillStyle = '#fff'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(set.label(k, r)), x, y + 1);
+    }));
+    g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(W - 330, H - 30, 330, 30); g.fillStyle = '#556'; g.font = '19px sans-serif'; g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(credit, W - 8, H - 15);
+    return c;
+  };
+  const tl = []; for (let x = tx0; x <= tx1; x++) for (let y = ty0; y <= ty1; y++) tl.push({ x, y });
+  const tryTiles = async (url) => { const t = await Promise.all(tl.map(async (p) => ({ ...p, im: await svLoadImg(url(p.x, p.y)) }))); return t.filter(x => x.im).length >= Math.ceil(t.length * .6) ? t : null; };
+  let tiles = await tryTiles((x, y) => `https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/Base/${z}/${y}/${x}.png`), credit = '© 브이월드(국토교통부)';
+  if (!tiles){ tiles = await tryTiles((x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`); credit = '© OpenStreetMap'; }
+  if (tiles){ try { return draw(tiles, credit).toDataURL('image/png'); } catch (e) { /* 캔버스 보안 제한 → 배경 없이 */ } }
+  return draw([], '위치 개략도 (지도 배경 없음)').toDataURL('image/png');
+}
+async function svPrintGroups(only){
   if (!svGroups) return;
+  toast('🗺 지도를 만드는 중이에요…');
+  const sel = svGroups.list.map((g, i) => ({ g, i })).filter(x => only === null || x.i === only);
+  const imgs = new Map();
+  await Promise.all(sel.map(async ({ g, i }) => { if (!g.unk) imgs.set(i, await svMapImage([{ items: g.items, color: svColor(i), label: (k) => k + 1 }]).catch(() => null)); }));
+  const overview = only === null && sel.filter(x => !x.g.unk).length > 1 ? await svMapImage(sel.filter(x => !x.g.unk).map(({ g, i }) => ({ items: g.items, color: svColor(i), label: () => i + 1 })), 1400, 700).catch(() => null) : null;
+  svPrintGroupsHtml(only, imgs, overview);
+}
+function svPrintGroupsHtml(only, imgs, overview){
   const today = kstToday(), gs = svGroups.list.map((g, i) => ({ g, i })).filter(x => only === null || x.i === only);
   const org = (typeof apSettings !== 'undefined' && apSettings['본점'] && apSettings['본점'].org_name) || '춘천시산림조합';
   const font = typeof AP_FONT !== 'undefined' ? AP_FONT : "'Apple SD Gothic Neo','Malgun Gothic',sans-serif", link = typeof AP_FONT_LINK !== 'undefined' ? AP_FONT_LINK : '';
@@ -438,14 +480,14 @@ function svPrintGroups(only){
   .title{margin-top:14px;border-top:5px solid #111;border-bottom:1px solid #111;padding:12px 0 9px;text-align:center}.title h1{font-size:24px;margin:0;letter-spacing:3px}.title .sub{margin-top:6px;color:#555;font-size:12px}
   h2{font-size:13.5px;margin:14px 0 5px;padding-left:9px;border-left:5px solid #111;page-break-after:avoid}h2 small{font-weight:500;color:#555;font-size:11.5px;margin-left:6px}
   table.t{width:calc(100% - 1px);border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:4px 6px;vertical-align:middle}table.t th{background:#eee;font-size:11.5px}
-  tr{page-break-inside:avoid}thead{display:table-header-group}.c{text-align:center}.r{text-align:right}.g{page-break-inside:avoid}.foot{margin-top:10px;font-size:11px;color:#666;text-align:center}`;
+  tr{page-break-inside:avoid}thead{display:table-header-group}.c{text-align:center}.r{text-align:right}.nw{white-space:nowrap}.g{page-break-inside:avoid}img.map{display:block;width:100%;height:auto;border:1px solid #444;margin:0 0 6px}.foot{margin-top:10px;font-size:11px;color:#666;text-align:center}`;
   const sum = `<h2>묶음 요약 <small>(${gs.length}개 묶음 · ${gs.reduce((s, x) => s + x.g.items.length, 0)}곳)</small></h2><table class="t"><thead><tr><th style="width:6%">묶음</th><th>권역</th><th style="width:9%">건수</th><th style="width:20%">대출잔액 합계</th><th style="width:16%">조사 예정일</th></tr></thead><tbody>${gs.map(({ g, i }) => `<tr><td class="c">${i + 1}</td><td>${esc(g.name)}${g.unk ? ' (위치 미확인)' : ''}${g.asg ? ' · ' + esc(g.asg) : ''}</td><td class="c">${g.items.length}</td><td class="r">${esc(svComma(g.sum))}원</td><td></td></tr>`).join('')}</tbody></table>`;
   const body = gs.map(({ g, i }) => `<div class="g"><h2>${i + 1}번 묶음 — ${esc(g.name)}<small>${g.items.length}곳 · 잔액 ${esc(svComma(g.sum))}원${g.diam !== null && g.items.length > 1 ? ` · 가장 먼 두 곳 약 ${g.diam.toFixed(1)}km` : ''}${g.unk ? ' · 위치 미확인(주소 기준)' : ''}</small></h2>
-    <table class="t"><thead><tr><th style="width:5%">순서</th><th style="width:12%">성명</th><th style="width:10%">고객번호</th><th style="width:15%">계좌번호</th><th style="width:13%">대출잔액(원)</th><th style="width:9%">사업구분</th><th>사업장 소재지</th><th style="width:8%">담당</th><th style="width:11%">조사일</th></tr></thead><tbody>
-    ${g.items.map((r, k) => `<tr><td class="c">${k + 1}</td><td>${esc(r.name)}</td><td class="c">${esc(r.cust_no)}</td><td class="c">${esc(r.account_no)}</td><td class="r">${r.balance === null ? '-' : esc(svComma(r.balance))}</td><td class="c">${esc(r.biz_type || '')}</td><td>${esc(r.address)}</td><td class="c">${esc(svAsgName(r))}</td><td></td></tr>`).join('')}</tbody></table></div>`).join('');
+    ${imgs.get(i) ? `<img class="map" src="${imgs.get(i)}" alt="묶음 지도" />` : ''}<table class="t"><thead><tr><th style="width:6.5%;white-space:nowrap">순서</th><th style="width:10%">성명</th><th style="width:10%">고객번호</th><th style="width:17%">계좌번호</th><th style="width:12%">대출잔액(원)</th><th style="width:9%">사업구분</th><th>사업장 소재지</th><th style="width:8%">담당</th><th style="width:11%">조사일</th></tr></thead><tbody>
+    ${g.items.map((r, k) => `<tr><td class="c">${k + 1}</td><td>${esc(r.name)}</td><td class="c nw">${esc(r.cust_no)}</td><td class="c nw">${esc(r.account_no)}</td><td class="r nw">${r.balance === null ? '-' : esc(svComma(r.balance))}</td><td class="c">${esc(r.biz_type || '')}</td><td>${esc(r.address)}</td><td class="c">${esc(svAsgName(r))}</td><td></td></tr>`).join('')}</tbody></table></div>`).join('');
   const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>정책자금 실태조사 현장 묶음</title>${link}<style>${css}</style></head><body>
     <div class="top"><div class="org">${esc(org)}</div><table class="sign"><tr><th>담당</th><th>과장</th><th>상무</th><th>전무</th><th>조합장</th></tr><tr><td></td><td></td><td></td><td></td><td></td></tr></table></div>
-    <div class="title"><h1>정책자금 실태조사 현장 조사 계획</h1><div class="sub">기준일 ${esc(today)} · 가까운 사업장끼리 묶음 (묶음 ${svGroups.km}km 이내 · 최대 ${svGroups.n}곳)</div></div>${only === null ? sum : ''}${body}
+    <div class="title"><h1>정책자금 실태조사 현장 조사 계획</h1><div class="sub">기준일 ${esc(today)} · 가까운 사업장끼리 묶음 (묶음 ${svGroups.km}km 이내 · 최대 ${svGroups.n}곳)</div></div>${only === null ? sum : ''}${overview ? `<h2>전체 지도 <small>(원 안의 숫자 = 묶음 번호)</small></h2><img class="map" src="${overview}" alt="전체 지도" />` : ''}${body}
     <div class="foot">방문 순서는 가까운 곳으로 이어가는 추천 순서이며, 실제 동선에 맞게 조정하세요.</div></body></html>`;
   apPreview(html, '정책자금 실태조사 현장 조사 계획', `실태조사_현장묶음_${today}`);
 }
