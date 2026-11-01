@@ -493,7 +493,7 @@
     </div>
     </div>
     <div id="appraisal"></div>
-    <div id="debt"><div id="debtMain"></div><div id="fire"></div></div>
+    <div id="debt"><div id="debtMain"></div></div>
     <div id="personal" style="display:none">
       <div id="pcal"></div>
       <div id="ptiles"></div>
@@ -1012,8 +1012,6 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'perf_daily' }, () => { if (typeof schedulePerf === 'function') schedulePerf(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'perf_year' }, () => { if (typeof schedulePerf === 'function') schedulePerf(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personal_events' }, () => { if (typeof schedulePcal === 'function') schedulePcal(); })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'fire_insurance' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'fire_insurance_history' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_logs' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_cases' }, scheduleAp)
@@ -1653,10 +1651,9 @@
 </script>
 <script src="appraisal.js?v=46"></script>
 <script src="calendar.js?v=6"></script>
-<script src="debt.js?v=6"></script>
+<script src="debt.js?v=7"></script>
 <script src="debtreport.js?v=4"></script>
 <script src="perf.js?v=8"></script>
 <script src="cover.js?v=1"></script>
-<script src="fire.js?v=2"></script>
 </body>
 </html>

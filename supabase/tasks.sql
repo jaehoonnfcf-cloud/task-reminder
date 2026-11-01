@@ -473,3 +473,8 @@ select cron.schedule('task-remind-perf', '0 0 * * 1-5', $$
     headers := jsonb_build_object('x-cron-secret', '<CRON_SECRET>', 'Content-Type', 'application/json'),
     body := '{"mode":"perf"}'::jsonb);
 $$);
+
+-- 화재보험관리 기능 삭제 (사후관리는 연체채권관리만 남김). 위의 fire_insurance 관련 구문은 이력용이며 아래로 정리됨
+drop function if exists public.renew_fire_insurance(bigint, date, date, text);
+drop table if exists public.fire_insurance_history;
+drop table if exists public.fire_insurance;

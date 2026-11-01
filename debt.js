@@ -92,7 +92,6 @@ async function loadDebt(){
   debtCases = data || [];
   dbBadge();
   if (divn === 'debt') renderDebt();
-  if (typeof loadFire === 'function') loadFire();
   const ae = document.activeElement;
   if (debtOpenId && !(ae && $('dbDetailOv').contains(ae) && /INPUT|TEXTAREA|SELECT/.test(ae.tagName))) renderDbDetail();
 }
