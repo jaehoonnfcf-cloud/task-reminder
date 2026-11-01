@@ -71,6 +71,11 @@ async function loadSurvey(){
   if (svGroups) svGroups = null;
 }
 
+// 목록 화면의 담당자·사업구분·검색 조건에 맞는지 (현장 묶음 추천도 이 조건에 맞는 대출건만 대상으로 한다)
+const svMatch = (r) => (svAsg === 'all' || svAsgName(r) === svAsg) && (svBiz === 'all' || r.biz_type === svBiz) && (!svQ || [r.name, r.cust_no, r.account_no, svAddrText(r)].some(v => String(v || '').toLowerCase().includes(svQ)));
+const svTargets = () => svRows.filter(r => !svDone(r) && svMatch(r));
+const svCondText = () => [svBiz !== 'all' ? `사업구분 ${svBiz}` : '', svAsg !== 'all' ? `담당 ${svAsg || '없음'}` : '', svQ ? `검색 “${svQ}”` : ''].filter(Boolean).join(' · ') || '전체';
+
 // ---------- 목록 ----------
 function renderSurvey(){
   const el = $('survey');
@@ -113,8 +118,7 @@ function renderSurvey(){
   if (svAsg !== 'all' && svAsg !== '' && !asgs.includes(svAsg)) svAsg = 'all'; if (svBiz !== 'all' && !bizs.includes(svBiz)) svBiz = 'all';
   $('svAsgSel').innerHTML = `<option value="all">담당자 전체</option>${asgs.map(a => `<option ${a === svAsg ? 'selected' : ''}>${esc(a)}</option>`).join('')}<option value="" ${svAsg === '' ? 'selected' : ''}>(담당자 없음)</option>`;
   $('svBizSel').innerHTML = `<option value="all">사업구분 전체</option>${bizs.map(a => `<option ${a === svBiz ? 'selected' : ''}>${esc(a)}</option>`).join('')}`;
-  const shown = svRows.filter(r => (svView === 'done' ? svDone(r) : !svDone(r)) && (svAsg === 'all' || svAsgName(r) === svAsg) && (svBiz === 'all' || r.biz_type === svBiz)
-    && (!svQ || [r.name, r.cust_no, r.account_no, svAddrText(r)].some(v => String(v || '').toLowerCase().includes(svQ))));
+  const shown = svRows.filter(r => (svView === 'done' ? svDone(r) : !svDone(r)) && svMatch(r));
   shown.sort(svView === 'done' ? (a, b) => String(b.survey_date).localeCompare(String(a.survey_date)) || a.id - b.id : (a, b) => a.id - b.id);
   const pct = svRows.length ? Math.round(nDone / svRows.length * 100) : 0, sumAll = svRows.reduce((s, r) => s + Number(r.balance || 0), 0), sumOpen = svRows.filter(r => !svDone(r)).reduce((s, r) => s + Number(r.balance || 0), 0);
   $('svSum').innerHTML = `<span style="flex:1 1 100%"><b>완료 ${nDone} / ${svRows.length}건 (${pct}%)</b><div class="svbar"><i style="width:${pct}%"></i></div></span>${svRows.length ? `<span>대출잔액 합계 <b>${dbWon(sumAll)}</b></span><span>미완료 잔액 <b>${dbWon(sumOpen)}</b></span>` : ''}<span>목록 <b>${shown.length}건</b></span>`;
@@ -373,10 +377,11 @@ async function svGeocode(addr){
   return null;
 }
 function svOpenGroup(){
-  if (!svRows.some(r => !svDone(r))) return alert('미완료 조사 대상이 없어요.');
+  if (!svTargets().length) return alert(svCondText() === '전체' ? '미완료 조사 대상이 없어요.' : `선택한 조건(${svCondText()})에 맞는 미완료 조사 대상이 없어요.`);
   let p = { km: 5, n: 8, asg: false }; try { p = { ...p, ...JSON.parse(localStorage.getItem('svGp') || '{}') }; } catch (e) {}
   $('svGpPanel').innerHTML = `<div class="ph"><h2>📍 현장 조사 묶음 추천</h2><button class="x" data-g="close">✕</button></div>
     <div class="muted" style="font-size:13.5px;line-height:1.6;margin-top:6px">미완료 조사 대상의 사업장 주소를 지도 좌표로 바꿔서, <b>가까운 곳끼리</b> 한 묶음으로 만들어요. 묶음마다 방문 순서(가까운 곳으로 이어가는 길)도 같이 보여줘요.</div>
+    <div class="dbsum" style="margin-top:10px;border-radius:12px;background:var(--field);border:0"><span>대상 <b>${esc(svCondText())}</b> · 미완료 대출 <b>${svTargets().length}건</b> (현장 ${svTargets().reduce((s, r) => s + svSites(r).length, 0)}곳)</span><span class="muted">목록 화면에서 사업구분·담당자를 고르면 그 대상만 묶어요</span></div>
     <div class="dbline" style="margin-top:12px"><label style="margin:0">묶음 크기(가장 먼 두 곳 사이)</label><select id="svgKm">${[2, 3, 5, 8, 12, 20].map(k => `<option value="${k}" ${k === p.km ? 'selected' : ''}>${k}km 이내</option>`).join('')}</select>
       <label style="margin:0">최대</label><select id="svgN">${[4, 6, 8, 10, 15, 20].map(k => `<option value="${k}" ${k === p.n ? 'selected' : ''}>${k}곳</option>`).join('')}</select>
       <label class="chk" style="margin:0"><input type="checkbox" id="svgAsg" ${p.asg ? 'checked' : ''} /> 담당자별로 따로</label></div>
@@ -385,7 +390,7 @@ function svOpenGroup(){
   svGeoLabel(); svGroups = null; svShowOv('svGpOv');
 }
 function svGeoLabel(){
-  const t = svRows.filter(r => !svDone(r)).flatMap(svSites), need = t.filter(r => r.lat == null && r.geo_status !== 'fail').length, fail = t.filter(r => r.geo_status === 'fail').length;
+  const t = svTargets().flatMap(svSites), need = t.filter(r => r.lat == null && r.geo_status !== 'fail').length, fail = t.filter(r => r.geo_status === 'fail').length;
   const b = $('svgGeoBtn'); if (!b) return;
   b.textContent = need ? `📌 위치 확인 (${need}건)` : `📌 위치 확인 완료${fail ? ` · 실패 ${fail}건 다시 시도` : ''}`;
   b.dataset.retry = need ? '' : fail ? '1' : '0'; b.disabled = !need && !fail;
@@ -397,9 +402,10 @@ $('svGpPanel').addEventListener('click', async (ev) => {
   if (a === 'geo') return svRunGeo(b.dataset.retry === '1');
   if (a === 'make'){
     const km = +$('svgKm').value, n = +$('svgN').value, asg = $('svgAsg').checked; try { localStorage.setItem('svGp', JSON.stringify({ km, n, asg })); } catch (e) {}
-    const targets = svPoints(svRows.filter(r => !svDone(r))); svGroups = { list: svBuildGroups(targets, km, n, asg), km, n };
+    const targets = svPoints(svTargets()); svGroups = { list: svBuildGroups(targets, km, n, asg), km, n, cond: svCondText() };
     return svShowGroups();
   }
+  if (a === 'mt'){ svMapType = b.dataset.t === 'sat' ? 'sat' : 'base'; try { localStorage.setItem('svMapType', svMapType); } catch (e) {} document.querySelectorAll('#svMapSeg button').forEach(x => x.classList.toggle('on', x.dataset.t === svMapType)); return svMapDraw(); }
   if (a === 'focus') return svMapFocus(+b.dataset.i);
   if (a === 'print') return svPrintGroups(b.dataset.i === undefined ? null : +b.dataset.i);
   if (a === 'finish'){
@@ -419,7 +425,7 @@ $('svGpPanel').addEventListener('click', async (ev) => {
 });
 async function svRunGeo(retry){
   if (svBusy) return; svBusy = true;
-  const targets = svRows.filter(r => !svDone(r)).flatMap(svSites).filter(r => retry ? r.geo_status === 'fail' : r.lat == null && r.geo_status !== 'fail'), msg = $('svgMsg'); let done = 0, ok = 0, fail = 0, i = 0;
+  const targets = svTargets().flatMap(svSites).filter(r => retry ? r.geo_status === 'fail' : r.lat == null && r.geo_status !== 'fail'), msg = $('svgMsg'); let done = 0, ok = 0, fail = 0, i = 0;
   $('svgGeoBtn').disabled = true;
   const worker = async () => {
     while (i < targets.length){
@@ -435,7 +441,7 @@ async function svRunGeo(retry){
 }
 const SV_COLORS = ['#e4572e', '#2e86de', '#16a34a', '#a855f7', '#f59e0b', '#0891b2', '#db2777', '#65a30d', '#7c3aed', '#ea580c', '#0d9488', '#4b5563'];
 const svColor = (i) => SV_COLORS[i % SV_COLORS.length];
-let svMap = null, svMapGroups = [];
+let svMap = null, svMapGroups = [], svMapType = (() => { try { return localStorage.getItem('svMapType') === 'sat' ? 'sat' : 'base'; } catch (e) { return 'base'; } })();
 async function svMapDraw(){
   const box = $('svMapEl'); if (!box) return;
   try { await apLoadLeaflet(); } catch (e) { box.innerHTML = `<div class="muted" style="padding:14px">${esc(e.message)} — 지도를 불러오지 못했어요.</div>`; return; }
@@ -444,9 +450,11 @@ async function svMapDraw(){
   box.innerHTML = '';
   svMap = L.map('svMapEl', { zoomControl: true, preferCanvas: false }).setView([37.88, 127.73], 11);
   const opt = { maxZoom: 19, maxNativeZoom: 18, attribution: '© 브이월드(국토교통부)' };
-  const base = L.tileLayer(`https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/Base/{z}/{y}/{x}.png`, opt).addTo(svMap);
+  const sat = svMapType === 'sat';
+  const base = L.tileLayer(`https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/${sat ? 'Satellite' : 'Base'}/{z}/{y}/{x}.${sat ? 'jpeg' : 'png'}`, opt).addTo(svMap);
+  if (sat) L.tileLayer(`https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/Hybrid/{z}/{y}/{x}.png`, opt).addTo(svMap);   // 항공지도 위에 지명·도로명 표시
   let ok = 0, err = 0, fb = null;
-  base.on('tileload', () => { ok++; }); base.on('tileerror', () => { err++; if (err >= 6 && !ok && !fb){ fb = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(svMap); fb.bringToBack(); } });
+  base.on('tileload', () => { ok++; }); base.on('tileerror', () => { err++; if (err >= 6 && !ok && !fb && !sat){ fb = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(svMap); fb.bringToBack(); } });
   const all = [];
   svGroups.list.forEach((g, gi) => {
     const pts = g.items.filter(r => r.lat != null && r.lng != null); if (!pts.length) return;
@@ -468,9 +476,10 @@ function svMapFocus(gi){
 }
 function svShowGroups(){
   const gs = svGroups.list, tot = gs.reduce((s, g) => s + g.items.length, 0), loanN = new Set(gs.flatMap(g => g.items.map(r => r.id))).size, unk = gs.filter(g => g.unk).reduce((s, g) => s + g.items.length, 0), today = kstToday();
-  const need = svRows.filter(r => !svDone(r)).flatMap(svSites).filter(r => r.lat == null && r.geo_status !== 'fail').length;
+  const need = svTargets().flatMap(svSites).filter(r => r.lat == null && r.geo_status !== 'fail').length;
   $('svgOut').innerHTML = `<div class="dbsum" style="margin-top:12px;border-radius:12px;background:var(--field)"><span><b>${gs.length}개 묶음</b> · 현장 ${tot}곳 (대출 ${loanN}건)</span><span>묶음당 평균 ${(tot / Math.max(1, gs.length)).toFixed(1)}곳</span>${unk ? `<span class="o">위치 미확인 ${unk}곳 (주소 기준으로 묶음)</span>` : ''}${need ? `<span class="r">위치 확인 안 한 건 ${need}곳 — 먼저 “위치 확인”을 눌러주세요</span>` : ''}<span style="flex:1"></span><button class="btn small" data-g="print">🖨 전체 인쇄</button></div>
-    <div id="svMapEl" class="svmap"><div class="muted" style="padding:14px">지도를 불러오는 중…</div></div>
+    <div class="seg" id="svMapSeg" style="margin-top:12px"><button data-g="mt" data-t="base" class="${svMapType === 'base' ? 'on' : ''}">🗺 일반지도</button><button data-g="mt" data-t="sat" class="${svMapType === 'sat' ? 'on' : ''}">🛰 항공지도</button><span class="muted" style="align-self:center;margin-left:8px;font-size:12.5px">고른 지도로 보고서도 인쇄돼요</span></div>
+    <div id="svMapEl" class="svmap" style="margin-top:8px"><div class="muted" style="padding:14px">지도를 불러오는 중…</div></div>
     <div class="muted" style="font-size:12.5px;margin-top:6px">원 안의 숫자 = 묶음 번호, 점선 = 추천 방문 순서. 묶음의 “🗺 지도에서 보기”를 누르면 그 묶음으로 확대돼요.${gs.some(g => g.unk) ? ' (위치 미확인 묶음은 지도에 나오지 않아요)' : ''}</div>
     ${gs.map((g, i) => `<div class="svgrp ${g.unk ? 'unk' : ''}"><div class="gh"><span class="gn" style="background:${g.unk ? '#9aa3b2' : svColor(i)}">${i + 1}</span><b>${esc(g.name)}</b><span class="muted">${g.items.length}곳${g.loans !== g.items.length ? ` · 대출 ${g.loans}건` : ''}</span><span style="flex:1"></span>${g.unk ? '' : `<button class="btn small" data-g="focus" data-i="${i}">🗺 지도에서 보기</button>`}<button class="btn small" data-g="print" data-i="${i}">🖨 인쇄</button></div>
       <div class="gm">대출잔액 ${esc(dbWon(g.sum))}${g.diam !== null && g.items.length > 1 ? ` · 가장 먼 두 곳 약 ${g.diam.toFixed(1)}km` : ''}${g.unk ? ' · 좌표 없음(주소 기준)' : ''}${g.asg ? ` · 담당 ${esc(g.asg)}` : ''}</div>
@@ -481,7 +490,7 @@ function svShowGroups(){
 // 인쇄용 지도 그림: 브이월드(안 되면 OpenStreetMap) 타일을 캔버스에 이어 붙이고 마커·방문 순서선을 그려 PNG 로 만든다.
 // 타일을 가져올 수 없거나 캔버스가 막히면(CORS) 배경 없는 위치 개략도로 대신한다.
 const svLoadImg = (src) => new Promise((res) => { const im = new Image(); im.crossOrigin = 'anonymous'; const t = setTimeout(() => res(null), 9000); im.onload = () => { clearTimeout(t); res(im); }; im.onerror = () => { clearTimeout(t); res(null); }; im.src = src; });
-async function svMapImage(sets, W = 1400, H = 560){   // sets: [{ items, color, label: (k, item) => text }]
+async function svMapImage(sets, W = 1400, H = 560, type = 'base'){   // sets: [{ items, color, label: (k, item) => text }]
   const pts = sets.flatMap(g => g.items.filter(r => r.lat != null && r.lng != null)); if (!pts.length) return null;
   const mx = (lng, z) => (lng + 180) / 360 * 2 ** z * 256, my = (lat, z) => (1 - Math.log(Math.tan(svRad(lat)) + 1 / Math.cos(svRad(lat))) / Math.PI) / 2 * 2 ** z * 256;
   const la = pts.map(r => r.lat), lo = pts.map(r => r.lng), pad = 90;
@@ -507,8 +516,10 @@ async function svMapImage(sets, W = 1400, H = 560){   // sets: [{ items, color, 
   };
   const tl = []; for (let x = tx0; x <= tx1; x++) for (let y = ty0; y <= ty1; y++) tl.push({ x, y });
   const tryTiles = async (url) => { const t = await Promise.all(tl.map(async (p) => ({ ...p, im: await svLoadImg(url(p.x, p.y)) }))); return t.filter(x => x.im).length >= Math.ceil(t.length * .6) ? t : null; };
-  let tiles = await tryTiles((x, y) => `https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/Base/${z}/${y}/${x}.png`), credit = '© 브이월드(국토교통부)';
-  if (!tiles){ tiles = await tryTiles((x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`); credit = '© OpenStreetMap'; }
+  const sat = type === 'sat';
+  let tiles = await tryTiles((x, y) => `https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/${sat ? 'Satellite' : 'Base'}/${z}/${y}/${x}.${sat ? 'jpeg' : 'png'}`), credit = '© 브이월드(국토교통부)';
+  if (tiles && sat){ const over = await Promise.all(tl.map(async (p) => ({ ...p, im: await svLoadImg(`https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/Hybrid/${z}/${p.y}/${p.x}.png`) }))); tiles = tiles.concat(over.filter(t => t.im)); credit = '© 브이월드(국토교통부) · 항공영상'; }   // 지명 표시 겹치기
+  if (!tiles && !sat){ tiles = await tryTiles((x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`); credit = '© OpenStreetMap'; }
   if (tiles){ try { return draw(tiles, credit).toDataURL('image/png'); } catch (e) { /* 캔버스 보안 제한 → 배경 없이 */ } }
   return draw([], '위치 개략도 (지도 배경 없음)').toDataURL('image/png');
 }
@@ -517,8 +528,8 @@ async function svPrintGroups(only){
   toast('🗺 지도를 만드는 중이에요…');
   const sel = svGroups.list.map((g, i) => ({ g, i })).filter(x => only === null || x.i === only);
   const imgs = new Map();
-  await Promise.all(sel.map(async ({ g, i }) => { if (!g.unk) imgs.set(i, await svMapImage([{ items: g.items, color: svColor(i), label: (k) => k + 1 }]).catch(() => null)); }));
-  const overview = only === null && sel.filter(x => !x.g.unk).length > 1 ? await svMapImage(sel.filter(x => !x.g.unk).map(({ g, i }) => ({ items: g.items, color: svColor(i), label: () => i + 1 })), 1400, 700).catch(() => null) : null;
+  await Promise.all(sel.map(async ({ g, i }) => { if (!g.unk) imgs.set(i, await svMapImage([{ items: g.items, color: svColor(i), label: (k) => k + 1 }], 1400, 560, svMapType).catch(() => null)); }));
+  const overview = only === null && sel.filter(x => !x.g.unk).length > 1 ? await svMapImage(sel.filter(x => !x.g.unk).map(({ g, i }) => ({ items: g.items, color: svColor(i), label: () => i + 1 })), 1400, 700, svMapType).catch(() => null) : null;
   svPrintGroupsHtml(only, imgs, overview);
 }
 function svPrintGroupsHtml(only, imgs, overview){
@@ -538,7 +549,7 @@ function svPrintGroupsHtml(only, imgs, overview){
     ${(() => { const fs = svFirstOf(g.items); return g.items.map((r, k) => `<tr><td class="c">${k + 1}</td><td>${esc(r.name)}</td><td class="c nw">${esc(r.cust_no)}</td><td class="c nw">${esc(r.account_no)}</td><td class="r nw">${r.balance === null ? '-' : fs[k] ? esc(svComma(r.balance)) : '〃'}</td><td class="c">${esc(r.biz_type || '')}</td><td>${esc(r.address)}${svSiteTag(r) ? ` <small>(${svSiteTag(r)})</small>` : ''}</td><td class="c">${esc(svAsgName(r))}</td><td></td></tr>`).join(''); })()}</tbody></table></div>`).join('');
   const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>정책자금 실태조사 현장 묶음</title>${link}<style>${css}</style></head><body>
     <div class="top"><div class="org">${esc(org)}</div><table class="sign"><tr><th>담당</th><th>과장</th><th>상무</th><th>전무</th><th>조합장</th></tr><tr><td></td><td></td><td></td><td></td><td></td></tr></table></div>
-    <div class="title"><h1>정책자금 실태조사 현장 조사 계획</h1><div class="sub">기준일 ${esc(today)} · 가까운 사업장끼리 묶음 (묶음 ${svGroups.km}km 이내 · 최대 ${svGroups.n}곳)</div></div>${only === null ? sum : ''}${overview ? `<h2>전체 지도 <small>(원 안의 숫자 = 묶음 번호)</small></h2><img class="map" src="${overview}" alt="전체 지도" />` : ''}${body}
+    <div class="title"><h1>정책자금 실태조사 현장 조사 계획</h1><div class="sub">기준일 ${esc(today)} · 가까운 사업장끼리 묶음 (묶음 ${svGroups.km}km 이내 · 최대 ${svGroups.n}곳 · 대상 ${esc(svGroups.cond || '전체')} · ${svMapType === 'sat' ? '항공지도' : '일반지도'})</div></div>${only === null ? sum : ''}${overview ? `<h2>전체 지도 <small>(원 안의 숫자 = 묶음 번호)</small></h2><img class="map" src="${overview}" alt="전체 지도" />` : ''}${body}
     <div class="foot">방문 순서는 가까운 곳으로 이어가는 추천 순서이며, 실제 동선에 맞게 조정하세요.</div></body></html>`;
   apPreview(html, '정책자금 실태조사 현장 조사 계획', `실태조사_현장묶음_${today}`);
 }
