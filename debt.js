@@ -91,6 +91,7 @@ async function loadDebt(){
   if (error){ console.warn('채권관리 불러오기 실패', error.message); return; }
   debtCases = data || [];
   dbBadge();
+  if (typeof loadSurvey === 'function') await loadSurvey();
   if (divn === 'debt') renderDebt();
   const ae = document.activeElement;
   if (debtOpenId && !(ae && $('dbDetailOv').contains(ae) && /INPUT|TEXTAREA|SELECT/.test(ae.tagName))) renderDbDetail();
@@ -103,7 +104,19 @@ function dbBadge(){   // 오늘 조치 + 지연된 조치 건수
 }
 
 // ---------- 목록 ----------
+document.getElementById('dbTabs').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-t]'); if (!b || b.dataset.t === dbTab) return;
+  dbTab = b.dataset.t; try { localStorage.setItem('dbTab', dbTab); } catch (x) {}
+  if (typeof render === 'function') render(); else renderDebt();
+});
+let dbTab = (() => { try { return localStorage.getItem('dbTab') === 'survey' ? 'survey' : 'debt'; } catch (e) { return 'debt'; } })();
 function renderDebt(){
+  document.querySelectorAll('#dbTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === dbTab));
+  $('debtMain').style.display = dbTab === 'debt' ? '' : 'none'; $('survey').style.display = dbTab === 'survey' ? 'flex' : 'none';
+  if (dbTab === 'survey') return typeof renderSurvey === 'function' ? renderSurvey() : undefined;
+  renderDebtMain();
+}
+function renderDebtMain(){
   const el = $('debtMain');
   if (!el.dataset.ready){
     el.dataset.ready = '1';

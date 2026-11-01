@@ -478,3 +478,33 @@ $$);
 drop function if exists public.renew_fire_insurance(bigint, date, date, text);
 drop table if exists public.fire_insurance_history;
 drop table if exists public.fire_insurance;
+
+-- 사후관리 > 정책자금실태조사: survey_cases (고객번호·성명·계좌번호·대출잔액·사업구분·사업장소재지·실태조사일·담당자). 실태조사일이 있으면 완료.
+-- (고객번호, 계좌번호) 유일 → CSV 재업로드 시 덮어쓰기. lat/lng/geo_status 는 현장 묶음 추천용 좌표 캐시. 권한은 연체채권과 같은 has_debt()
+create table if not exists public.survey_cases (
+  id bigint generated always as identity primary key,
+  cust_no text not null check (char_length(cust_no) between 1 and 30),
+  name text not null check (char_length(name) between 1 and 100),
+  account_no text not null check (char_length(account_no) between 1 and 30),
+  balance bigint check (balance is null or balance >= 0),
+  biz_type text check (biz_type is null or char_length(biz_type) <= 50),
+  address text not null check (char_length(address) between 1 and 200),
+  survey_date date,
+  assignee_name text check (assignee_name is null or char_length(assignee_name) <= 50),
+  assignee_email text,
+  memo text check (memo is null or char_length(memo) <= 500),
+  lat double precision, lng double precision,
+  geo_status text check (geo_status is null or geo_status in ('ok','fail')),
+  created_by text not null default auth.email(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (cust_no, account_no)
+);
+create index if not exists survey_cases_open_idx on public.survey_cases (survey_date);
+alter table public.survey_cases enable row level security;
+create policy sv_sel on public.survey_cases for select to authenticated using (has_debt());
+create policy sv_ins on public.survey_cases for insert to authenticated with check (has_debt());
+create policy sv_upd on public.survey_cases for update to authenticated using (has_debt()) with check (has_debt());
+create policy sv_del on public.survey_cases for delete to authenticated using (has_debt());
+grant select, insert, update, delete on public.survey_cases to authenticated;
+alter publication supabase_realtime add table public.survey_cases;
