@@ -508,3 +508,21 @@ create policy sv_upd on public.survey_cases for update to authenticated using (h
 create policy sv_del on public.survey_cases for delete to authenticated using (has_debt());
 grant select, insert, update, delete on public.survey_cases to authenticated;
 alter publication supabase_realtime add table public.survey_cases;
+
+-- 정책자금실태조사: 한 대출건(survey_cases)에 사업장 현장 여러 곳 → survey_sites. 소재지·좌표는 현장 단위로 옮김(기존 주소는 현장 1로 이관 후 survey_cases 의 address/lat/lng/geo_status 삭제)
+create table if not exists public.survey_sites (
+  id bigint generated always as identity primary key,
+  case_id bigint not null references public.survey_cases(id) on delete cascade,
+  seq smallint not null default 1,
+  address text not null check (char_length(address) between 1 and 200),
+  lat double precision, lng double precision,
+  geo_status text check (geo_status is null or geo_status in ('ok','fail'))
+);
+create index if not exists survey_sites_case_idx on public.survey_sites (case_id, seq);
+alter table public.survey_sites enable row level security;
+create policy ss_sel on public.survey_sites for select to authenticated using (has_debt());
+create policy ss_ins on public.survey_sites for insert to authenticated with check (has_debt());
+create policy ss_upd on public.survey_sites for update to authenticated using (has_debt()) with check (has_debt());
+create policy ss_del on public.survey_sites for delete to authenticated using (has_debt());
+grant select, insert, update, delete on public.survey_sites to authenticated;
+alter publication supabase_realtime add table public.survey_sites;

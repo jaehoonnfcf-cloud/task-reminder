@@ -1014,6 +1014,7 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personal_events' }, () => { if (typeof schedulePcal === 'function') schedulePcal(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'survey_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'survey_sites' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_logs' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_cases' }, scheduleAp)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_properties' }, scheduleAp)
@@ -1654,7 +1655,7 @@
 <script src="calendar.js?v=6"></script>
 <script src="debt.js?v=8"></script>
 <script src="debtreport.js?v=4"></script>
-<script src="survey.js?v=5"></script>
+<script src="survey.js?v=6"></script>
 <script src="perf.js?v=8"></script>
 <script src="cover.js?v=1"></script>
 </body>

@@ -7,6 +7,8 @@ const svNum = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); return 
 const svComma = (n) => n === null || n === undefined ? '-' : Number(n).toLocaleString('ko-KR');
 const svAsgName = (r) => r.assignee_email ? nameOf(r.assignee_email) : (r.assignee_name || '');
 const svDone = (r) => !!r.survey_date;
+const svSites = (r) => r.sites || [];
+const svAddrText = (r) => svSites(r).map(x => x.address).join(' / ');
 const svCsvCell = (v) => /[,"\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : v;
 
 (function(){
@@ -56,10 +58,11 @@ async function loadSurvey(){
   if (!debtCan()){ svRows = []; return; }
   let all = [];
   for (let from = 0; from < 20000; from += 1000){
-    const { data, error } = await sb.from('survey_cases').select('*').order('id', { ascending: true }).range(from, from + 999);
+    const { data, error } = await sb.from('survey_cases').select('*, survey_sites(*)').order('id', { ascending: true }).range(from, from + 999);
     if (error){ console.warn('정책자금실태조사 불러오기 실패', error.message); return; }
     all = all.concat(data || []); if (!data || data.length < 1000) break;
   }
+  all.forEach(r => { r.sites = [...(r.survey_sites || [])].sort((a, b) => a.seq - b.seq || a.id - b.id); });
   svRows = all;
   if (typeof divn !== 'undefined' && divn === 'debt' && dbTab === 'survey'){
     const ae = document.activeElement;
@@ -111,7 +114,7 @@ function renderSurvey(){
   $('svAsgSel').innerHTML = `<option value="all">담당자 전체</option>${asgs.map(a => `<option ${a === svAsg ? 'selected' : ''}>${esc(a)}</option>`).join('')}<option value="" ${svAsg === '' ? 'selected' : ''}>(담당자 없음)</option>`;
   $('svBizSel').innerHTML = `<option value="all">사업구분 전체</option>${bizs.map(a => `<option ${a === svBiz ? 'selected' : ''}>${esc(a)}</option>`).join('')}`;
   const shown = svRows.filter(r => (svView === 'done' ? svDone(r) : !svDone(r)) && (svAsg === 'all' || svAsgName(r) === svAsg) && (svBiz === 'all' || r.biz_type === svBiz)
-    && (!svQ || [r.name, r.cust_no, r.account_no, r.address].some(v => String(v || '').toLowerCase().includes(svQ))));
+    && (!svQ || [r.name, r.cust_no, r.account_no, svAddrText(r)].some(v => String(v || '').toLowerCase().includes(svQ))));
   shown.sort(svView === 'done' ? (a, b) => String(b.survey_date).localeCompare(String(a.survey_date)) || a.id - b.id : (a, b) => a.id - b.id);
   const pct = svRows.length ? Math.round(nDone / svRows.length * 100) : 0, sumAll = svRows.reduce((s, r) => s + Number(r.balance || 0), 0), sumOpen = svRows.filter(r => !svDone(r)).reduce((s, r) => s + Number(r.balance || 0), 0);
   $('svSum').innerHTML = `<span style="flex:1 1 100%"><b>완료 ${nDone} / ${svRows.length}건 (${pct}%)</b><div class="svbar"><i style="width:${pct}%"></i></div></span>${svRows.length ? `<span>대출잔액 합계 <b>${dbWon(sumAll)}</b></span><span>미완료 잔액 <b>${dbWon(sumOpen)}</b></span>` : ''}<span>목록 <b>${shown.length}건</b></span>`;
@@ -123,11 +126,12 @@ function svRowHtml(r){
   return `<div class="svrow ${svDone(r) ? 'done' : ''}" data-sid="${r.id}">
     <div><div class="nm">${esc(r.name)}</div><div class="sub">고객번호 ${esc(r.cust_no)}</div></div>
     <div>${esc(r.account_no)}</div><div class="mo">${r.balance === null ? '-' : svComma(r.balance) + '원'}</div><div>${esc(r.biz_type || '-')}</div>
-    <div class="ad">${esc(r.address)}${r.geo_status === 'fail' ? '<span class="svgeo">📍위치 미확인</span>' : ''}</div><div>${esc(a || '-')}</div>
+    <div class="ad">${svSites(r).map(x => `<div>${svSites(r).length > 1 ? '· ' : ''}${esc(x.address)}${x.geo_status === 'fail' ? '<span class="svgeo">📍위치 미확인</span>' : ''}</div>`).join('') || '-'}${svSites(r).length > 1 ? `<span class="svgeo">현장 ${svSites(r).length}곳</span>` : ''}</div><div>${esc(a || '-')}</div>
     <div>${svDone(r) ? `<span class="svok">✅ 완료</span><br>` : ''}<input type="date" data-sdate="${r.id}" value="${esc(r.survey_date || '')}" title="날짜를 넣으면 완료 처리돼요" /></div></div>`;
 }
 
 // ---------- 등록/수정 ----------
+const svSiteInput = (x) => `<div class="svsite" data-sid="${x.id || ''}" style="display:flex;gap:6px;margin-top:6px"><input class="svsa" maxlength="200" placeholder="사업장 소재지" value="${esc(x.address)}" style="flex:1" /><button class="btn small danger" type="button" data-f="delsite" title="이 현장 삭제">✕</button></div>`;
 function svOpenForm(id){
   if (!debtCan()) return;
   svEditId = id || null; const r = id ? svRows.find(x => x.id === id) : null; if (id && !r) return;
@@ -136,7 +140,9 @@ function svOpenForm(id){
     <label>성명</label><input id="svfName" maxlength="100" value="${esc(r ? r.name : '')}" />
     <div class="row"><div><label>고객번호</label><input id="svfCust" maxlength="30" value="${esc(r ? r.cust_no : '')}" /></div><div><label>계좌번호</label><input id="svfAcct" maxlength="30" value="${esc(r ? r.account_no : '')}" /></div></div>
     <div class="row"><div><label>대출잔액 (원)</label><input id="svfBal" inputmode="numeric" value="${r && r.balance !== null ? svComma(r.balance) : ''}" /></div><div><label>사업구분</label><input id="svfBiz" maxlength="50" value="${esc(r ? r.biz_type || '' : '')}" /></div></div>
-    <label>사업장 소재지</label><input id="svfAddr" maxlength="200" value="${esc(r ? r.address : '')}" />
+    <label>사업장 소재지 <span class="muted" style="font-weight:400">(현장이 여러 곳이면 추가해요 · 대출건 하나에 포함)</span></label>
+    <div id="svfSites">${(r && svSites(r).length ? svSites(r) : [{ id: '', address: '' }]).map(svSiteInput).join('')}</div>
+    <button class="btn small" type="button" data-f="addsite" style="margin-top:6px">＋ 현장 추가</button>
     <div class="row"><div><label>담당자</label><select id="svfAsg">${asgOpts}</select></div><div><label>실태조사일 <span class="muted" style="font-weight:400">(넣으면 완료)</span></label><input type="date" id="svfDate" value="${esc(r ? r.survey_date || '' : '')}" /></div></div>
     <label>메모</label><textarea id="svfMemo" rows="3" maxlength="500">${esc(r ? r.memo || '' : '')}</textarea>
     <div class="acts" style="margin-top:14px;justify-content:space-between"><div>${r ? '<button class="btn danger" data-f="del">삭제</button>' : ''}</div><div style="display:flex;gap:8px"><button class="btn" data-f="close">취소</button><button class="btn primary" data-f="save">저장</button></div></div>`;
@@ -146,6 +152,8 @@ $('svFormPanel').addEventListener('input', (e) => { if (e.target.id === 'svfBal'
 $('svFormPanel').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-f]'); if (!b) return;
   if (b.dataset.f === 'close') return svCloseOv('svFormOv');
+  if (b.dataset.f === 'addsite'){ $('svfSites').insertAdjacentHTML('beforeend', svSiteInput({ id: '', address: '' })); return $('svfSites').lastElementChild.querySelector('input').focus(); }
+  if (b.dataset.f === 'delsite'){ if ($('svfSites').children.length <= 1) return alert('현장은 최소 1곳이 필요해요.'); return b.closest('.svsite').remove(); }
   const r = svEditId ? svRows.find(x => x.id === svEditId) : null;
   if (b.dataset.f === 'del'){
     if (!r || !confirm(`"${r.name}" 건을 삭제할까요?`)) return;
@@ -153,16 +161,32 @@ $('svFormPanel').addEventListener('click', async (e) => {
     svCloseOv('svFormOv'); toast('삭제했어요'); await loadSurvey(); return renderSurvey();
   }
   const g = (id) => $(id).value.trim();
-  const name = g('svfName'), cust = g('svfCust'), acct = g('svfAcct'), addr = g('svfAddr'), date = $('svfDate').value || null, asgE = $('svfAsg').value || null;
-  if (!name || !cust || !acct || !addr) return alert('성명 · 고객번호 · 계좌번호 · 사업장 소재지는 꼭 입력해주세요.');
+  const name = g('svfName'), cust = g('svfCust'), acct = g('svfAcct'), date = $('svfDate').value || null, asgE = $('svfAsg').value || null;
+  const sites = [...document.querySelectorAll('#svfSites .svsite')].map(d => ({ id: d.dataset.sid ? +d.dataset.sid : null, address: d.querySelector('input').value.trim().replace(/\s+/g, ' ') })).filter(x => x.address);
+  if (!name || !cust || !acct || !sites.length) return alert('성명 · 고객번호 · 계좌번호 · 사업장 소재지(1곳 이상)는 꼭 입력해주세요.');
+  if (new Set(sites.map(x => x.address)).size !== sites.length) return alert('같은 소재지가 두 번 들어 있어요.');
   if (svRows.some(x => x.cust_no === cust && x.account_no === acct && x.id !== svEditId)) return alert('같은 고객번호·계좌번호가 이미 등록돼 있어요.');
-  const patch = { name, cust_no: cust, account_no: acct, balance: svNum(g('svfBal')), biz_type: g('svfBiz') || null, address: addr, survey_date: date, assignee_email: asgE, assignee_name: asgE ? null : (r && !r.assignee_email ? r.assignee_name : null), memo: g('svfMemo') || null, updated_at: new Date().toISOString() };
-  if (!r || r.address !== addr){ patch.lat = null; patch.lng = null; patch.geo_status = null; }
+  const patch = { name, cust_no: cust, account_no: acct, balance: svNum(g('svfBal')), biz_type: g('svfBiz') || null, survey_date: date, assignee_email: asgE, assignee_name: asgE ? null : (r && !r.assignee_email ? r.assignee_name : null), memo: g('svfMemo') || null, updated_at: new Date().toISOString() };
   b.disabled = true;
-  const { error } = r ? await sb.from('survey_cases').update(patch).eq('id', r.id) : await sb.from('survey_cases').insert(patch);
+  let cid = r ? r.id : null, error = null;
+  if (r) error = (await sb.from('survey_cases').update(patch).eq('id', r.id)).error;
+  else { const ins = await sb.from('survey_cases').insert(patch).select('id').single(); error = ins.error; cid = ins.data && ins.data.id; }
+  if (!error) error = await svSyncSites(cid, r ? svSites(r) : [], sites);
   b.disabled = false; if (error) return alert(error.message);
   svCloseOv('svFormOv'); toast('저장했어요'); await loadSurvey(); renderSurvey();
 });
+
+// 현장 목록 저장: 화면 순서대로 seq 를 매기고, 주소가 바뀐 현장은 좌표를 비운다 (지운 현장은 삭제)
+async function svSyncSites(cid, cur, next){
+  const keep = new Set(next.filter(x => x.id).map(x => x.id)), gone = cur.filter(x => !keep.has(x.id)).map(x => x.id);
+  if (gone.length){ const { error } = await sb.from('survey_sites').delete().in('id', gone); if (error) return error; }
+  for (let i = 0; i < next.length; i++){
+    const x = next[i], old = x.id ? cur.find(c => c.id === x.id) : null;
+    if (old){ if (old.address !== x.address || old.seq !== i + 1){ const { error } = await sb.from('survey_sites').update(old.address !== x.address ? { address: x.address, seq: i + 1, lat: null, lng: null, geo_status: null } : { seq: i + 1 }).eq('id', old.id); if (error) return error; } }
+    else { const { error } = await sb.from('survey_sites').insert({ case_id: cid, seq: i + 1, address: x.address }); if (error) return error; }
+  }
+  return null;
+}
 
 // ---------- CSV 올리기 ----------
 const SV_HEAD = ['고객번호', '성명', '계좌번호', '대출잔액', '사업구분', '사업장소재지', '실태조사일', '담당자'];
@@ -190,30 +214,39 @@ function svCsvRows(grid){
   const col = { cust: ix('고객번호', '고객'), name: ix('성명', '이름', '고객명'), acct: ix('계좌'), bal: ix('잔액'), biz: ix('사업구분', '업종'), addr: ix('소재지', '주소'), date: ix('실태조사일', '조사일'), asg: ix('담당') };
   if (col.cust < 0 || col.name < 0 || col.acct < 0 || col.addr < 0) return null;
   const key = (c, a) => `${c}|${a}`, exist = new Map(svRows.map(r => [key(r.cust_no, r.account_no), r])), seen = new Set();
-  return grid.slice(1).map((c, n) => {
+  const lines = grid.slice(1).map((c, n) => {
     const g = (k) => col[k] >= 0 ? (c[col[k]] ?? '').trim() : '';
-    const errs = [], warns = [];
-    const cust = g('cust'), name = g('name'), acct = g('acct'), addr = g('addr');
+    const errs = [];
+    const cust = g('cust'), name = g('name'), acct = g('acct'), addr = g('addr').replace(/\s+/g, ' ');
     if (!cust) errs.push('고객번호'); if (!name) errs.push('성명'); if (!acct) errs.push('계좌번호'); if (!addr) errs.push('소재지');
     const balS = g('bal'), bal = balS === '' ? null : svNum(balS); if (balS !== '' && bal === null) errs.push('대출잔액');
     const date = svDate(g('date')); if (date === null) errs.push('실태조사일 형식');
-    let asgE = null, asgN = null; const a = g('asg'); if (a){ const m = members.find(x => x.email === a || x.name === a); if (m) asgE = m.email; else { asgN = a; warns.push('담당자 미등록(이름만 저장)'); } }
-    const k = key(cust, acct), old = exist.get(k);
-    if (seen.has(k)) warns.push('파일 안 중복(마지막 줄 적용)'); seen.add(k);
-    let row = null;
-    if (!errs.length){
-      row = { cust_no: cust, name, account_no: acct, balance: bal, biz_type: g('biz') || null, address: addr, survey_date: date || (old ? old.survey_date : null),
-        assignee_email: a ? asgE : (old ? old.assignee_email : null), assignee_name: a ? asgN : (old ? old.assignee_name : null), memo: old ? old.memo : null,
-        lat: old && old.address === addr ? old.lat : null, lng: old && old.address === addr ? old.lng : null, geo_status: old && old.address === addr ? old.geo_status : null, updated_at: new Date().toISOString() };
-    }
-    return { n: n + 2, errs, warns, upd: !!old, row, view: [cust, name, acct, bal === null ? '' : svComma(bal), g('biz'), addr, date || '', a] };
+    return { n: n + 2, errs, warns: [], note: '', key: key(cust, acct), cust, name, acct, addr, bal, biz: g('biz') || null, date: date || '', asg: g('asg'), view: [cust, name, acct, bal === null ? '' : svComma(bal), g('biz'), addr, date || '', g('asg')] };
   });
+  // 같은 고객번호+계좌번호의 여러 줄 = 한 대출건의 여러 현장 (대출 정보는 첫 줄 기준, 조사일·담당자는 비어 있지 않은 줄 값)
+  const cases = new Map();
+  lines.filter(l => !l.errs.length).forEach(l => {
+    let c = cases.get(l.key);
+    if (!c){ const old = exist.get(l.key); c = { key: l.key, old, first: l, addrs: [], date: '', asg: '' }; cases.set(l.key, c); }
+    else l.note = '＋ 같은 대출건의 현장 추가';
+    if (c.addrs.includes(l.addr)){ l.warns.push('같은 소재지 중복(무시)'); } else c.addrs.push(l.addr);
+    if (l.date) c.date = l.date; if (l.asg) c.asg = l.asg;
+  });
+  cases.forEach(c => {
+    const f = c.first, old = c.old; let asgE = null, asgN = null;
+    if (c.asg){ const m = members.find(x => x.email === c.asg || x.name === c.asg); if (m) asgE = m.email; else { asgN = c.asg; f.warns.push('담당자 미등록(이름만 저장)'); } }
+    c.row = { cust_no: f.cust, name: f.name, account_no: f.acct, balance: f.bal, biz_type: f.biz, survey_date: c.date || (old ? old.survey_date : null),
+      assignee_email: c.asg ? asgE : (old ? old.assignee_email : null), assignee_name: c.asg ? asgN : (old ? old.assignee_name : null), memo: old ? old.memo : null, updated_at: new Date().toISOString() };
+    if (old){ const cur = svSites(old).map(x => x.address); if (cur.join('|') !== c.addrs.join('|')) f.warns.push(`현장 목록 교체 (${cur.length}곳 → ${c.addrs.length}곳)`); }
+    if (c.addrs.length > 1 && !f.note) f.note = `현장 ${c.addrs.length}곳`;
+  });
+  return { lines, cases: [...cases.values()] };
 }
 function svOpenCsv(){
   svCsv = null;
   $('svCsvPanel').innerHTML = `<div class="ph"><h2>📥 정책자금실태조사 CSV 올리기</h2><button class="x" data-sc="close">✕</button></div>
     <div class="muted" style="font-size:13.5px;line-height:1.6;margin-top:6px">엑셀에서 아래 순서의 열로 만든 뒤 <b>CSV로 저장</b>해서 올려주세요. (한글 엑셀 CSV · UTF-8 모두 가능, 첫 줄은 제목 줄)<br>
-    <b>${SV_HEAD.join(' · ')}</b><br>· 같은 <b>고객번호+계좌번호</b>가 이미 있으면 새로 만들지 않고 <b>덮어써요</b>(비워둔 실태조사일·담당자는 기존 값 유지).<br>· 실태조사일이 있는 줄은 올리자마자 <b>완료</b>로 들어가요. 날짜는 2026-11-20 형식, 금액은 원 단위(콤마 가능), 담당자는 이름.</div>
+    <b>${SV_HEAD.join(' · ')}</b><br>· 같은 <b>고객번호+계좌번호</b>가 이미 있으면 새로 만들지 않고 <b>덮어써요</b>(비워둔 실태조사일·담당자는 기존 값 유지).<br>· <b>한 대출건에 현장이 여러 곳</b>이면 같은 고객번호·계좌번호로 줄만 늘려 소재지를 각각 적으세요(대출잔액은 대출건당 한 번만 계산). 이미 있는 대출건은 파일의 현장 목록으로 <b>교체</b>돼요.<br>· 실태조사일이 있는 줄은 올리자마자 <b>완료</b>로 들어가요. 날짜는 2026-11-20 형식, 금액은 원 단위(콤마 가능), 담당자는 이름.</div>
     <div class="acts" style="margin-top:12px"><button class="btn" data-sc="tpl">⬇ 양식(CSV) 내려받기</button><label class="btn primary" style="cursor:pointer;margin:0">📂 CSV 파일 선택<input type="file" id="svCsvFile" accept=".csv,.txt,text/csv" hidden /></label></div>
     <div id="svCsvOut" style="margin-top:12px"></div>`;
   $('svCsvFile').onchange = async (e) => {
@@ -222,15 +255,15 @@ function svOpenCsv(){
     try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (x) { text = new TextDecoder('euc-kr').decode(buf); }   // 한글 엑셀 CSV(CP949)
     const grid = svParseCsv(text.replace(/^﻿/, ''));
     if (grid.length < 2) return ($('svCsvOut').innerHTML = '<div class="muted">데이터 줄이 없어요. 첫 줄은 제목, 둘째 줄부터 데이터여야 해요.</div>');
-    const rows = svCsvRows(grid);
-    if (!rows) return ($('svCsvOut').innerHTML = `<div style="color:var(--danger)">제목 줄에서 ${SV_HEAD.join(', ')} 열을 찾지 못했어요. 양식을 내려받아 확인해주세요.</div>`);
-    svCsv = rows;
-    const okN = rows.filter(r => r.row).length, badN = rows.length - okN, updN = rows.filter(r => r.row && r.upd).length, doneN = rows.filter(r => r.row && r.row.survey_date).length;
-    $('svCsvOut').innerHTML = `<div style="font-weight:700">${rows.length}줄 읽음 · <span style="color:var(--green)">등록 가능 ${okN}건</span>${updN ? ` (그중 덮어쓰기 ${updN}건)` : ''}${doneN ? ` · 완료로 등록 ${doneN}건` : ''}${badN ? ` · <span style="color:var(--danger)">오류 ${badN}건(제외)</span>` : ''}</div>
+    const res = svCsvRows(grid);
+    if (!res) return ($('svCsvOut').innerHTML = `<div style="color:var(--danger)">제목 줄에서 ${SV_HEAD.join(', ')} 열을 찾지 못했어요. 양식을 내려받아 확인해주세요.</div>`);
+    const rows = res.lines; svCsv = res.cases;
+    const okN = res.cases.length, badN = rows.filter(r => r.errs.length).length, updN = res.cases.filter(c => c.old).length, doneN = res.cases.filter(c => c.row.survey_date).length, siteN = res.cases.reduce((s, c) => s + c.addrs.length, 0);
+    $('svCsvOut').innerHTML = `<div style="font-weight:700">${rows.length}줄 읽음 → <span style="color:var(--green)">대출 ${okN}건 (현장 ${siteN}곳)</span>${updN ? ` · 덮어쓰기 ${updN}건` : ''}${doneN ? ` · 완료로 등록 ${doneN}건` : ''}${badN ? ` · <span style="color:var(--danger)">오류 ${badN}줄(제외)</span>` : ''}</div>
       <div class="sc"><table><thead><tr><th>줄</th><th>결과</th>${SV_HEAD.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>
-      ${rows.slice(0, 300).map(r => `<tr class="${r.errs.length ? 'bad' : r.warns.length ? 'wn' : ''}"><td>${r.n}</td><td>${r.errs.length ? `✕ ${esc(r.errs.join(', '))}` : `✓${r.upd ? ' 덮어쓰기' : ''}${r.warns.length ? ' ⚠ ' + esc(r.warns.join(', ')) : ''}`}</td>${r.view.map(v => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}
+      ${rows.slice(0, 300).map(r => `<tr class="${r.errs.length ? 'bad' : r.warns.length ? 'wn' : ''}"><td>${r.n}</td><td>${r.errs.length ? `✕ ${esc(r.errs.join(', '))}` : `✓${r.note ? ' ' + esc(r.note) : ''}${r.warns.length ? ' ⚠ ' + esc(r.warns.join(', ')) : ''}`}</td>${r.view.map(v => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}
       </tbody></table></div>${rows.length > 300 ? `<div class="muted" style="margin-top:6px">미리보기는 300줄까지만 보여요. (등록은 전체)</div>` : ''}
-      <div class="acts" style="margin-top:12px"><button class="btn primary" data-sc="import" ${okN ? '' : 'disabled'}>${okN}건 등록</button><button class="btn" data-sc="close">취소</button></div>`;
+      <div class="acts" style="margin-top:12px"><button class="btn primary" data-sc="import" ${okN ? '' : 'disabled'}>대출 ${okN}건 등록</button><button class="btn" data-sc="close">취소</button></div>`;
   };
   svShowOv('svCsvOv');
 }
@@ -239,20 +272,30 @@ $('svCsvPanel').addEventListener('click', async (ev) => {
   const a = b.dataset.sc;
   if (a === 'close') return svCloseOv('svCsvOv');
   if (a === 'tpl'){
-    const sample = ['1023456', '홍길동', '123-45-6789012', '85000000', '정책자금(시설)', '강원특별자치도 춘천시 동산면 원창리 99', '', '정재훈'];
-    const blob = new Blob(['﻿' + SV_HEAD.join(',') + '\r\n' + sample.map(svCsvCell).join(',') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+    const sample = ['1023456', '홍길동', '123-45-6789012', '85000000', '정책자금(시설)', '강원특별자치도 춘천시 동산면 원창리 99', '', '정재훈'], sample2 = [...sample]; sample2[5] = '강원특별자치도 춘천시 신북읍 천전리 12';   // 같은 대출건의 두 번째 현장
+    const blob = new Blob(['﻿' + SV_HEAD.join(',') + '\r\n' + sample.map(svCsvCell).join(',') + '\r\n' + sample2.map(svCsvCell).join(',') + '\r\n'], { type: 'text/csv;charset=utf-8' });
     const u = URL.createObjectURL(blob), l = document.createElement('a'); l.href = u; l.download = '정책자금실태조사_업로드_양식.csv'; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); return;
   }
   if (a === 'import'){
-    const map = new Map(); (svCsv || []).filter(r => r.row).forEach(r => map.set(`${r.row.cust_no}|${r.row.account_no}`, r.row));   // 파일 안 중복은 마지막 줄만
-    const rows = [...map.values()]; if (!rows.length) return;
-    if (!confirm(`${rows.length}건을 등록할까요?`)) return;
+    const cs = (svCsv || []).filter(c => c.row); if (!cs.length) return;
+    if (!confirm(`대출 ${cs.length}건(현장 ${cs.reduce((s, c) => s + c.addrs.length, 0)}곳)을 등록할까요?`)) return;
     b.disabled = true;
+    const rows = cs.map(c => c.row);
     for (let i = 0; i < rows.length; i += 200){
       const { error } = await sb.from('survey_cases').upsert(rows.slice(i, i + 200), { onConflict: 'cust_no,account_no' });
       if (error){ b.disabled = false; return alert(`등록하지 못했어요 (${i + 1}번째 건부터): ` + error.message); }
     }
-    svCloseOv('svCsvOv'); toast(`📥 ${rows.length}건을 등록했어요`); svView = 'open'; await loadSurvey(); renderSurvey();
+    await loadSurvey();   // 새로 생긴 id 를 얻기 위해 다시 읽는다
+    const byKey = new Map(svRows.map(r => [`${r.cust_no}|${r.account_no}`, r])), delIds = [], ins = [];
+    cs.forEach(c => {
+      const r = byKey.get(c.key); if (!r) return;
+      const cur = svSites(r); if (cur.map(x => x.address).join('|') === c.addrs.join('|')) return;   // 현장 목록이 같으면 그대로(좌표 유지)
+      if (cur.length) delIds.push(r.id);
+      c.addrs.forEach((ad, k) => { const o = cur.find(x => x.address === ad); ins.push({ case_id: r.id, seq: k + 1, address: ad, lat: o ? o.lat : null, lng: o ? o.lng : null, geo_status: o ? o.geo_status : null }); });
+    });
+    for (let i = 0; i < delIds.length; i += 100){ const { error } = await sb.from('survey_sites').delete().in('case_id', delIds.slice(i, i + 100)); if (error){ b.disabled = false; return alert('현장 목록을 바꾸지 못했어요: ' + error.message); } }
+    for (let i = 0; i < ins.length; i += 200){ const { error } = await sb.from('survey_sites').insert(ins.slice(i, i + 200)); if (error){ b.disabled = false; return alert('현장 저장에 실패했어요: ' + error.message); } }
+    svCloseOv('svCsvOv'); toast(`📥 대출 ${cs.length}건을 등록했어요`); svView = 'open'; await loadSurvey(); renderSurvey();
   }
 });
 
@@ -300,6 +343,10 @@ function svCluster(pts, maxKm, maxN){
   }
   return cl.filter(c => c.alive).map(c => c.m.map(i => pts[i]));
 }
+// 묶음의 점 = 현장 하나. 대출 정보는 대출건 것을 그대로 쓰고(잔액은 묶음 안에서 한 번만 합산), k/n = 그 대출건의 몇 번째 현장인지
+const svPoints = (cases) => cases.flatMap(c => svSites(c).map((s, k) => ({ ...c, address: s.address, lat: s.lat, lng: s.lng, geo_status: s.geo_status, siteId: s.id, k: k + 1, n: svSites(c).length })));
+const svFirstOf = (items) => { const seen = new Set(); return items.map(r => { const f = !seen.has(r.id); seen.add(r.id); return f; }); };   // 같은 대출건의 첫 현장만 true
+const svSiteTag = (r) => r.n > 1 ? `현장 ${r.k}/${r.n}` : '';
 function svBuildGroups(targets, maxKm, maxN, byAsg){
   const parts = byAsg ? [...new Set(targets.map(r => svAsgName(r) || '(담당자 없음)'))].map(a => ({ a, rows: targets.filter(r => (svAsgName(r) || '(담당자 없음)') === a) })) : [{ a: '', rows: targets }];
   const groups = [];
@@ -309,7 +356,7 @@ function svBuildGroups(targets, maxKm, maxN, byAsg){
     const byArea = new Map(); nog.forEach(r => { const a = svArea(r.address), k = `${a.sgg}|${a.emd}`; (byArea.get(k) || byArea.set(k, []).get(k)).push(r); });
     [...byArea.values()].forEach(a => { for (let i = 0; i < a.length; i += maxN) groups.push({ unk: true, asg: p.a, items: a.slice(i, i + maxN) }); });
   });
-  groups.forEach(g => { g.name = svName(g.items); g.sum = g.items.reduce((s, r) => s + Number(r.balance || 0), 0); g.diam = g.unk ? null : svDiam(g.items); });
+  groups.forEach(g => { g.name = svName(g.items); g.loans = new Set(g.items.map(r => r.id)).size; g.sum = g.items.reduce((s, r, i, a) => s + (a.findIndex(x => x.id === r.id) === i ? Number(r.balance || 0) : 0), 0); g.diam = g.unk ? null : svDiam(g.items); });
   groups.sort((a, b) => a.unk - b.unk || b.items.length - a.items.length || b.sum - a.sum);
   return groups;
 }
@@ -338,7 +385,7 @@ function svOpenGroup(){
   svGeoLabel(); svGroups = null; svShowOv('svGpOv');
 }
 function svGeoLabel(){
-  const t = svRows.filter(r => !svDone(r)), need = t.filter(r => r.lat == null && r.geo_status !== 'fail').length, fail = t.filter(r => r.geo_status === 'fail').length;
+  const t = svRows.filter(r => !svDone(r)).flatMap(svSites), need = t.filter(r => r.lat == null && r.geo_status !== 'fail').length, fail = t.filter(r => r.geo_status === 'fail').length;
   const b = $('svgGeoBtn'); if (!b) return;
   b.textContent = need ? `📌 위치 확인 (${need}건)` : `📌 위치 확인 완료${fail ? ` · 실패 ${fail}건 다시 시도` : ''}`;
   b.dataset.retry = need ? '' : fail ? '1' : '0'; b.disabled = !need && !fail;
@@ -350,7 +397,7 @@ $('svGpPanel').addEventListener('click', async (ev) => {
   if (a === 'geo') return svRunGeo(b.dataset.retry === '1');
   if (a === 'make'){
     const km = +$('svgKm').value, n = +$('svgN').value, asg = $('svgAsg').checked; try { localStorage.setItem('svGp', JSON.stringify({ km, n, asg })); } catch (e) {}
-    const targets = svRows.filter(r => !svDone(r)); svGroups = { list: svBuildGroups(targets, km, n, asg), km, n };
+    const targets = svPoints(svRows.filter(r => !svDone(r))); svGroups = { list: svBuildGroups(targets, km, n, asg), km, n };
     return svShowGroups();
   }
   if (a === 'focus') return svMapFocus(+b.dataset.i);
@@ -358,23 +405,27 @@ $('svGpPanel').addEventListener('click', async (ev) => {
   if (a === 'finish'){
     const gi = +b.dataset.i, g = svGroups.list[gi], inp = $(`svgDate${gi}`), d = inp && inp.value;
     if (!d) return alert('실태조사일을 선택해주세요.');
-    if (!confirm(`${gi + 1}번 묶음 ${g.items.length}곳의 실태조사일을 ${d}로 입력하고 완료 처리할까요?`)) return;
+    // 대출건은 현장을 모두 다녀와야 완료 → 현장이 전부 이 묶음 안에 있는 대출건만 완료 처리 (일부 현장이 다른 묶음에 있는 건은 제외)
+    const cnt = new Map(); g.items.forEach(r => cnt.set(r.id, (cnt.get(r.id) || 0) + 1));
+    const done = [...cnt].filter(([id, n]) => (svRows.find(x => x.id === id) || { sites: [] }).sites.length === n).map(x => x[0]), skip = cnt.size - done.length;
+    if (!done.length) return alert('이 묶음의 대출건은 모두 다른 묶음에도 현장이 있어요. 모든 현장을 다녀온 뒤 목록에서 실태조사일을 넣어주세요.');
+    if (!confirm(`${gi + 1}번 묶음의 대출 ${done.length}건의 실태조사일을 ${d}로 입력하고 완료 처리할까요?${skip ? `\n(다른 묶음에도 현장이 남은 ${skip}건은 완료 처리하지 않아요)` : ''}`)) return;
     b.disabled = true;
-    const { error } = await sb.from('survey_cases').update({ survey_date: d, updated_at: new Date().toISOString() }).in('id', g.items.map(r => r.id));
+    const { error } = await sb.from('survey_cases').update({ survey_date: d, updated_at: new Date().toISOString() }).in('id', done);
     b.disabled = false; if (error) return alert(error.message);
-    toast(`✅ ${g.items.length}곳 완료 처리`); svGroups = null; $('svgOut').innerHTML = '<div class="muted" style="margin-top:12px">완료 처리했어요. 다시 “묶음 만들기”를 눌러 남은 곳으로 새로 묶어보세요.</div>';
+    toast(`✅ 대출 ${done.length}건 완료 처리${skip ? ` (현장이 남은 ${skip}건 제외)` : ''}`); svGroups = null; $('svgOut').innerHTML = '<div class="muted" style="margin-top:12px">완료 처리했어요. 다시 “묶음 만들기”를 눌러 남은 곳으로 새로 묶어보세요.</div>';
     await loadSurvey(); svGeoLabel(); renderSurvey();
   }
 });
 async function svRunGeo(retry){
   if (svBusy) return; svBusy = true;
-  const targets = svRows.filter(r => !svDone(r) && (retry ? r.geo_status === 'fail' : r.lat == null && r.geo_status !== 'fail')), msg = $('svgMsg'); let done = 0, ok = 0, fail = 0, i = 0;
+  const targets = svRows.filter(r => !svDone(r)).flatMap(svSites).filter(r => retry ? r.geo_status === 'fail' : r.lat == null && r.geo_status !== 'fail'), msg = $('svgMsg'); let done = 0, ok = 0, fail = 0, i = 0;
   $('svgGeoBtn').disabled = true;
   const worker = async () => {
     while (i < targets.length){
       const r = targets[i++], pos = await svGeocode(r.address);
       const patch = pos ? { lat: pos.lat, lng: pos.lng, geo_status: 'ok' } : { geo_status: 'fail' };
-      const { error } = await sb.from('survey_cases').update(patch).eq('id', r.id);
+      const { error } = await sb.from('survey_sites').update(patch).eq('id', r.id);
       if (!error) Object.assign(r, patch);
       pos ? ok++ : fail++; done++; if (msg) msg.textContent = `위치 확인 중… ${done} / ${targets.length}`;
     }
@@ -403,7 +454,7 @@ async function svMapDraw(){
     if (pts.length > 1) L.polyline(ll, { color: col, weight: 3, opacity: .75, dashArray: '6 6' }).addTo(layer);
     pts.forEach((r, k) => {
       const icon = L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: `<div style="width:30px;height:30px;border-radius:50%;background:${col};color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)">${gi + 1}</div>` });
-      L.marker([r.lat, r.lng], { icon }).bindPopup(`<b>${gi + 1}번 묶음 · ${k + 1}번째</b><br>${esc(r.name)} ${r.balance !== null ? '· ' + svComma(r.balance) + '원' : ''}<br><span style="color:#667">${esc(r.address)}</span>`).addTo(layer);
+      L.marker([r.lat, r.lng], { icon }).bindPopup(`<b>${gi + 1}번 묶음 · ${k + 1}번째</b>${svSiteTag(r) ? ' · ' + svSiteTag(r) : ''}<br>${esc(r.name)} ${r.balance !== null ? '· ' + svComma(r.balance) + '원' : ''}<br><span style="color:#667">${esc(r.address)}</span>`).addTo(layer);
     });
     svMapGroups[gi] = L.latLngBounds(ll); all.push(...ll);
   });
@@ -416,14 +467,14 @@ function svMapFocus(gi){
   svMap.fitBounds(svMapGroups[gi].pad(0.3), { maxZoom: 16 });
 }
 function svShowGroups(){
-  const gs = svGroups.list, tot = gs.reduce((s, g) => s + g.items.length, 0), unk = gs.filter(g => g.unk).reduce((s, g) => s + g.items.length, 0), today = kstToday();
-  const need = svRows.filter(r => !svDone(r) && r.lat == null && r.geo_status !== 'fail').length;
-  $('svgOut').innerHTML = `<div class="dbsum" style="margin-top:12px;border-radius:12px;background:var(--field)"><span><b>${gs.length}개 묶음</b> · ${tot}곳</span><span>묶음당 평균 ${(tot / Math.max(1, gs.length)).toFixed(1)}곳</span>${unk ? `<span class="o">위치 미확인 ${unk}곳 (주소 기준으로 묶음)</span>` : ''}${need ? `<span class="r">위치 확인 안 한 건 ${need}곳 — 먼저 “위치 확인”을 눌러주세요</span>` : ''}<span style="flex:1"></span><button class="btn small" data-g="print">🖨 전체 인쇄</button></div>
+  const gs = svGroups.list, tot = gs.reduce((s, g) => s + g.items.length, 0), loanN = new Set(gs.flatMap(g => g.items.map(r => r.id))).size, unk = gs.filter(g => g.unk).reduce((s, g) => s + g.items.length, 0), today = kstToday();
+  const need = svRows.filter(r => !svDone(r)).flatMap(svSites).filter(r => r.lat == null && r.geo_status !== 'fail').length;
+  $('svgOut').innerHTML = `<div class="dbsum" style="margin-top:12px;border-radius:12px;background:var(--field)"><span><b>${gs.length}개 묶음</b> · 현장 ${tot}곳 (대출 ${loanN}건)</span><span>묶음당 평균 ${(tot / Math.max(1, gs.length)).toFixed(1)}곳</span>${unk ? `<span class="o">위치 미확인 ${unk}곳 (주소 기준으로 묶음)</span>` : ''}${need ? `<span class="r">위치 확인 안 한 건 ${need}곳 — 먼저 “위치 확인”을 눌러주세요</span>` : ''}<span style="flex:1"></span><button class="btn small" data-g="print">🖨 전체 인쇄</button></div>
     <div id="svMapEl" class="svmap"><div class="muted" style="padding:14px">지도를 불러오는 중…</div></div>
     <div class="muted" style="font-size:12.5px;margin-top:6px">원 안의 숫자 = 묶음 번호, 점선 = 추천 방문 순서. 묶음의 “🗺 지도에서 보기”를 누르면 그 묶음으로 확대돼요.${gs.some(g => g.unk) ? ' (위치 미확인 묶음은 지도에 나오지 않아요)' : ''}</div>
-    ${gs.map((g, i) => `<div class="svgrp ${g.unk ? 'unk' : ''}"><div class="gh"><span class="gn" style="background:${g.unk ? '#9aa3b2' : svColor(i)}">${i + 1}</span><b>${esc(g.name)}</b><span class="muted">${g.items.length}곳</span><span style="flex:1"></span>${g.unk ? '' : `<button class="btn small" data-g="focus" data-i="${i}">🗺 지도에서 보기</button>`}<button class="btn small" data-g="print" data-i="${i}">🖨 인쇄</button></div>
+    ${gs.map((g, i) => `<div class="svgrp ${g.unk ? 'unk' : ''}"><div class="gh"><span class="gn" style="background:${g.unk ? '#9aa3b2' : svColor(i)}">${i + 1}</span><b>${esc(g.name)}</b><span class="muted">${g.items.length}곳${g.loans !== g.items.length ? ` · 대출 ${g.loans}건` : ''}</span><span style="flex:1"></span>${g.unk ? '' : `<button class="btn small" data-g="focus" data-i="${i}">🗺 지도에서 보기</button>`}<button class="btn small" data-g="print" data-i="${i}">🖨 인쇄</button></div>
       <div class="gm">대출잔액 ${esc(dbWon(g.sum))}${g.diam !== null && g.items.length > 1 ? ` · 가장 먼 두 곳 약 ${g.diam.toFixed(1)}km` : ''}${g.unk ? ' · 좌표 없음(주소 기준)' : ''}${g.asg ? ` · 담당 ${esc(g.asg)}` : ''}</div>
-      <ol>${g.items.map(r => `<li><b>${esc(r.name)}</b> <small>${esc(r.biz_type || '')}${r.balance !== null ? ' · ' + svComma(r.balance) + '원' : ''}${!g.asg && svAsgName(r) ? ' · ' + esc(svAsgName(r)) : ''}</small><br><small>${esc(r.address)}</small></li>`).join('')}</ol>
+      <ol>${(() => { const fs = svFirstOf(g.items); return g.items.map((r, ix) => `<li><b>${esc(r.name)}</b> <small>${esc(r.biz_type || '')}${svSiteTag(r) ? ' · ' + svSiteTag(r) : ''}${r.balance !== null ? (fs[ix] ? ' · ' + svComma(r.balance) + '원' : ' · (잔액 위와 같은 대출건)') : ''}${!g.asg && svAsgName(r) ? ' · ' + esc(svAsgName(r)) : ''}</small><br><small>${esc(r.address)}</small></li>`).join(''); })()}</ol>
       <div class="dbline" style="margin:8px 0 0 34px"><span class="muted" style="font-size:13px">이 묶음을 같이 조사했다면</span><input type="date" id="svgDate${i}" value="${today}" /><button class="btn small primary" data-g="finish" data-i="${i}">✅ 조사일 입력·완료</button></div></div>`).join('')}`;
   svMapDraw();
 }
@@ -481,10 +532,10 @@ function svPrintGroupsHtml(only, imgs, overview){
   h2{font-size:13.5px;margin:14px 0 5px;padding-left:9px;border-left:5px solid #111;page-break-after:avoid}h2 small{font-weight:500;color:#555;font-size:11.5px;margin-left:6px}
   table.t{width:calc(100% - 1px);border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:4px 6px;vertical-align:middle}table.t th{background:#eee;font-size:11.5px}
   tr{page-break-inside:avoid}thead{display:table-header-group}.c{text-align:center}.r{text-align:right}.nw{white-space:nowrap}.g{page-break-inside:avoid}img.map{display:block;width:100%;height:auto;border:1px solid #444;margin:0 0 6px}.foot{margin-top:10px;font-size:11px;color:#666;text-align:center}`;
-  const sum = `<h2>묶음 요약 <small>(${gs.length}개 묶음 · ${gs.reduce((s, x) => s + x.g.items.length, 0)}곳)</small></h2><table class="t"><thead><tr><th style="width:6%">묶음</th><th>권역</th><th style="width:9%">건수</th><th style="width:20%">대출잔액 합계</th><th style="width:16%">조사 예정일</th></tr></thead><tbody>${gs.map(({ g, i }) => `<tr><td class="c">${i + 1}</td><td>${esc(g.name)}${g.unk ? ' (위치 미확인)' : ''}${g.asg ? ' · ' + esc(g.asg) : ''}</td><td class="c">${g.items.length}</td><td class="r">${esc(svComma(g.sum))}원</td><td></td></tr>`).join('')}</tbody></table>`;
-  const body = gs.map(({ g, i }) => `<div class="g"><h2>${i + 1}번 묶음 — ${esc(g.name)}<small>${g.items.length}곳 · 잔액 ${esc(svComma(g.sum))}원${g.diam !== null && g.items.length > 1 ? ` · 가장 먼 두 곳 약 ${g.diam.toFixed(1)}km` : ''}${g.unk ? ' · 위치 미확인(주소 기준)' : ''}</small></h2>
+  const sum = `<h2>묶음 요약 <small>(${gs.length}개 묶음 · 현장 ${gs.reduce((s, x) => s + x.g.items.length, 0)}곳)</small></h2><table class="t"><thead><tr><th style="width:6%">묶음</th><th>권역</th><th style="width:9%">건수</th><th style="width:20%">대출잔액 합계</th><th style="width:16%">조사 예정일</th></tr></thead><tbody>${gs.map(({ g, i }) => `<tr><td class="c">${i + 1}</td><td>${esc(g.name)}${g.unk ? ' (위치 미확인)' : ''}${g.asg ? ' · ' + esc(g.asg) : ''}</td><td class="c">${g.items.length}${g.loans !== g.items.length ? `<br><small>(대출 ${g.loans})</small>` : ''}</td><td class="r">${esc(svComma(g.sum))}원</td><td></td></tr>`).join('')}</tbody></table>`;
+  const body = gs.map(({ g, i }) => `<div class="g"><h2>${i + 1}번 묶음 — ${esc(g.name)}<small>${g.items.length}곳 · 잔액 ${esc(svComma(g.sum))}원${g.loans !== g.items.length ? ` (대출 ${g.loans}건 기준)` : ''}${g.diam !== null && g.items.length > 1 ? ` · 가장 먼 두 곳 약 ${g.diam.toFixed(1)}km` : ''}${g.unk ? ' · 위치 미확인(주소 기준)' : ''}</small></h2>
     ${imgs.get(i) ? `<img class="map" src="${imgs.get(i)}" alt="묶음 지도" />` : ''}<table class="t"><thead><tr><th style="width:6.5%;white-space:nowrap">순서</th><th style="width:10%">성명</th><th style="width:10%">고객번호</th><th style="width:17%">계좌번호</th><th style="width:12%">대출잔액(원)</th><th style="width:9%">사업구분</th><th>사업장 소재지</th><th style="width:8%">담당</th><th style="width:11%">조사일</th></tr></thead><tbody>
-    ${g.items.map((r, k) => `<tr><td class="c">${k + 1}</td><td>${esc(r.name)}</td><td class="c nw">${esc(r.cust_no)}</td><td class="c nw">${esc(r.account_no)}</td><td class="r nw">${r.balance === null ? '-' : esc(svComma(r.balance))}</td><td class="c">${esc(r.biz_type || '')}</td><td>${esc(r.address)}</td><td class="c">${esc(svAsgName(r))}</td><td></td></tr>`).join('')}</tbody></table></div>`).join('');
+    ${(() => { const fs = svFirstOf(g.items); return g.items.map((r, k) => `<tr><td class="c">${k + 1}</td><td>${esc(r.name)}</td><td class="c nw">${esc(r.cust_no)}</td><td class="c nw">${esc(r.account_no)}</td><td class="r nw">${r.balance === null ? '-' : fs[k] ? esc(svComma(r.balance)) : '〃'}</td><td class="c">${esc(r.biz_type || '')}</td><td>${esc(r.address)}${svSiteTag(r) ? ` <small>(${svSiteTag(r)})</small>` : ''}</td><td class="c">${esc(svAsgName(r))}</td><td></td></tr>`).join(''); })()}</tbody></table></div>`).join('');
   const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>정책자금 실태조사 현장 묶음</title>${link}<style>${css}</style></head><body>
     <div class="top"><div class="org">${esc(org)}</div><table class="sign"><tr><th>담당</th><th>과장</th><th>상무</th><th>전무</th><th>조합장</th></tr><tr><td></td><td></td><td></td><td></td><td></td></tr></table></div>
     <div class="title"><h1>정책자금 실태조사 현장 조사 계획</h1><div class="sub">기준일 ${esc(today)} · 가까운 사업장끼리 묶음 (묶음 ${svGroups.km}km 이내 · 최대 ${svGroups.n}곳)</div></div>${only === null ? sum : ''}${overview ? `<h2>전체 지도 <small>(원 안의 숫자 = 묶음 번호)</small></h2><img class="map" src="${overview}" alt="전체 지도" />` : ''}${body}
