@@ -532,3 +532,37 @@ drop policy if exists dc_sel on public.debt_cases; create policy dc_sel on publi
 drop policy if exists dl_sel on public.debt_logs; create policy dl_sel on public.debt_logs for select to authenticated using (is_member());
 drop policy if exists sv_sel on public.survey_cases; create policy sv_sel on public.survey_cases for select to authenticated using (is_member());
 drop policy if exists ss_sel on public.survey_sites; create policy ss_sel on public.survey_sites for select to authenticated using (is_member());
+
+-- 감정평가 > 임대사업자 RTI 계산: rti_calcs(고객별 계산 저장: 입력값 jsonb + 결과) / rti_settings(기준금리·Stress·판정 기준, 한 행)
+-- 조회는 팀원 전체, 저장·수정은 has_appraisal(), 삭제는 작성자·관리자, 기준값 수정은 관리자.
+create table if not exists public.rti_settings (
+  id smallint primary key default 1 check (id = 1),
+  base_rate numeric(5,2) not null default 2.93, base_month text not null default '2026년 3월',
+  ref_loan_rate numeric(5,2) not null default 4.79, ref_loan_month text not null default '2024년 12월',
+  stress_existing numeric(4,2) not null default 1.00, stress_new numeric(4,2) not null default 1.50,
+  est_ratio numeric(5,2) not null default 70, small_limit bigint not null default 100000000,
+  th_non_house numeric(4,2) not null default 1.50, th_non_house_ok numeric(4,2) not null default 1.20,
+  th_house numeric(4,2) not null default 1.25, th_house_ok numeric(4,2) not null default 1.00,
+  updated_by text, updated_at timestamptz not null default now()
+);
+insert into public.rti_settings (id) values (1) on conflict (id) do nothing;
+create table if not exists public.rti_calcs (
+  id bigint generated always as identity primary key,
+  title text not null check (char_length(title) between 1 and 100),
+  kind text not null default '비주택' check (kind in ('비주택','주택')),
+  data jsonb not null default '{}'::jsonb,
+  income bigint not null default 0, interest bigint not null default 0, rti numeric(8,2), verdict text,
+  memo text check (memo is null or char_length(memo) <= 500),
+  created_by text not null default auth.email(), created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+alter table public.rti_settings enable row level security;
+alter table public.rti_calcs enable row level security;
+create policy rs_sel on public.rti_settings for select to authenticated using (is_member());
+create policy rs_upd on public.rti_settings for update to authenticated using (is_admin()) with check (is_admin());
+create policy rc_sel on public.rti_calcs for select to authenticated using (is_member());
+create policy rc_ins on public.rti_calcs for insert to authenticated with check (has_appraisal() and created_by = auth.email());
+create policy rc_upd on public.rti_calcs for update to authenticated using (has_appraisal()) with check (has_appraisal());
+create policy rc_del on public.rti_calcs for delete to authenticated using (has_appraisal() and (created_by = auth.email() or is_admin()));
+grant select, update on public.rti_settings to authenticated;
+grant select, insert, update, delete on public.rti_calcs to authenticated;
+alter publication supabase_realtime add table public.rti_calcs;
