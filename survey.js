@@ -55,7 +55,7 @@ function svCloseOv(id){ $(id).style.display = 'none'; if (!['svFormOv', 'svCsvOv
 
 // ---------- 불러오기 ----------
 async function loadSurvey(){
-  if (!debtCan()){ svRows = []; return; }
+  if (!debtView()){ svRows = []; return; }
   let all = [];
   for (let from = 0; from < 20000; from += 1000){
     const { data, error } = await sb.from('survey_cases').select('*, survey_sites(*)').order('id', { ascending: true }).range(from, from + 999);
@@ -86,7 +86,7 @@ function renderSurvey(){
         <div class="seg" id="svViewSeg"><button data-v="open">미완료 <span id="svNA"></span></button><button data-v="done">완료 <span id="svNB"></span></button></div>
         <select id="svAsgSel"></select><select id="svBizSel"></select>
         <input id="svQ" class="search" type="search" placeholder="🔍 성명·고객번호·계좌·소재지" />
-        <button class="btn small" data-sv="csv">📥 CSV 올리기</button><button class="btn small primary" data-sv="group">📍 현장 묶음 추천</button>
+        ${debtCan() ? '<button class="btn small" data-sv="csv">📥 CSV 올리기</button>' : '<span class="pill ro" title="등록·수정 권한이 없어 보기만 가능해요">👀 보기 전용</span>'}<button class="btn small primary" data-sv="group">📍 현장 묶음 추천</button>
       </div>
       <div class="dbsum" id="svSum"></div>
       <div class="svhead"><span>성명 / 고객번호</span><span>계좌번호</span><span>대출잔액</span><span>사업구분</span><span>사업장 소재지</span><span>담당자</span><span>실태조사일</span></div>
@@ -131,13 +131,12 @@ function svRowHtml(r){
     <div><div class="nm">${esc(r.name)}</div><div class="sub">고객번호 ${esc(r.cust_no)}</div></div>
     <div>${esc(r.account_no)}</div><div class="mo">${r.balance === null ? '-' : svComma(r.balance) + '원'}</div><div>${esc(r.biz_type || '-')}</div>
     <div class="ad">${svSites(r).map(x => `<div>${svSites(r).length > 1 ? '· ' : ''}${esc(x.address)}${x.geo_status === 'fail' ? '<span class="svgeo">📍위치 미확인</span>' : ''}</div>`).join('') || '-'}${svSites(r).length > 1 ? `<span class="svgeo">현장 ${svSites(r).length}곳</span>` : ''}</div><div>${esc(a || '-')}</div>
-    <div>${svDone(r) ? `<span class="svok">✅ 완료</span><br>` : ''}<input type="date" data-sdate="${r.id}" value="${esc(r.survey_date || '')}" title="날짜를 넣으면 완료 처리돼요" /></div></div>`;
+    <div>${svDone(r) ? `<span class="svok">✅ 완료</span><br>` : ''}${debtCan() ? `<input type="date" data-sdate="${r.id}" value="${esc(r.survey_date || '')}" title="날짜를 넣으면 완료 처리돼요" />` : (r.survey_date ? esc(r.survey_date) : '<span class="muted">-</span>')}</div></div>`;
 }
 
 // ---------- 등록/수정 ----------
 const svSiteInput = (x) => `<div class="svsite" data-sid="${x.id || ''}" style="display:flex;gap:6px;margin-top:6px"><input class="svsa" maxlength="200" placeholder="사업장 소재지" value="${esc(x.address)}" style="flex:1" /><button class="btn small danger" type="button" data-f="delsite" title="이 현장 삭제">✕</button></div>`;
 function svOpenForm(id){
-  if (!debtCan()) return;
   svEditId = id || null; const r = id ? svRows.find(x => x.id === id) : null; if (id && !r) return;
   const asgOpts = `<option value="">미지정</option>${members.map(m => `<option value="${esc(m.email)}" ${r && r.assignee_email === m.email ? 'selected' : ''}>${esc(m.name || m.email)}</option>`).join('')}`;
   $('svFormPanel').innerHTML = `<div class="ph"><h2>${r ? '조사 대상 수정' : '조사 대상 등록'}</h2><button class="x" data-f="close">✕</button></div>
@@ -150,6 +149,11 @@ function svOpenForm(id){
     <div class="row"><div><label>담당자</label><select id="svfAsg">${asgOpts}</select></div><div><label>실태조사일 <span class="muted" style="font-weight:400">(넣으면 완료)</span></label><input type="date" id="svfDate" value="${esc(r ? r.survey_date || '' : '')}" /></div></div>
     <label>메모</label><textarea id="svfMemo" rows="3" maxlength="500">${esc(r ? r.memo || '' : '')}</textarea>
     <div class="acts" style="margin-top:14px;justify-content:space-between"><div>${r ? '<button class="btn danger" data-f="del">삭제</button>' : ''}</div><div style="display:flex;gap:8px"><button class="btn" data-f="close">취소</button><button class="btn primary" data-f="save">저장</button></div></div>`;
+  if (!debtCan()){   // 권한이 없으면 보기만 (입력칸 잠금, 저장·삭제·현장 추가 버튼 없음)
+    $('svFormPanel').querySelectorAll('input,select,textarea').forEach(x => { x.disabled = true; });
+    $('svFormPanel').querySelectorAll('[data-f=save],[data-f=del],[data-f=addsite],[data-f=delsite]').forEach(x => x.remove());
+    $('svFormPanel').querySelector('h2').textContent = '조사 대상 (보기 전용)';
+  }
   svShowOv('svFormOv');
 }
 $('svFormPanel').addEventListener('input', (e) => { if (e.target.id === 'svfBal'){ const n = svNum(e.target.value); e.target.value = n === null ? '' : svComma(n); } });
@@ -385,7 +389,7 @@ function svOpenGroup(){
     <div class="dbline" style="margin-top:12px"><label style="margin:0">묶음 크기(가장 먼 두 곳 사이)</label><select id="svgKm">${[2, 3, 5, 8, 12, 20].map(k => `<option value="${k}" ${k === p.km ? 'selected' : ''}>${k}km 이내</option>`).join('')}</select>
       <label style="margin:0">최대</label><select id="svgN">${[4, 6, 8, 10, 15, 20].map(k => `<option value="${k}" ${k === p.n ? 'selected' : ''}>${k}곳</option>`).join('')}</select>
       <label class="chk" style="margin:0"><input type="checkbox" id="svgAsg" ${p.asg ? 'checked' : ''} /> 담당자별로 따로</label></div>
-    <div class="dbline" style="margin-top:10px"><button class="btn" data-g="geo" id="svgGeoBtn"></button><button class="btn primary" data-g="make">🧭 묶음 만들기</button><span class="muted" id="svgMsg" style="font-size:13px"></span></div>
+    <div class="dbline" style="margin-top:10px">${debtCan() ? '<button class="btn" data-g="geo" id="svgGeoBtn"></button>' : ''}<button class="btn primary" data-g="make">🧭 묶음 만들기</button><span class="muted" id="svgMsg" style="font-size:13px"></span></div>
     <div id="svgOut"></div>`;
   svGeoLabel(); svGroups = null; svShowOv('svGpOv');
 }
@@ -477,7 +481,7 @@ function svMapFocus(gi){
 function svShowGroups(){
   const gs = svGroups.list, tot = gs.reduce((s, g) => s + g.items.length, 0), loanN = new Set(gs.flatMap(g => g.items.map(r => r.id))).size, unk = gs.filter(g => g.unk).reduce((s, g) => s + g.items.length, 0), today = kstToday();
   const need = svTargets().flatMap(svSites).filter(r => r.lat == null && r.geo_status !== 'fail').length;
-  $('svgOut').innerHTML = `<div class="dbsum" style="margin-top:12px;border-radius:12px;background:var(--field)"><span><b>${gs.length}개 묶음</b> · 현장 ${tot}곳 (대출 ${loanN}건)</span><span>묶음당 평균 ${(tot / Math.max(1, gs.length)).toFixed(1)}곳</span>${unk ? `<span class="o">위치 미확인 ${unk}곳 (주소 기준으로 묶음)</span>` : ''}${need ? `<span class="r">위치 확인 안 한 건 ${need}곳 — 먼저 “위치 확인”을 눌러주세요</span>` : ''}<span style="flex:1"></span><button class="btn small" data-g="print">🖨 전체 인쇄</button></div>
+  $('svgOut').innerHTML = `<div class="dbsum" style="margin-top:12px;border-radius:12px;background:var(--field)"><span><b>${gs.length}개 묶음</b> · 현장 ${tot}곳 (대출 ${loanN}건)</span><span>묶음당 평균 ${(tot / Math.max(1, gs.length)).toFixed(1)}곳</span>${unk ? `<span class="o">위치 미확인 ${unk}곳 (주소 기준으로 묶음)</span>` : ''}${need ? `<span class="r">위치 확인 안 한 건 ${need}곳 — ${debtCan() ? '먼저 “위치 확인”을 눌러주세요' : '권한자가 위치 확인을 하면 지도에 나와요'}</span>` : ''}<span style="flex:1"></span><button class="btn small" data-g="print">🖨 전체 인쇄</button></div>
     <div class="seg" id="svMapSeg" style="margin-top:12px"><button data-g="mt" data-t="base" class="${svMapType === 'base' ? 'on' : ''}">🗺 일반지도</button><button data-g="mt" data-t="sat" class="${svMapType === 'sat' ? 'on' : ''}">🛰 항공지도</button><span class="muted" style="align-self:center;margin-left:8px;font-size:12.5px">고른 지도로 보고서도 인쇄돼요</span></div>
     <div id="svMapEl" class="svmap" style="margin-top:8px"><div class="muted" style="padding:14px">지도를 불러오는 중…</div></div>
     <div class="muted" style="font-size:12.5px;margin-top:6px">원 안의 숫자 = 묶음 번호, 점선 = 추천 방문 순서. 묶음의 “🗺 지도에서 보기”를 누르면 그 묶음으로 확대돼요.${gs.some(g => g.unk) ? ' (위치 미확인 묶음은 지도에 나오지 않아요)' : ''}</div>
@@ -485,6 +489,7 @@ function svShowGroups(){
       <div class="gm">대출잔액 ${esc(dbWon(g.sum))}${g.diam !== null && g.items.length > 1 ? ` · 가장 먼 두 곳 약 ${g.diam.toFixed(1)}km` : ''}${g.unk ? ' · 좌표 없음(주소 기준)' : ''}${g.asg ? ` · 담당 ${esc(g.asg)}` : ''}</div>
       <ol>${(() => { const fs = svFirstOf(g.items); return g.items.map((r, ix) => `<li><b>${esc(r.name)}</b> <small>${esc(r.biz_type || '')}${svSiteTag(r) ? ' · ' + svSiteTag(r) : ''}${r.balance !== null ? (fs[ix] ? ' · ' + svComma(r.balance) + '원' : ' · (잔액 위와 같은 대출건)') : ''}${!g.asg && svAsgName(r) ? ' · ' + esc(svAsgName(r)) : ''}</small><br><small>${esc(r.address)}</small></li>`).join(''); })()}</ol>
       <div class="dbline" style="margin:8px 0 0 34px"><span class="muted" style="font-size:13px">이 묶음을 같이 조사했다면</span><input type="date" id="svgDate${i}" value="${today}" /><button class="btn small primary" data-g="finish" data-i="${i}">✅ 조사일 입력·완료</button></div></div>`).join('')}`;
+  if (!debtCan()) document.querySelectorAll('#svgOut .dbline').forEach(x => { if (x.querySelector('[data-g=finish]')) x.remove(); });
   svMapDraw();
 }
 // 인쇄용 지도 그림: 브이월드(안 되면 OpenStreetMap) 타일을 캔버스에 이어 붙이고 마커·방문 순서선을 그려 PNG 로 만든다.

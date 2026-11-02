@@ -526,3 +526,9 @@ create policy ss_upd on public.survey_sites for update to authenticated using (h
 create policy ss_del on public.survey_sites for delete to authenticated using (has_debt());
 grant select, insert, update, delete on public.survey_sites to authenticated;
 alter publication supabase_realtime add table public.survey_sites;
+
+-- 사후관리(연체채권·정책자금실태조사)는 팀원 누구나 '보기'만 가능하도록 조회 정책을 is_member() 로 완화. 등록·수정·삭제는 기존처럼 has_debt()(perm_debt 또는 관리자)만.
+drop policy if exists dc_sel on public.debt_cases; create policy dc_sel on public.debt_cases for select to authenticated using (is_member());
+drop policy if exists dl_sel on public.debt_logs; create policy dl_sel on public.debt_logs for select to authenticated using (is_member());
+drop policy if exists sv_sel on public.survey_cases; create policy sv_sel on public.survey_cases for select to authenticated using (is_member());
+drop policy if exists ss_sel on public.survey_sites; create policy ss_sel on public.survey_sites for select to authenticated using (is_member());
