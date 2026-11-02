@@ -19,6 +19,16 @@ function rtiNewData(){
   return { monthly: 0, jeonse: 0, estMonthly: 0, estJeonse: 0, baseRate: s.base_rate, estRatio: s.est_ratio, stressEx: s.stress_existing, stressNew: s.stress_new,
     existing: [{ p: 0, r: 0 }, { p: 0, r: 0 }], news: [{ p: 0, r: 0 }], forced: false };
 }
+function rtiStale(m){   // '2026년 3월' 형태의 기준 시점이 3개월 넘게 지났는지
+  const x = String(m || '').match(/(\d{4})\s*년\s*(\d{1,2})\s*월/); if (!x) return false;
+  const now = new Date(Date.now() + 9 * 3600e3);
+  return (now.getUTCFullYear() - +x[1]) * 12 + (now.getUTCMonth() + 1 - +x[2]) > 3;
+}
+function rtiStaleMsg(){
+  const s = rtiS(), a = [];
+  if (rtiStale(s.base_month)) a.push(`수신금리(${s.base_month} 기준)`); if (rtiStale(s.ref_loan_month)) a.push(`여신금리(${s.ref_loan_month} 기준)`);
+  return a.length ? `⚠ ${a.join(' · ')} 자료가 오래됐어요. 한국은행 최신 자료로 ${isAdmin() ? '⚙ 기준값에서 바꿔주세요' : '관리자가 ⚙ 기준값을 갱신해야 해요'}.` : '';
+}
 function rtiCompute(d, kind){
   const s = rtiS(), base = Number(d.baseRate) || 0, er = (Number(d.estRatio) || 0) / 100;
   const mInc = Math.round(Number(d.monthly || 0) * 12), jInc = Math.round(Number(d.jeonse || 0) * base / 100);
@@ -62,6 +72,7 @@ function rtiCompute(d, kind){
   .rtitbl input{ width:100%; min-width:70px; text-align:right; padding:7px 9px; font-size:14px; } .rtitbl .est td{ background:#fff8e6; } .rtitbl tfoot td{ font-weight:800; font-size:15px; }
   .rtitbl .calc{ font-weight:700; white-space:nowrap; } .rtitbl .rate{ width:78px; }
   .rtiscroll{ overflow-x:auto; } .rtibox .chk{ white-space:normal; align-items:flex-start; line-height:1.5; }
+  .rtiwarn{ background:#fff3c4; color:#7a5200; border-radius:14px; padding:10px 14px; font-size:13.5px; font-weight:700; }
   .rtiinfo{ font-size:13px; line-height:1.6; color:#44546f; } .rtiinfo table{ width:100%; border-collapse:collapse; margin:6px 0 10px; } .rtiinfo th,.rtiinfo td{ border:1px solid var(--line); padding:5px 8px; text-align:center; font-size:12.5px; } .rtiinfo th{ background:var(--field); }
   .rtiinfo tr.cur td,.rtiinfo tr.cur th{ background:#fff3c4; font-weight:800; }
   .rtiinfo .ex{ color:#7c2d8e; font-weight:600; }
@@ -95,7 +106,8 @@ function renderRti(){
   if (rtiMode === 'edit' && rtiDraft) return;   // 편집 중에는 다시 그리지 않음
   rtiMode = 'list';
   const rows = rtiCalcs.filter(r => (rtiKind === 'all' || r.kind === rtiKind) && (!rtiQ || String(r.title).toLowerCase().includes(rtiQ)));
-  el.innerHTML = `<div class="list-panel"><div class="toolbar">
+  const stale = rtiStaleMsg();
+  el.innerHTML = `${stale ? `<div class="rtiwarn">${esc(stale)}</div>` : ''}<div class="list-panel"><div class="toolbar">
       <div class="seg" id="rtiKindSeg"><button data-k="all" class="${rtiKind === 'all' ? 'on' : ''}">전체</button><button data-k="비주택" class="${rtiKind === '비주택' ? 'on' : ''}">비주택</button><button data-k="주택" class="${rtiKind === '주택' ? 'on' : ''}">주택</button></div>
       <input id="rtiQ" class="search" type="search" placeholder="🔍 고객명 검색" value="${esc(rtiQ)}" />
       ${isAdmin() ? '<button class="btn small" data-r="set">⚙ 기준값</button>' : ''}${rtiCan() ? '<button class="btn small primary" data-r="new">＋ 새 RTI 계산</button>' : '<span class="pill ro">👀 보기 전용</span>'}
@@ -144,9 +156,10 @@ function renderRtiEditor(){
   const el = $('rti'), D = rtiDraft, d = D.d, s = rtiS(), can = rtiCan();
   el.innerHTML = `<div class="rtibox" style="padding:14px 18px"><div class="dbline" style="gap:10px">
       <button class="btn small" data-r="back">← 목록</button>
-      <input id="rtiTitle" placeholder="고객명 (예: 김태규)" maxlength="100" value="${esc(D.title)}" style="flex:1;min-width:150px;font-weight:700" ${can ? '' : 'disabled'} />
+      <input id="rtiTitle" placeholder="고객명" maxlength="100" value="${esc(D.title)}" style="flex:1;min-width:150px;font-weight:700" ${can ? '' : 'disabled'} />
       <div class="seg" id="rtiKindEd"><button data-k="비주택" class="${D.kind === '비주택' ? 'on' : ''}">비주택 임대업</button><button data-k="주택" class="${D.kind === '주택' ? 'on' : ''}">주택 임대업</button></div>
       <button class="btn small" data-r="print">🖨 인쇄</button>${can ? '<button class="btn small primary" data-r="save">💾 저장</button>' : ''}${can && D.id ? '<button class="btn small danger" data-r="del">삭제</button>' : ''}</div></div>
+    ${rtiStaleMsg() ? `<div class="rtiwarn">${esc(rtiStaleMsg())}</div>` : ''}
     <div class="rtied"><div style="display:flex;flex-direction:column;gap:12px;min-width:0">
       <div class="rtibox"><div class="rtisum"><div class="inc"><div class="k">연간 임대소득</div><div class="v" id="rtoInc"></div></div><div class="int"><div class="k">연간 이자비용</div><div class="v" id="rtoInt"></div></div><div><div class="k">RTI</div><div class="v" id="rtoRti"></div></div><div><div class="k">판정</div><div class="v" style="font-size:15px"><span class="rtiv" id="rtoV"></span></div></div></div>
         <div class="muted" style="font-size:12.5px;margin-top:8px" id="rtoNote"></div></div>
@@ -197,7 +210,7 @@ function rtiRefresh(){
       <tr class="${D.kind === '주택' ? 'cur' : ''}"><th>주택 임대업</th><td>${s.th_house.toFixed(2)}배 이상</td><td>${s.th_house_ok.toFixed(2)}배 이상</td></tr>
       <tr class="${D.kind === '비주택' ? 'cur' : ''}"><th>비주택 임대업</th><td>${s.th_non_house.toFixed(2)}배 이상</td><td>${s.th_non_house_ok.toFixed(2)}배 이상</td></tr></table>
     <div class="muted" style="font-size:12px">※ 근린상가주택은 비주택임대업으로 계산</div>
-    <div style="margin-top:10px"><b>산출근거</b><br>• 기준금리: 한국은행고시 예금은행 수신금리(신규취급액 기준) <b>${rtiPctTxt(s.base_rate)}</b> (${esc(s.base_month)} 기준) — <a href="https://ecos.bok.or.kr" target="_blank" rel="noopener">ECOS</a><br>• 기존대출 참고금리: 예금은행 대출금리(잔액기준, 중소기업대출) <b>${rtiPctTxt(s.ref_loan_rate)}</b> (${esc(s.ref_loan_month)} 기준) — <a href="http://ecos.bok.or.kr/#/Short/cb9e75" target="_blank" rel="noopener">ECOS</a><br>• Stress: 기존대출 +${s.stress_existing.toFixed(2)}%p, 신규대출 +${s.stress_new.toFixed(2)}%p</div>
+    <div style="margin-top:10px"><b>산출근거</b><br>• 기준금리: 한국은행고시 예금은행 수신금리(신규취급액 기준) <b>${rtiPctTxt(s.base_rate)}</b> (${esc(s.base_month)} 기준)<br>• 기존대출 참고금리: 예금은행 대출금리(잔액기준, 중소기업대출) <b>${rtiPctTxt(s.ref_loan_rate)}</b> (${esc(s.ref_loan_month)} 기준)<br>• Stress: 기존대출 +${s.stress_existing.toFixed(2)}%p, 신규대출 +${s.stress_new.toFixed(2)}%p</div>
     <div class="ex" style="margin-top:10px">* RTI 산정 예외 조건<br>1) 1억원 이하의 소액 대출<br>2) 상속, 채권보전을 위한 경매참가 등 불가피하게 채무를 인수하게 되는 경우</div>`;
 }
 $('rti').addEventListener('input', (e) => {
@@ -230,9 +243,9 @@ function rtiOpenSettings(){
   if (!isAdmin()) return; const s = rtiS();
   const f = (id, label, v, w = 90) => `<div><label>${label}</label><input id="${id}" inputmode="decimal" value="${v}" style="width:${w}px" /></div>`;
   $('rtiSetPanel').innerHTML = `<div class="ph"><h2>⚙ RTI 기준값</h2><button class="x" data-s="close">✕</button></div>
-    <div class="muted" style="font-size:13px;margin:4px 0 8px">새 계산의 기본값으로 쓰여요. 이미 저장한 계산은 저장 당시 값을 그대로 유지해요.</div>
-    <div class="row">${f('rsBase', '기준금리·수신금리 (%)', s.base_rate)}<div><label>기준 시점</label><input id="rsBaseM" value="${esc(s.base_month)}" maxlength="20" /></div></div>
-    <div class="row">${f('rsRef', '대출금리 참고 (%)', s.ref_loan_rate)}<div><label>기준 시점</label><input id="rsRefM" value="${esc(s.ref_loan_month)}" maxlength="20" /></div></div>
+    <div class="muted" style="font-size:13px;margin:4px 0 8px">수신금리·여신금리·Stress 금리는 한국은행 <b>최신 자료</b>로 기준 시점과 함께 입력해주세요. 새 계산의 기본값으로 쓰이고, 이미 저장한 계산은 저장 당시 값을 그대로 유지해요. 기준 시점이 3개월 넘게 지나면 계산 화면에 경고가 떠요.</div>
+    <div class="row">${f('rsBase', '수신금리 (%) · 예금은행 수신금리', s.base_rate)}<div><label>기준 시점</label><input id="rsBaseM" value="${esc(s.base_month)}" maxlength="20" /></div></div>
+    <div class="row">${f('rsRef', '여신금리 (%) · 예금은행 대출금리', s.ref_loan_rate)}<div><label>기준 시점</label><input id="rsRefM" value="${esc(s.ref_loan_month)}" maxlength="20" /></div></div>
     <div class="row">${f('rsSEx', '기존대출 Stress (%p)', s.stress_existing)}${f('rsSNew', '신규대출 Stress (%p)', s.stress_new)}${f('rsEst', '추정비율 (%)', s.est_ratio)}</div>
     <div class="row">${f('rsNH', '비주택 원칙 (배)', s.th_non_house)}${f('rsNHo', '비주택 승인時 (배)', s.th_non_house_ok)}${f('rsH', '주택 원칙 (배)', s.th_house)}${f('rsHo', '주택 승인時 (배)', s.th_house_ok)}</div>
     <div><label>소액 대출 기준 (원 이하 산정 예외)</label><input id="rsSmall" inputmode="numeric" value="${rtiW(s.small_limit)}" /></div>
