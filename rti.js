@@ -17,7 +17,7 @@ const rtiR2 = (n) => Math.round(n * 100) / 100;
 function rtiNewData(){
   const s = rtiS();
   return { monthly: 0, jeonse: 0, estMonthly: 0, estJeonse: 0, baseRate: s.base_rate, estRatio: s.est_ratio, stressEx: s.stress_existing, stressNew: s.stress_new,
-    existing: [{ p: 0, r: 0 }, { p: 0, r: 0 }], news: [{ p: 0, r: 0 }], forced: false };
+    existing: [{ p: 0, r: 0, t: 'v' }, { p: 0, r: 0, t: 'v' }], news: [{ p: 0, r: 0, t: 'v' }], refRate: s.ref_loan_rate, forced: false };
 }
 function rtiStale(m){   // '2026년 3월' 형태의 기준 시점이 3개월 넘게 지났는지
   const x = String(m || '').match(/(\d{4})\s*년\s*(\d{1,2})\s*월/); if (!x) return false;
@@ -34,8 +34,11 @@ function rtiCompute(d, kind){
   const mInc = Math.round(Number(d.monthly || 0) * 12), jInc = Math.round(Number(d.jeonse || 0) * base / 100);
   const eM = Math.round(Number(d.estMonthly || 0) * 12 * er), eJ = Math.round(Number(d.estJeonse || 0) * base / 100 * er);
   const income = mInc + jInc + eM + eJ;
-  const row = (x, add) => { const st = (Number(x.r) || 0) + add; return { p: Number(x.p) || 0, r: Number(x.r) || 0, s: st, i: Math.round((Number(x.p) || 0) * st / 100) }; };
-  const ex = (d.existing || []).map(x => row(x, Number(d.stressEx) || 0)), nw = (d.news || []).map(x => row(x, Number(d.stressNew) || 0));
+  // 금리: 입력한 금리 (기존대출은 실제 금리를 모르면 참고금리 = 예금은행 중소기업대출 가중평균금리(잔액기준) 적용). Stress: 변동금리에만 가산, 3년 이상 고정금리는 제외
+  const refRate = Number(d.refRate !== undefined ? d.refRate : s.ref_loan_rate) || 0;
+  const row = (x, add, isEx) => { const p = Number(x.p) || 0, has = Number(x.r) > 0, rate = has ? Number(x.r) : (isEx && p > 0 ? refRate : 0), fixed = x.t === 'f', st = rate + (fixed ? 0 : add);
+    return { p, r: rate, s: st, i: Math.round(p * st / 100), refUsed: isEx && p > 0 && !has, fixed }; };
+  const ex = (d.existing || []).map(x => row(x, Number(d.stressEx) || 0, true)), nw = (d.news || []).map(x => row(x, Number(d.stressNew) || 0, false));
   const interest = ex.concat(nw).reduce((a, x) => a + x.i, 0), newSum = nw.reduce((a, x) => a + x.p, 0);
   const hasI = interest > 0, rti = hasI ? rtiR2(income / interest) : null;   // 시트처럼 소수 둘째 자리 반올림 값으로 판정
   const th = kind === '주택' ? [s.th_house, s.th_house_ok] : [s.th_non_house, s.th_non_house_ok];
@@ -145,10 +148,12 @@ $('rti').addEventListener('click', async (e) => {
 
 // ---------- 편집 화면 ----------
 const rtiIn = (f, v, money, extra = '') => `<input data-f="${f}" ${money ? 'inputmode="numeric"' : 'inputmode="decimal"'} value="${money ? (v ? rtiW(v) : '') : (v === 0 || v === '' ? '' : v)}" ${rtiCan() ? '' : 'disabled'} ${extra} />`;
-function rtiLoanRows(arr, grp){
+function rtiLoanRows(arr, grp, ref){
+  const dis = rtiCan() ? '' : 'disabled';
   return arr.map((x, i) => `<tr><td>${grp === 'ex' ? '기존대출' : '신규대출'} ${i + 1}</td>
-    <td>${`<input data-g="${grp}" data-i="${i}" data-f="p" inputmode="numeric" value="${x.p ? rtiW(x.p) : ''}" ${rtiCan() ? '' : 'disabled'} />`}</td>
-    <td>${`<input class="rate" data-g="${grp}" data-i="${i}" data-f="r" inputmode="decimal" value="${x.r ? x.r : ''}" placeholder="%" ${rtiCan() ? '' : 'disabled'} />`}</td>
+    <td>${`<input data-g="${grp}" data-i="${i}" data-f="p" inputmode="numeric" value="${x.p ? rtiW(x.p) : ''}" ${dis} />`}</td>
+    <td>${`<input class="rate" data-g="${grp}" data-i="${i}" data-f="r" inputmode="decimal" value="${x.r ? x.r : ''}" placeholder="${grp === 'ex' ? ref + ' 참고' : '%'}" title="${grp === 'ex' ? '실제 금리를 모르면 비워두세요 (참고금리 적용)' : ''}" ${dis} />`}</td>
+    <td><select data-g="${grp}" data-i="${i}" data-f="t" ${dis}><option value="v" ${x.t === 'f' ? '' : 'selected'}>변동</option><option value="f" ${x.t === 'f' ? 'selected' : ''}>고정(3년↑)</option></select></td>
     <td class="calc" data-o="${grp}s${i}"></td><td class="calc" data-o="${grp}i${i}"></td>
     <td style="width:34px">${rtiCan() && arr.length > 1 ? `<button class="btn small" data-r="rm${grp === 'ex' ? 'ex' : 'new'}" data-i="${i}" title="삭제">✕</button>` : ''}</td></tr>`).join('');
 }
@@ -171,13 +176,13 @@ function renderRtiEditor(){
         <tfoot><tr><td>합계</td><td></td><td></td><td data-o="income"></td></tr></tfoot></table></div>
         <div class="dbline" style="margin-top:12px"><label style="margin:0">기준금리(수신금리) <input data-f="baseRate" inputmode="decimal" value="${d.baseRate}" style="width:80px;text-align:right" ${can ? '' : 'disabled'} /> %</label>
           <label style="margin:0">추정비율 <input data-f="estRatio" inputmode="decimal" value="${d.estRatio}" style="width:70px;text-align:right" ${can ? '' : 'disabled'} /> %</label></div></div>
-      <div class="rtibox"><h3>〈이자비용 계산〉</h3><div class="rtiscroll"><table class="rtitbl"><thead><tr><th>구분</th><th>원금</th><th>금리(%)</th><th>Stress금리</th><th>연간이자비용</th><th></th></tr></thead><tbody>
-        ${rtiLoanRows(d.existing, 'ex')}${rtiLoanRows(d.news, 'nw')}</tbody>
-        <tfoot><tr><td>합계</td><td data-o="pSum" class="calc"></td><td></td><td></td><td data-o="interest"></td><td></td></tr></tfoot></table></div>
+      <div class="rtibox"><h3>〈이자비용 계산〉</h3><div class="rtiscroll"><table class="rtitbl"><thead><tr><th>구분</th><th>원금</th><th>금리(%)</th><th>금리유형</th><th>Stress 포함 금리</th><th>연간이자비용</th><th></th></tr></thead><tbody>
+        ${rtiLoanRows(d.existing, 'ex', d.refRate !== undefined ? d.refRate : s.ref_loan_rate)}${rtiLoanRows(d.news, 'nw', '')}</tbody>
+        <tfoot><tr><td>합계</td><td data-o="pSum" class="calc"></td><td></td><td></td><td></td><td data-o="interest"></td><td></td></tr></tfoot></table></div>
         ${can ? '<div class="dbline" style="margin-top:10px"><button class="btn small" data-r="addex">＋ 기존대출 추가</button><button class="btn small" data-r="addnew">＋ 신규대출 추가</button></div>' : ''}
         <div class="dbline" style="margin-top:12px"><label style="margin:0">기존대출 Stress <input data-f="stressEx" inputmode="decimal" value="${d.stressEx}" style="width:64px;text-align:right" ${can ? '' : 'disabled'} /> %p</label>
           <label style="margin:0">신규대출 Stress <input data-f="stressNew" inputmode="decimal" value="${d.stressNew}" style="width:64px;text-align:right" ${can ? '' : 'disabled'} /> %p</label></div>
-        <div class="muted" style="font-size:12px;margin-top:6px">연간이자비용 = 원금 × (금리 + Stress). 기존대출 금리 참고: 대출금리(잔액기준, 중소기업대출) ${rtiPctTxt(s.ref_loan_rate)} (${esc(s.ref_loan_month)} 기준)</div></div>
+        <div class="muted" style="font-size:12px;margin-top:6px">연간이자비용 = 원금 × (금리 + Stress). Stress는 <b>변동금리</b>에만 가산하고 3년 이상 고정금리는 제외해요. 기존대출의 실제 금리를 모르면 금리를 비워두세요 → 참고금리(예금은행 대출금리·잔액기준 중소기업대출) ${rtiPctTxt(d.refRate !== undefined ? d.refRate : s.ref_loan_rate)} 적용</div></div>
       <div class="rtibox"><label class="chk" style="margin:0"><input type="checkbox" data-f="forced" ${d.forced ? 'checked' : ''} ${can ? '' : 'disabled'} /> 상속, 채권보전을 위한 경매참가 등 <b>불가피하게 채무를 인수</b>하게 되는 경우 (RTI 산정 예외)</label>
         <label style="margin-top:10px">메모</label><textarea id="rtiMemo" rows="2" maxlength="500" ${can ? '' : 'disabled'}>${esc(D.memo)}</textarea></div>
     </div>
@@ -190,7 +195,7 @@ function rtiRead(){   // 화면 입력값을 draft 에 반영
   D.title = ($('rtiTitle') || {}).value || D.title; D.memo = ($('rtiMemo') || {}).value || '';
   document.querySelectorAll('#rti [data-f]').forEach(inp => {
     const f = inp.dataset.f, g = inp.dataset.g;
-    if (g){ const row = (g === 'ex' ? d.existing : d.news)[+inp.dataset.i]; if (row) row[f] = f === 'p' ? rtiNum(inp.value) : rtiPct(inp.value); return; }
+    if (g){ const row = (g === 'ex' ? d.existing : d.news)[+inp.dataset.i]; if (row) row[f] = f === 't' ? (inp.value === 'f' ? 'f' : 'v') : f === 'p' ? rtiNum(inp.value) : rtiPct(inp.value); return; }
     if (f === 'forced'){ d.forced = inp.checked; return; }
     d[f] = ['baseRate', 'estRatio', 'stressEx', 'stressNew'].includes(f) ? rtiPct(inp.value) : rtiNum(inp.value);
   });
@@ -200,7 +205,8 @@ function rtiRefresh(){
   const D = rtiDraft, d = D.d, c = rtiCompute(d, D.kind), s = rtiS(), set = (k, v) => document.querySelectorAll(`#rti [data-o="${k}"]`).forEach(x => { x.textContent = v; });
   set('mInc', rtiW(c.mInc)); set('jInc', rtiW(c.jInc)); set('eM', rtiW(c.eM)); set('eJ', rtiW(c.eJ)); set('income', rtiW(c.income)); set('interest', rtiW(c.interest));
   set('pSum', rtiW(c.ex.concat(c.nw).reduce((a, x) => a + x.p, 0)));
-  c.ex.forEach((x, i) => { set(`exs${i}`, rtiPctTxt(x.s)); set(`exi${i}`, rtiW(x.i)); }); c.nw.forEach((x, i) => { set(`nws${i}`, rtiPctTxt(x.s)); set(`nwi${i}`, rtiW(x.i)); });
+  const tag = (x) => `${rtiPctTxt(x.s)}${x.fixed ? ' (고정)' : ''}${x.refUsed ? ' (참고금리)' : ''}`;
+  c.ex.forEach((x, i) => { set(`exs${i}`, tag(x)); set(`exi${i}`, rtiW(x.i)); }); c.nw.forEach((x, i) => { set(`nws${i}`, tag(x)); set(`nwi${i}`, rtiW(x.i)); });
   $('rtoInc').textContent = `${rtiW(c.income)}원`; $('rtoInt').textContent = `${rtiW(c.interest)}원`; $('rtoRti').textContent = c.rti === null ? '-' : c.rti.toFixed(2);
   $('rtoV').textContent = c.verdict; $('rtoV').className = `rtiv ${c.vcls}`;
   $('rtoNote').textContent = c.rti === null ? '' : `기준 ${D.kind} 임대업: 원칙 ${c.th[0].toFixed(2)}배 이상 · 여신위원회 승인 시 ${c.th[1].toFixed(2)}배 이상${c.small ? ' · 신규대출 합계가 소액 기준(' + rtiW(s.small_limit) + '원) 이하라 산정 예외 대상' : ''}`;
@@ -210,7 +216,7 @@ function rtiRefresh(){
       <tr class="${D.kind === '주택' ? 'cur' : ''}"><th>주택 임대업</th><td>${s.th_house.toFixed(2)}배 이상</td><td>${s.th_house_ok.toFixed(2)}배 이상</td></tr>
       <tr class="${D.kind === '비주택' ? 'cur' : ''}"><th>비주택 임대업</th><td>${s.th_non_house.toFixed(2)}배 이상</td><td>${s.th_non_house_ok.toFixed(2)}배 이상</td></tr></table>
     <div class="muted" style="font-size:12px">※ 근린상가주택은 비주택임대업으로 계산</div>
-    <div style="margin-top:10px"><b>산출근거</b><br>• 기준금리: 한국은행고시 예금은행 수신금리(신규취급액 기준) <b>${rtiPctTxt(s.base_rate)}</b> (${esc(s.base_month)} 기준)<br>• 기존대출 참고금리: 예금은행 대출금리(잔액기준, 중소기업대출) <b>${rtiPctTxt(s.ref_loan_rate)}</b> (${esc(s.ref_loan_month)} 기준)<br>• Stress: 기존대출 +${s.stress_existing.toFixed(2)}%p, 신규대출 +${s.stress_new.toFixed(2)}%p</div>
+    <div style="margin-top:10px"><b>산출근거</b><br>• 기준금리: 한국은행고시 예금은행 수신금리(신규취급액 기준) <b>${rtiPctTxt(s.base_rate)}</b> (${esc(s.base_month)} 기준)<br>• 기존대출 참고금리: 예금은행 대출금리(잔액기준, 중소기업대출) <b>${rtiPctTxt(s.ref_loan_rate)}</b> (${esc(s.ref_loan_month)} 기준)<br>• Stress(스트레스 금리): 변동금리 대출에 가산, 3년 이상 고정금리는 제외. 기존대출 +${Number(d.stressEx).toFixed(2)}%p, 신규대출 +${Number(d.stressNew).toFixed(2)}%p<br><span class="muted">최저 1%p — 최근 3년간 예금은행 중소기업대출 신규취급 월별 가중평균금리의 최고치에서 최근 월 금리를 뺀 값(1%p 미만이면 1%p)</span><br>• 기존대출 금리: 실제 금리, 모르면 참고금리(잔액기준 중소기업대출 가중평균금리) 적용</div>
     <div class="ex" style="margin-top:10px">* RTI 산정 예외 조건<br>1) 1억원 이하의 소액 대출<br>2) 상속, 채권보전을 위한 경매참가 등 불가피하게 채무를 인수하게 되는 경우</div>`;
 }
 $('rti').addEventListener('input', (e) => {
@@ -246,6 +252,8 @@ function rtiOpenSettings(){
     <div class="muted" style="font-size:13px;margin:4px 0 8px">수신금리·여신금리·Stress 금리는 한국은행 <b>최신 자료</b>로 기준 시점과 함께 입력해주세요. 새 계산의 기본값으로 쓰이고, 이미 저장한 계산은 저장 당시 값을 그대로 유지해요. 기준 시점이 3개월 넘게 지나면 계산 화면에 경고가 떠요.</div>
     <div class="row">${f('rsBase', '수신금리 (%) · 예금은행 수신금리', s.base_rate)}<div><label>기준 시점</label><input id="rsBaseM" value="${esc(s.base_month)}" maxlength="20" /></div></div>
     <div class="row">${f('rsRef', '여신금리 (%) · 예금은행 대출금리', s.ref_loan_rate)}<div><label>기준 시점</label><input id="rsRefM" value="${esc(s.ref_loan_month)}" maxlength="20" /></div></div>
+    <div class="row" style="align-items:flex-end">${f('rsHi', '최근 3년 최고 금리 (%)', '')}${f('rsLo', '최근 월 금리 (%)', '')}<div><button class="btn small" type="button" data-s="calc">Stress 계산</button></div></div>
+    <div class="muted" style="font-size:12px;margin:-2px 0 8px">예금은행 중소기업대출 신규취급 월별 가중평균금리의 3년 최고치와 최근 월 값을 넣으면 Stress = 최고치 − 최근 월 (1%p 미만이면 1%p)로 채워줘요.</div>
     <div class="row">${f('rsSEx', '기존대출 Stress (%p)', s.stress_existing)}${f('rsSNew', '신규대출 Stress (%p)', s.stress_new)}${f('rsEst', '추정비율 (%)', s.est_ratio)}</div>
     <div class="row">${f('rsNH', '비주택 원칙 (배)', s.th_non_house)}${f('rsNHo', '비주택 승인時 (배)', s.th_non_house_ok)}${f('rsH', '주택 원칙 (배)', s.th_house)}${f('rsHo', '주택 승인時 (배)', s.th_house_ok)}</div>
     <div><label>소액 대출 기준 (원 이하 산정 예외)</label><input id="rsSmall" inputmode="numeric" value="${rtiW(s.small_limit)}" /></div>
@@ -255,6 +263,7 @@ function rtiOpenSettings(){
 $('rtiSetPanel').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-s]'); if (!b) return;
   if (b.dataset.s === 'close') return void ($('rtiSetOv').style.display = 'none');
+  if (b.dataset.s === 'calc'){ const hi = rtiPct($('rsHi').value), lo = rtiPct($('rsLo').value); if (!hi || !lo) return alert('3년 최고 금리와 최근 월 금리를 입력해주세요.'); const st = Math.max(1, rtiR2(hi - lo)); $('rsSNew').value = st; $('rsSEx').value = st; return; }
   const g = (id) => rtiPct($(id).value);
   const row = { base_rate: g('rsBase'), base_month: $('rsBaseM').value.trim() || RTI_DEF.base_month, ref_loan_rate: g('rsRef'), ref_loan_month: $('rsRefM').value.trim() || RTI_DEF.ref_loan_month,
     stress_existing: g('rsSEx'), stress_new: g('rsSNew'), est_ratio: g('rsEst'), small_limit: rtiNum($('rsSmall').value), th_non_house: g('rsNH'), th_non_house_ok: g('rsNHo'), th_house: g('rsH'), th_house_ok: g('rsHo'), updated_by: me, updated_at: new Date().toISOString() };
@@ -274,7 +283,7 @@ function rtiPrint(){
   h2{font-size:13.5px;margin:14px 0 5px;padding-left:9px;border-left:5px solid #111}table.t{width:calc(100% - 1px);border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:5px 8px;vertical-align:middle}table.t th{background:#eee;font-size:11.5px}
   .r{text-align:right}.c{text-align:center}.nw{white-space:nowrap}.big td{font-size:15px;font-weight:800}.est td{background:#fff8e6}tfoot td{font-weight:800;background:#f3f3f3}tr.cur td,tr.cur th{background:#fff3c4;font-weight:800}tr{page-break-inside:avoid}
   .v{display:inline-block;border:1.5px solid #111;border-radius:99px;padding:3px 14px;font-weight:800}.foot{margin-top:10px;font-size:11px;color:#666}.ex{color:#5b2a86;font-weight:600;margin-top:8px}.note{font-size:11.5px;color:#444;margin-top:6px}`;
-  const loan = (arr, name) => arr.map((x, i) => `<tr><td>${name} ${i + 1}</td><td class="r">${rtiW(x.p)}</td><td class="r">${rtiPctTxt(x.r)}</td><td class="r">${rtiPctTxt(x.s)}</td><td class="r">${rtiW(x.i)}</td></tr>`).join('');
+  const loan = (arr, name) => arr.map((x, i) => `<tr><td>${name} ${i + 1}</td><td class="r">${rtiW(x.p)}</td><td class="r">${rtiPctTxt(x.r)}${x.refUsed ? ' <small>(참고)</small>' : ''}</td><td class="c">${x.fixed ? '고정' : '변동'}</td><td class="r">${rtiPctTxt(x.s)}</td><td class="r">${rtiW(x.i)}</td></tr>`).join('');
   const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>임대사업자 RTI 계산내역</title>${link}<style>${css}</style></head><body>
   <div class="org">${esc(org)}</div><div class="title"><h1>임대사업자 RTI 계산내역 (${esc(D.title || '')})</h1><div class="sub">작성일 ${esc(today)} · 작성자 ${esc(nameOf(me))}</div></div>
   <h2>계산 결과</h2><table class="t"><tr><th style="width:20%">구분</th><th>${esc(D.kind)} 임대업</th><th style="width:22%">판정</th></tr>
@@ -286,9 +295,9 @@ function rtiPrint(){
     <tr class="est"><td>추정-월세</td><td class="r">${rtiW(d.estMonthly)}</td><td class="c">× 12 × ${rtiPctTxt(d.estRatio)}</td><td class="r">${rtiW(c.eM)}</td></tr>
     <tr class="est"><td>추정-전세</td><td class="r">${rtiW(d.estJeonse)}</td><td class="c">× ${rtiPctTxt(d.baseRate)} × ${rtiPctTxt(d.estRatio)}</td><td class="r">${rtiW(c.eJ)}</td></tr></tbody>
     <tfoot><tr><td>합계</td><td></td><td></td><td class="r">${rtiW(c.income)}</td></tr></tfoot></table>
-  <h2>이자비용 계산</h2><table class="t"><thead><tr><th style="width:20%">구분</th><th>원금</th><th style="width:15%">금리</th><th style="width:17%">Stress금리</th><th style="width:22%">연간이자비용</th></tr></thead><tbody>${loan(c.ex, '기존대출')}${loan(c.nw, '신규대출')}</tbody>
-    <tfoot><tr><td>합계</td><td class="r">${rtiW(c.ex.concat(c.nw).reduce((a, x) => a + x.p, 0))}</td><td></td><td></td><td class="r">${rtiW(c.interest)}</td></tr></tfoot></table>
-  <div class="note">Stress: 기존대출 +${Number(d.stressEx).toFixed(2)}%p, 신규대출 +${Number(d.stressNew).toFixed(2)}%p (연간이자비용 = 원금 × (금리 + Stress))</div>
+  <h2>이자비용 계산</h2><table class="t"><thead><tr><th style="width:20%">구분</th><th>원금</th><th style="width:14%">금리</th><th style="width:10%">유형</th><th style="width:15%">Stress 포함</th><th style="width:20%">연간이자비용</th></tr></thead><tbody>${loan(c.ex, '기존대출')}${loan(c.nw, '신규대출')}</tbody>
+    <tfoot><tr><td>합계</td><td class="r">${rtiW(c.ex.concat(c.nw).reduce((a, x) => a + x.p, 0))}</td><td></td><td></td><td></td><td class="r">${rtiW(c.interest)}</td></tr></tfoot></table>
+  <div class="note">Stress: 변동금리에만 가산(3년 이상 고정금리 제외) — 기존대출 +${Number(d.stressEx).toFixed(2)}%p, 신규대출 +${Number(d.stressNew).toFixed(2)}%p · 연간이자비용 = 원금 × (금리 + Stress) · (참고) = 실제 금리 미입력으로 참고금리 ${rtiPctTxt(d.refRate !== undefined ? d.refRate : s.ref_loan_rate)} 적용</div>
   <h2>판정 기준</h2><table class="t"><tr><th>구분</th><th>원칙</th><th>여신위원회 승인時</th></tr>
     <tr class="${D.kind === '주택' ? 'cur' : ''}"><td class="c">주택 임대업</td><td class="c">${s.th_house.toFixed(2)}배 이상</td><td class="c">${s.th_house_ok.toFixed(2)}배 이상</td></tr>
     <tr class="${D.kind === '비주택' ? 'cur' : ''}"><td class="c">비주택 임대업</td><td class="c">${s.th_non_house.toFixed(2)}배 이상</td><td class="c">${s.th_non_house_ok.toFixed(2)}배 이상</td></tr></table>
