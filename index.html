@@ -76,6 +76,8 @@
   .side-h .muted{ font-weight:500; font-size:12px; }
   .q-row{ display:grid; grid-template-columns:1fr auto auto; gap:10px; align-items:baseline; padding:8px 16px; font-size:14px; border-bottom:1px solid #f0f1f3; }
   .q-row:last-child{ border-bottom:0; }
+  .q-mg{ border:0; cursor:pointer; font:inherit; font-size:12px; font-weight:700; color:#44546f; background:#eef1f6; border-radius:99px; padding:3px 10px; margin-left:6px; vertical-align:1px; } .q-mg.on{ background:#16181d; color:#fff; }
+  .q-edit{ display:flex; align-items:center; gap:10px; margin:0; font-weight:500; cursor:pointer; color:var(--ink); font-size:14px; } .q-edit input{ width:18px; height:18px; min-height:0; flex:none; padding:0; -webkit-appearance:auto; appearance:auto; } .q-edit.off .q-name{ opacity:.45; text-decoration:line-through; } .q-hint{ padding:8px 16px 10px; font-size:12px; color:var(--muted); }
   .q-name{ color:#44546f; font-weight:600; } .q-price{ font-weight:800; font-variant-numeric:tabular-nums; }
   .q-chg{ font-size:12.5px; font-weight:700; min-width:92px; text-align:right; font-variant-numeric:tabular-nums; }
   .q-chg.up{ color:#d6342c; } .q-chg.down{ color:#0c66e4; } .q-chg.flat{ color:var(--muted); }
@@ -510,7 +512,7 @@
     </div>
     </div>
     <aside id="side">
-      <div class="side-card"><div class="side-h"><span>📈 시세정보</span><span class="muted" id="qTime"></span></div><div id="quotes"><div class="side-empty">불러오는 중...</div></div></div>
+      <div class="side-card"><div class="side-h"><span>📈 시세정보 <button class="q-mg" id="qManage" type="button">관리</button></span><span class="muted" id="qTime"></span></div><div id="quotes"><div class="side-empty">불러오는 중...</div></div></div>
       <div class="side-card" id="rcCard" style="display:none"><div class="side-h"><span>💬 최근 댓글</span><span class="muted">눌러서 업무 열기</span></div><div id="rcList"></div></div>
       <div class="side-card"><div class="side-h"><span>📰 경제뉴스</span><span class="muted" id="nTime"></span></div><div id="news"><div class="side-empty">불러오는 중...</div></div></div>
     </aside>
@@ -730,7 +732,7 @@
     const { data: ok } = await sb.rpc('is_member');
     if (!ok){ await sb.auth.signOut(); show(false); $('loginMsg').textContent = '등록되지 않은 이메일입니다.'; return; }
     me = session.user.email; show(true);
-    await reloadMembers(); syncClock();
+    await reloadMembers(); syncClock(); loadQuotePrefs();
     renderWho();
     if (!started) setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
     if (!started) divn = hashDiv() || 'home';   // 열 때마다 현황판이 기본화면 (주소 끝 #credit 등으로 바로 열 수도 있음)
@@ -962,14 +964,45 @@
   async function loadQuotes(){
     const { data, error } = await sb.functions.invoke('info-feed', { body: { type: 'quotes' } });
     if (error || !data || !data.quotes || !data.quotes.length){ if (!quotesOk) $('quotes').innerHTML = '<div class="side-empty">시세를 불러오지 못했습니다.<br>잠시 후 다시 시도합니다.</div>'; return; }
-    quotesOk = true;
+    quotesOk = true; quoteLast = data;
     $('qTime').textContent = hhmm(data.updated) + ' 기준';
-    $('quotes').innerHTML = data.quotes.map(q => {
-      const cls = Math.abs(q.pct) < 0.005 ? 'flat' : q.change > 0 ? 'up' : 'down', arrow = cls === 'flat' ? '' : q.change > 0 ? '▲' : '▼';
-      return `<div class="q-row"><span class="q-name">${esc(q.name)}</span><span class="q-price">${esc(q.prefix)}${fnum(q.price, q.dec)}${esc(q.suffix)}</span>
-        <span class="q-chg ${cls}">${arrow} ${fnum(Math.abs(q.change), q.dec)} (${fnum(Math.abs(q.pct), 2)}%)</span></div>`;
-    }).join('');
+    renderQuotes();
   }
+  // 시세정보 개인화: 로그인한 사람마다 보이고 싶은 항목만 골라 두면(관리) 다른 기기에서도 그대로 (user_prefs.quote_hidden)
+  let quoteLast = null, quoteHidden = new Set(), quoteManage = false;
+  function renderQuotes(){
+    if (!quoteLast) return;
+    const list = quoteLast.quotes, row = (q) => {
+      const cls = Math.abs(q.pct) < 0.005 ? 'flat' : q.change > 0 ? 'up' : 'down', arrow = cls === 'flat' ? '' : q.change > 0 ? '▲' : '▼';
+      return `<span class="q-price">${esc(q.prefix)}${fnum(q.price, q.dec)}${esc(q.suffix)}</span><span class="q-chg ${cls}">${arrow} ${fnum(Math.abs(q.change), q.dec)} (${fnum(Math.abs(q.pct), 2)}%)</span>`;
+    };
+    $('qManage').textContent = quoteManage ? '완료' : '관리'; $('qManage').classList.toggle('on', quoteManage);
+    if (quoteManage){
+      $('quotes').innerHTML = `<div class="q-hint">보고 싶은 항목만 체크하세요. 내 계정에만 적용돼요. <a href="#" id="qAll">모두 보이기</a></div>` + list.map(q => `<label class="q-row q-edit ${quoteHidden.has(q.sym) ? 'off' : ''}"><input type="checkbox" data-qs="${esc(q.sym)}" ${quoteHidden.has(q.sym) ? '' : 'checked'} /><span class="q-name">${esc(q.name)}</span><span class="q-price" style="font-weight:600;color:var(--muted)">${esc(q.prefix)}${fnum(q.price, q.dec)}${esc(q.suffix)}</span></label>`).join('');
+      return;
+    }
+    const vis = list.filter(q => !quoteHidden.has(q.sym));
+    $('quotes').innerHTML = vis.length ? vis.map(q => `<div class="q-row"><span class="q-name">${esc(q.name)}</span>${row(q)}</div>`).join('') : '<div class="side-empty">모든 항목을 숨겼어요.<br>위의 “관리”에서 다시 켤 수 있어요.</div>';
+  }
+  async function loadQuotePrefs(){
+    try { quoteHidden = new Set(JSON.parse(localStorage.getItem('quoteHidden:' + me) || '[]')); } catch (e) {}
+    const { data, error } = await sb.from('user_prefs').select('quote_hidden').eq('email', me).maybeSingle();
+    if (!error && data) quoteHidden = new Set(data.quote_hidden || []);
+    renderQuotes();
+  }
+  let quoteSaveT = null;
+  function saveQuotePrefs(){
+    try { localStorage.setItem('quoteHidden:' + me, JSON.stringify([...quoteHidden])); } catch (e) {}
+    clearTimeout(quoteSaveT);
+    quoteSaveT = setTimeout(async () => { const { error } = await sb.from('user_prefs').upsert({ email: me, quote_hidden: [...quoteHidden], updated_at: new Date().toISOString() }, { onConflict: 'email' }); if (error) console.warn('시세 설정 저장 실패', error.message); }, 400);
+  }
+  $('qManage').onclick = () => { quoteManage = !quoteManage; renderQuotes(); };
+  $('quotes').addEventListener('change', (e) => {
+    const c = e.target.closest('input[data-qs]'); if (!c) return;
+    c.checked ? quoteHidden.delete(c.dataset.qs) : quoteHidden.add(c.dataset.qs);
+    c.closest('.q-edit').classList.toggle('off', !c.checked); saveQuotePrefs();
+  });
+  $('quotes').addEventListener('click', (e) => { if (e.target.id === 'qAll'){ e.preventDefault(); quoteHidden.clear(); saveQuotePrefs(); renderQuotes(); } });
   async function loadNews(){
     const { data, error } = await sb.functions.invoke('info-feed', { body: { type: 'news' } });
     if (error || !data || !data.items || !data.items.length){ if (!newsOk) $('news').innerHTML = '<div class="side-empty">뉴스를 불러오지 못했습니다.<br>잠시 후 다시 시도합니다.</div>'; return; }

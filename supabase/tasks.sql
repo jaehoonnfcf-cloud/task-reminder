@@ -589,3 +589,15 @@ alter publication supabase_realtime add table public.event_bookings;
 -- 이벤트 항목에 '심신단련휴가' 추가 (기존 DB는 아래로 체크 제약 교체)
 alter table public.event_bookings drop constraint if exists event_bookings_kind_check;
 alter table public.event_bookings add constraint event_bookings_kind_check check (kind in ('건강검진','연차','반차(오전)','반차(오후)','심신단련휴가'));
+
+-- 사용자별 설정(시세정보에서 숨길 항목 등): user_prefs. 본인 행만 조회·저장.
+create table if not exists public.user_prefs (
+  email text primary key default auth.email(),
+  quote_hidden text[] not null default '{}',
+  updated_at timestamptz not null default now()
+);
+alter table public.user_prefs enable row level security;
+create policy up_sel on public.user_prefs for select to authenticated using (email = auth.email());
+create policy up_ins on public.user_prefs for insert to authenticated with check (email = auth.email() and is_member());
+create policy up_upd on public.user_prefs for update to authenticated using (email = auth.email()) with check (email = auth.email());
+grant select, insert, update on public.user_prefs to authenticated;
