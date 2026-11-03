@@ -7,6 +7,7 @@ const EV_KINDS = {
   '연차': { icon: '🏖', short: '연차', color: '#3b6cf5', bg: '#dfe8ff' },
   '반차(오전)': { icon: '🌅', short: '오전반차', color: '#e08a00', bg: '#ffecc7' },
   '반차(오후)': { icon: '🌇', short: '오후반차', color: '#c2410c', bg: '#ffe0cf' },
+  '심신단련휴가': { icon: '🧘', short: '심신단련', color: '#7c3aed', bg: '#ece4ff' },
 };
 let evRows = [], evStart = '', evFilter = 'all', evDay = null, evHol = new Set();
 const evDow = ['일', '월', '화', '수', '목', '금', '토'];

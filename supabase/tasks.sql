@@ -571,7 +571,7 @@ alter publication supabase_realtime add table public.rti_calcs;
 create table if not exists public.event_bookings (
   id bigint generated always as identity primary key,
   event_date date not null,
-  kind text not null check (kind in ('건강검진','연차','반차(오전)','반차(오후)')),
+  kind text not null check (kind in ('건강검진','연차','반차(오전)','반차(오후)','심신단련휴가')),
   person_email text not null default auth.email(),
   note text check (note is null or char_length(note) <= 100),
   created_by text not null default auth.email(),
@@ -585,3 +585,7 @@ create policy eb_ins on public.event_bookings for insert to authenticated with c
 create policy eb_del on public.event_bookings for delete to authenticated using (is_member() and (person_email = auth.email() or created_by = auth.email() or is_admin()));
 grant select, insert, delete on public.event_bookings to authenticated;
 alter publication supabase_realtime add table public.event_bookings;
+
+-- 이벤트 항목에 '심신단련휴가' 추가 (기존 DB는 아래로 체크 제약 교체)
+alter table public.event_bookings drop constraint if exists event_bookings_kind_check;
+alter table public.event_bookings add constraint event_bookings_kind_check check (kind in ('건강검진','연차','반차(오전)','반차(오후)','심신단련휴가'));
