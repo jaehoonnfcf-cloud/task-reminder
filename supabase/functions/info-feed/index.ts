@@ -23,8 +23,8 @@ const QUOTES = [
   { sym: "^TNX", name: "미국채 10년", dec: 3, suffix: "%" },
   { sym: "CL=F", name: "WTI 유가", dec: 2, prefix: "$" },
   { sym: "GC=F", name: "금", dec: 1, prefix: "$" },
-  { sym: "BTC-USD", name: "BTC", dec: 0, prefix: "$" },
-  { sym: "ETH-USD", name: "ETH", dec: 1, prefix: "$" },
+  { sym: "BTC-KRW", name: "BTC", dec: 0, prefix: "₩", alt: "BTC-USD" },   // 원화 시세, 안 되면 달러 시세 × 달러/원 환율로 계산
+  { sym: "ETH-KRW", name: "ETH", dec: 0, prefix: "₩", alt: "ETH-USD" },
 ];
 
 const cache = new Map<string, { t: number; v: unknown }>();
@@ -75,13 +75,22 @@ async function getNews() {
   return { items: uniq.slice(0, 40), errors, updated: new Date().toISOString(), empty: uniq.length === 0 };
 }
 
+async function yahoo(sym: string) {
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d`, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(8000) });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const meta = (await r.json())?.chart?.result?.[0]?.meta;
+  return { price: Number(meta?.regularMarketPrice), prev: Number(meta?.chartPreviousClose ?? meta?.previousClose) };
+}
+
 async function getQuotes() {
   const res = await Promise.allSettled(QUOTES.map(async (q) => {
-    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(q.sym)}?range=1d&interval=1d`, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(8000) });
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const meta = (await r.json())?.chart?.result?.[0]?.meta;
     const k = q.mult ?? 1;
-    const price = meta?.regularMarketPrice * k, prev = (meta?.chartPreviousClose ?? meta?.previousClose) * k;
+    let { price, prev } = await yahoo(q.sym).catch(async (e) => {
+      if (!q.alt) throw e;
+      const [u, w] = await Promise.all([yahoo(q.alt), yahoo("KRW=X")]);   // 달러 시세 × 환율
+      return { price: u.price * w.price, prev: u.prev * w.prev };
+    });
+    price *= k; prev *= k;
     if (!isFinite(price)) throw new Error("no price");
     return { sym: q.sym, name: q.name, dec: q.dec, prefix: q.prefix ?? "", suffix: q.suffix ?? "", price, change: isFinite(prev) ? price - prev : 0, pct: isFinite(prev) && prev ? ((price - prev) / prev) * 100 : 0 };
   }));
