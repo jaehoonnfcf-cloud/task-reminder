@@ -23,6 +23,8 @@ const QUOTES = [
   { sym: "^TNX", name: "미국채 10년", dec: 3, suffix: "%" },
   { sym: "CL=F", name: "WTI 유가", dec: 2, prefix: "$" },
   { sym: "GC=F", name: "금", dec: 1, prefix: "$" },
+  { sym: "BTC-USD", name: "BTC", dec: 0, prefix: "$" },
+  { sym: "ETH-USD", name: "ETH", dec: 1, prefix: "$" },
 ];
 
 const cache = new Map<string, { t: number; v: unknown }>();
