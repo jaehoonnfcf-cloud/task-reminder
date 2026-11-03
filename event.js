@@ -36,7 +36,8 @@ const evMonthShift = (ym, n) => { const [y, m] = ym.split('-').map(Number), t = 
   .evppl h3{ margin:0 0 8px; font-size:15.5px; } .evppl table{ width:100%; border-collapse:collapse; font-size:13.5px; } .evppl td{ padding:6px 4px; border-top:1px solid var(--line); vertical-align:top; } .evppl td:first-child{ font-weight:700; white-space:nowrap; width:78px; }
   .evtag{ display:inline-block; font-size:12px; font-weight:700; border-radius:6px; padding:1px 7px; margin:2px 4px 2px 0; }
   .evrow{ display:flex; align-items:center; gap:8px; padding:9px 2px; border-bottom:1px solid var(--line); } .evrow:last-child{ border-bottom:0; } .evrow .who{ font-weight:700; flex:1; min-width:0; }
-  .evkinds{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:8px; } .evkinds label{ display:flex; align-items:center; gap:6px; padding:10px 12px; border-radius:12px; background:var(--field); font-weight:700; cursor:pointer; margin:0; }
+  .evkinds{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:8px; } .evkinds label{ display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px; background:var(--field); font-weight:700; font-size:14.5px; color:var(--ink); cursor:pointer; margin:0; white-space:nowrap; }
+  .evkinds input{ width:20px; height:20px; min-height:0; flex:none; padding:0; -webkit-appearance:auto; appearance:auto; }
   @media (max-width:900px){ .evmonths{ grid-template-columns:1fr; } }
   @media (max-width:560px){ .evc .ico{ display:none; } .evc{ text-align:center; } .evd{ min-height:74px; padding:4px 2px 3px; } .evc{ font-size:10.5px; padding:1px 3px; } .evmon{ padding:12px 8px; } .evgrid{ gap:3px; } }`;
   document.head.appendChild(st);
