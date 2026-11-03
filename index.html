@@ -465,6 +465,7 @@
       <button data-div="appraisal"><span class="lf">🏛 감정평가</span><span class="ls">감정</span><span class="n" id="nAppraisal"></span></button>
       <button data-div="debt" id="debtBtn"><span class="lf">🛠 사후관리</span><span class="ls">사후</span><span class="n" id="nDebt"></span></button>
       <button data-div="personal"><span class="lf">🔒 개인업무</span><span class="ls">개인</span><span class="n" id="nPersonal"></span></button>
+      <button data-div="event"><span class="lf">🎉 이벤트</span><span class="ls">이벤트</span></button>
     </div>
     <span class="spacer"></span>
     <span class="pill ro" id="roPill" style="display:none" title="이 업무구분에 대한 등록·수정 권한이 없습니다">👀 보기 전용</span>
@@ -494,6 +495,7 @@
     </div>
     <div id="appraisal"></div>
     <div id="rti"></div>
+    <div id="event"></div>
     <div id="debt"><div class="seg" id="dbTabs"><button data-t="debt">📞 <span class="svlf">연체채권관리</span><span class="svls">연체채권</span></button><button data-t="survey">🏭 <span class="svlf">정책자금실태조사</span><span class="svls">실태조사</span></button></div><div id="debtMain"></div><div id="survey"></div></div>
     <div id="personal" style="display:none">
       <div id="pcal"></div>
@@ -721,7 +723,7 @@
     } catch (e) {}
   }
   tickClock(); setInterval(tickClock, 15000); setInterval(() => { if (me && !document.hidden) syncClock(); }, 600000);
-  const SCREENS = ['home', 'deposit', 'credit', 'appraisal', 'debt', 'personal'];
+  const SCREENS = ['home', 'deposit', 'credit', 'appraisal', 'debt', 'personal', 'event'];
   const hashDiv = () => { const d = location.hash.replace('#', ''); return SCREENS.includes(d) && true ? d : null; };
   let started = false;   // 로그인 이벤트(토큰 갱신·탭 복귀 등)로 start() 가 다시 불려도 보던 화면을 바꾸지 않도록
   async function start(session){
@@ -733,7 +735,7 @@
     if (!started) setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
     if (!started) divn = hashDiv() || 'home';   // 열 때마다 현황판이 기본화면 (주소 끝 #credit 등으로 바로 열 수도 있음)
     started = true;
-    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadRti === 'function') await loadRti(); if (typeof loadDebt === 'function') await loadDebt(); if (typeof loadCal === 'function') await loadCal(); if (typeof loadPcal === 'function') await loadPcal(); if (typeof loadPerf === 'function') await loadPerf(); ensureSide(); startRealtime();
+    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadEvent === 'function') await loadEvent(); if (typeof loadRti === 'function') await loadRti(); if (typeof loadDebt === 'function') await loadDebt(); if (typeof loadCal === 'function') await loadCal(); if (typeof loadPcal === 'function') await loadPcal(); if (typeof loadPerf === 'function') await loadPerf(); ensureSide(); startRealtime();
   }
 
   async function reloadMembers(){
@@ -836,21 +838,21 @@
 
   // ---------- 목록 렌더 ----------
   function applyDivUI(){
-    const personal = divn === 'personal', appr = divn === 'appraisal', debt = divn === 'debt', home = divn === 'home';
+    const personal = divn === 'personal', appr = divn === 'appraisal', debt = divn === 'debt', home = divn === 'home', ev = divn === 'event';
     $('app').dataset.div = divn;
     const nm = (nameOf(me) || '').trim() || '담당자';
-    $('helloT').innerHTML = home ? `안녕하세요, ${esc(nm)}님 👋<br><span>오늘의 조합 현황이에요</span>` : debt ? '사후관리 현황이에요 🛠<br><span>오늘 챙길 조치부터 확인해요</span>' : appr ? '새 의뢰 전에,<br><span>기존 기록부터 찾아볼까요? 🔍</span>' : personal ? '나만 보는 업무예요 🔒<br><span>오늘 할 일부터 확인해요</span>' : `안녕하세요, ${esc(nm)}님 👋<br><span>오늘 챙겨야 할 업무예요</span>`;
-    $('home').style.display = home ? 'flex' : 'none'; $('shared').style.display = personal || appr || debt || home ? 'none' : 'flex'; $('debt').style.display = debt ? 'flex' : 'none'; $('debtBtn').style.display = ''; $('personal').style.display = personal ? 'flex' : 'none'; $('appraisal').style.display = appr ? 'flex' : 'none'; $('rti').style.display = appr && typeof apTab !== 'undefined' && apTab === 'rti' ? 'flex' : 'none';
+    $('helloT').innerHTML = ev ? '이벤트 일정이에요 🎉<br><span>검진·연차·반차를 겹치지 않게 골라요</span>' : home ? `안녕하세요, ${esc(nm)}님 👋<br><span>오늘의 조합 현황이에요</span>` : debt ? '사후관리 현황이에요 🛠<br><span>오늘 챙길 조치부터 확인해요</span>' : appr ? '새 의뢰 전에,<br><span>기존 기록부터 찾아볼까요? 🔍</span>' : personal ? '나만 보는 업무예요 🔒<br><span>오늘 할 일부터 확인해요</span>' : `안녕하세요, ${esc(nm)}님 👋<br><span>오늘 챙겨야 할 업무예요</span>`;
+    $('home').style.display = home ? 'flex' : 'none'; $('shared').style.display = personal || appr || debt || home || ev ? 'none' : 'flex'; $('event').style.display = ev ? 'flex' : 'none'; $('debt').style.display = debt ? 'flex' : 'none'; $('debtBtn').style.display = ''; $('personal').style.display = personal ? 'flex' : 'none'; $('appraisal').style.display = appr ? 'flex' : 'none'; $('rti').style.display = appr && typeof apTab !== 'undefined' && apTab === 'rti' ? 'flex' : 'none';
     document.querySelectorAll('#divBtns button').forEach(b => b.classList.toggle('on', b.dataset.div === divn));
     const pToday = kstToday(), pDue = ptasks.filter(t => !t.done_at && t.due_date && t.due_date <= pToday).length;
     $('nPersonal').textContent = pDue || ''; $('nPersonal').style.display = pDue ? '' : 'none';
     const myOpen = (d) => tasks.filter(t => taskDiv(t) === d && isOpen(t) && isMine(t)).length;
     $('nCredit').textContent = myOpen('credit') || ''; $('nDeposit').textContent = myOpen('deposit') || '';
     $('nCredit').style.display = myOpen('credit') ? '' : 'none'; $('nDeposit').style.display = myOpen('deposit') ? '' : 'none';
-    const w = !home && (personal || canWrite(divn));   // debt 도 canWrite('debt'), 현황판에는 새 업무 버튼 없음
+    const w = !home && !ev && (personal || canWrite(divn));   // debt 도 canWrite('debt'), 현황판에는 새 업무 버튼 없음
     $('newBtn').style.display = w ? '' : 'none';
     $('newBtn').textContent = debt ? (typeof dbTab !== 'undefined' && dbTab === 'survey' ? '＋ 조사 대상 등록' : '＋ 연체채권 등록') : personal ? '＋ 개인 할 일' : appr ? (typeof apTab !== 'undefined' && apTab === 'rti' ? '＋ 새 RTI 계산' : '＋ 새 감정평가 의뢰') : '＋ 새 업무';
-    $('roPill').style.display = w || home ? 'none' : '';
+    $('roPill').style.display = w || home || ev ? 'none' : '';
     $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
     renderRecentComments();
   }
@@ -858,6 +860,7 @@
   function render(){
     applyDivUI();
     if (divn === 'home') return typeof renderPerf === 'function' ? renderPerf() : undefined;
+    if (divn === 'event') return typeof renderEvent === 'function' ? renderEvent() : undefined;
     if (divn === 'personal') return renderPersonal();
     if (divn === 'appraisal') return renderAppraisal();
     if (divn === 'debt') return renderDebt();
@@ -1014,6 +1017,7 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'perf_year' }, () => { if (typeof schedulePerf === 'function') schedulePerf(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personal_events' }, () => { if (typeof schedulePcal === 'function') schedulePcal(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'event_bookings' }, () => { if (typeof scheduleEvent === 'function') scheduleEvent(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rti_calcs' }, () => { if (typeof scheduleRti === 'function') scheduleRti(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rti_settings' }, () => { if (typeof scheduleRti === 'function') scheduleRti(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'survey_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
@@ -1076,6 +1080,7 @@
     if (divn === 'personal') loadPersonal();
     if (divn === 'appraisal') loadAppraisal();
     if (divn === 'debt') loadDebt();
+    if (divn === 'event' && typeof loadEvent === 'function') loadEvent();
   };
   $('list').addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]');
@@ -1660,6 +1665,7 @@
 <script src="debtreport.js?v=4"></script>
 <script src="survey.js?v=10"></script>
 <script src="rti.js?v=5"></script>
+<script src="event.js?v=2"></script>
 <script src="perf.js?v=8"></script>
 <script src="cover.js?v=1"></script>
 </body>

@@ -566,3 +566,22 @@ create policy rc_del on public.rti_calcs for delete to authenticated using (has_
 grant select, update on public.rti_settings to authenticated;
 grant select, insert, update, delete on public.rti_calcs to authenticated;
 alter publication supabase_realtime add table public.rti_calcs;
+
+-- 이벤트(건강검진·연차·반차 달력): event_bookings. 조회는 팀원 전체, 등록은 본인(관리자는 다른 직원 대신 가능), 삭제는 본인·등록자·관리자.
+create table if not exists public.event_bookings (
+  id bigint generated always as identity primary key,
+  event_date date not null,
+  kind text not null check (kind in ('건강검진','연차','반차(오전)','반차(오후)')),
+  person_email text not null default auth.email(),
+  note text check (note is null or char_length(note) <= 100),
+  created_by text not null default auth.email(),
+  created_at timestamptz not null default now(),
+  unique (event_date, person_email, kind)
+);
+create index if not exists event_bookings_date_idx on public.event_bookings (event_date);
+alter table public.event_bookings enable row level security;
+create policy eb_sel on public.event_bookings for select to authenticated using (is_member());
+create policy eb_ins on public.event_bookings for insert to authenticated with check (is_member() and created_by = auth.email() and (person_email = auth.email() or is_admin()));
+create policy eb_del on public.event_bookings for delete to authenticated using (is_member() and (person_email = auth.email() or created_by = auth.email() or is_admin()));
+grant select, insert, delete on public.event_bookings to authenticated;
+alter publication supabase_realtime add table public.event_bookings;
