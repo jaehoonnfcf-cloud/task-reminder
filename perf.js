@@ -70,8 +70,15 @@ function pfPrevBizDay(from = kstToday()){
   .pft-m{ position:relative; height:6px; border-radius:99px; background:var(--ct); } .pft-m i{ display:block; height:100%; border-radius:99px; background:var(--c); } .pft-m u{ position:absolute; top:-3px; bottom:-3px; width:2px; background:#16181d; opacity:.65; border-radius:2px; text-decoration:none; }
   .pft-t{ font-size:12.5px; color:var(--muted); font-weight:600; min-height:17px; } .pft-d{ display:flex; flex-wrap:wrap; gap:2px 14px; font-size:12.5px; color:#5a6172; min-height:18px; } .pft-d b{ font-weight:800; }
   .pft .gd{ color:#0a7a2a; } .pft .bd{ color:#c23030; } .pft .fl{ color:var(--muted); }
+  .pft-b{ display:flex; flex-direction:column; gap:7px; margin-top:4px; padding-top:10px; border-top:1px solid #e6e9f0; font-size:12.5px; }
+  .pft-r{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; color:#5a6172; } .pft-r b{ color:var(--ink); font-weight:800; } .pft-r .pfbn{ font-weight:800; color:var(--ink); } .pft-r .pfem{ font-style:normal; color:var(--muted); font-size:11.5px; }
+  .pft-r>span:first-child{ white-space:nowrap; }
+  @media (max-width:760px){ .pft-b{ font-size:12px; } .pft-b>.pft-r{ flex-direction:column; align-items:flex-start; gap:1px; } .pft-br .pfem{ display:none; } .pft-r b{ white-space:nowrap; } }
+  .pft-br{ display:flex; flex-direction:column; gap:4px; } .pft-bar{ display:block; height:5px; border-radius:99px; overflow:hidden; } .pft-bar i{ display:block; height:100%; border-radius:99px; }
+  .pft .gd{ color:#0a7a2a; font-weight:800; } .pft .bd{ color:#c23030; font-weight:800; }
   .pft-sp{ position:relative; height:34px; margin-top:2px; } .pfspk{ width:100%; height:34px; display:block; } .pfspd{ position:absolute; width:10px; height:10px; border-radius:50%; border:2px solid #fff; box-sizing:border-box; transform:translateY(-50%); }
-  .pfd-focus{ display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:16px; margin-top:16px; align-items:stretch; }
+  .pfd-focus{ display:block; margin-top:16px; }
+  .pfchips{ display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; } .pfchip{ background:#fff; border-radius:14px; padding:8px 14px; display:flex; flex-direction:column; gap:2px; min-width:104px; box-shadow:0 1px 2px rgba(20,24,40,.06); } .pfchip > span{ font-size:12px; color:#5a6172; font-weight:600; } .pfchip b{ font-size:15px; font-weight:800; letter-spacing:-.02em; } .pfchip .gd{ color:#0a7a2a; } .pfchip .bd{ color:#c23030; } .pfchip .tg{ color:var(--accent); } .pfchip .fl{ color:var(--muted); font-weight:700; }
   .pfd-main{ background:#f9fafc; border-radius:22px; padding:16px 18px 14px; min-width:0; } .pfd-side{ background:#f6f7fb; border-radius:22px; padding:18px 18px 16px; min-width:0; }
   .pfd-h{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; } .pfd-h b{ font-size:16px; letter-spacing:-.02em; }
   .pfd-chart{ position:relative; margin-top:10px; min-height:230px; } .pftip{ position:absolute; pointer-events:none; background:#16181d; color:#fff; border-radius:10px; padding:7px 11px; font-size:12px; white-space:nowrap; box-shadow:0 8px 20px rgba(0,0,0,.25); z-index:2; }
@@ -80,7 +87,7 @@ function pfPrevBizDay(from = kstToday()){
   .pfkv{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:9px 0; border-bottom:1px solid #e6e9f0; font-size:13.5px; } .pfkv > span{ color:#5a6172; } .pfkv b{ font-weight:800; text-align:right; } .pfkv .gd{ color:#0a7a2a; font-weight:800; } .pfkv .bd{ color:#c23030; font-weight:800; } .pfkv .tg{ color:var(--accent); font-weight:800; } .pfkv .fl{ color:var(--muted); }
   .pfs-sep{ height:10px; } .pfem{ font-style:normal; color:var(--muted); font-size:12px; margin-left:4px; font-weight:600; }
   .pfbr2{ margin-top:12px; } .pfbt2{ display:flex; justify-content:space-between; gap:8px; font-size:13px; } .pfbt2 em{ font-style:normal; color:var(--muted); font-size:12px; } .pfbar2{ height:6px; border-radius:99px; margin-top:6px; overflow:hidden; } .pfbar2 i{ display:block; height:100%; border-radius:99px; }
-  @media (max-width:1100px){ .pfd-tiles{ grid-template-columns:repeat(2,minmax(0,1fr)); } .pfd-focus{ grid-template-columns:1fr; } }
+  @media (max-width:1100px){ .pfd-tiles{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
   @media (max-width:760px){ .pft-h{ flex-wrap:wrap; row-gap:6px; } .pft-s{ margin-left:0; } .pft{ padding:14px 14px 10px; } .pft-v{ font-size:27px; } .pft-s{ font-size:11px; padding:2px 7px; } .pfd-main{ padding:14px 12px 12px; } }
   .pfbar{ height:10px; background:#fff; border-radius:99px; margin-top:10px; overflow:hidden; } .pfbar i{ display:block; height:100%; border-radius:99px; }
   .pfrow{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:#5a6172; margin-top:6px; font-weight:600; } .pfrow b{ color:var(--ink); }
@@ -204,6 +211,19 @@ function pfSpark(m, W = 150, H = 34){
   const lo = Math.min(...v), hi = Math.max(...v), sp = (hi - lo) || Math.abs(hi) * .02 || 1, x = (i) => 4 + (W - 8) * i / (v.length - 1), y = (a) => 5 + (H - 10) * (1 - (a - lo) / sp);
   return `<svg class="pfspk" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${v.map((a, i) => `${x(i).toFixed(1)},${y(a).toFixed(1)}`).join(' ')}" fill="none" stroke="#c3c8d4" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg><span class="pfspd" style="left:calc(${(x(v.length - 1) / W * 100).toFixed(2)}% - 5px);top:${(y(v[v.length - 1]) / H * 100).toFixed(2)}%;background:${m.color}"></span>`;
 }
+// 타일 아래 칸: 수신·여신은 본점/지점 잔액과 목표 대비, 연체율·유동성비율은 판단에 필요한 숫자 두 줄
+function pfTileBottom(m){
+  const row = (l, v, sub) => `<span class="pft-r"><span>${l}</span><b>${v}</b>${sub || ''}</span>`;
+  if (m.k === 'dep' || m.k === 'loan'){
+    const br = (n, o) => `<span class="pft-br"><span class="pft-r"><span><b class="pfbn">${n}</b> ${pfNm(o.v)}억원${o.t ? `<em class="pfem"> / 목표 ${pfNm(o.t)}</em>` : ''}</span>${o.t ? `<b>${pfNm(o.v / o.t * 100, 1)}%</b>` : '<em class="pfem">목표 미설정</em>'}</span>${o.t ? `<span class="pft-bar" style="background:${pfAlpha(m.color, .14)}"><i style="width:${Math.min(100, o.v / o.t * 100)}%;background:${m.color}"></i></span>` : ''}</span>`;
+    return br('본점', m.hq) + br('지점', m.br);
+  }
+  if (m.k === 'delinq'){
+    const left = m.tgt === null ? null : m.cur - m.tgt;
+    return row('목표까지', left === null ? '-' : left > 0 ? `<span class="bd">${pfNm(left, 2)}%p 초과</span>` : `<span class="gd">${pfNm(-left, 2)}%p 이내</span>`) + row('전년말', m.dYear ? `${pfNm(m.dYear.base, 2)}%` : '-');
+  }
+  return row('유동자산', lqM(m.curRow.asset)) + row('유동부채', lqM(m.curRow.debt));
+}
 function pfTile(m, sel, adm){
   const st = pfStatus(m), c = m.color;
   const frac = m.empty ? 0 : m.k === 'liq' ? Math.min(1, m.cur / 120) : m.k === 'delinq' ? (m.tgt === null ? 0 : m.cur <= m.tgt ? 1 : m.tgt / m.cur) : (m.tgt ? Math.min(1, m.cur / m.tgt) : 0);
@@ -215,30 +235,27 @@ function pfTile(m, sel, adm){
     <span class="pft-v">${big}</span>
     <span class="pft-m"><i style="width:${(frac * 100).toFixed(1)}%"></i>${m.k === 'liq' && !m.empty ? `<u style="left:${LQ_MIN / 120 * 100}%"></u>` : ''}</span>
     <span class="pft-t">${m.empty ? (adm ? '규제유동성비율 값을 입력해주세요' : '입력 전') : m.tgt !== null ? `${m.tgtLabel} ${pfNm(m.tgt, m.dec)}${m.unit}${m.k === 'liq' ? ' 이상' : ''}` : '&nbsp;'}</span>
-    <span class="pft-d">${d1}${d2}</span><span class="pft-sp">${m.empty ? '' : pfSpark(m)}</span></button>`;
+    <span class="pft-d">${d1}${d2}</span><span class="pft-b">${m.empty ? '' : pfTileBottom(m)}</span></button>`;
 }
 // 오른쪽 상세: 선택한 지표만 (수신·여신은 본점/지점, 유동성비율은 자산·부채와 전월말/전분기말)
-function pfSide(m, adm){
-  const kv = (l, v) => `<div class="pfkv"><span>${l}</span><b>${v}</b></div>`, u = m.unit, d = m.dec, sgn = (v, dd) => pfSg(v, u === '억원' ? '억원' : '%p', dd);
-  let h = `<div class="pfs-t"><i style="background:${m.color}"></i>${m.name} 상세</div>`;
-  if (m.empty) return h + `<div class="pfsub" style="margin-top:8px;font-size:13px;line-height:1.6">${adm ? '아직 입력된 값이 없어요.<br>“＋ 실적 입력”에서 유동자산합계·유동부채합계를 함께 입력하세요.<br>전월말·전분기말 값은 아래 “＋ 과거 날짜 입력”으로 넣으면 비교에 쓰여요.' : '관리자가 입력하면 표시돼요.'}</div>` + (adm ? `<button class="btn small" data-pf="liq" style="margin-top:12px">＋ 과거 날짜 입력</button>` : '');
-  h += kv('현재', `${pfNm(m.cur, d)}${u}`);
+function pfSide(m, adm){   // 차트 위의 값 칩: 선택한 지표의 현재·목표·비교 숫자를 한 줄로
+  const chip = (l, v) => `<div class="pfchip"><span>${l}</span><b>${v}</b></div>`, u = m.unit, d = m.dec, sgn = (v, dd) => pfSg(v, u === '억원' ? '억원' : '%p', dd);
+  if (m.empty) return `<div class="pfsub" style="font-size:13px;line-height:1.6">${adm ? '아직 입력된 값이 없어요. “＋ 실적 입력”에서 유동자산합계·유동부채합계를 함께 입력하세요. 전월말·전분기말 값은 아래 버튼으로 과거 날짜를 입력하면 비교에 쓰여요.' : '관리자가 입력하면 표시돼요.'}</div>${adm ? '<button class="btn small" data-pf="liq" style="margin-top:10px">＋ 과거 날짜 입력</button>' : ''}`;
+  let h = chip('현재', `${pfNm(m.cur, d)}${u}`);
   if (m.tgt !== null){
     const left = m.better === 'up' ? m.tgt - m.cur : m.cur - m.tgt;
-    h += kv(`${m.tgtLabel}${m.k === 'liq' ? '(이상)' : ''}`, `${pfNm(m.tgt, d)}${u}`);
-    if (m.k === 'liq') h += kv('기준 대비', m.cur >= m.tgt ? `<span class="gd">+${pfNm(m.cur - m.tgt, 2)}%p 충족</span>` : `<span class="bd">−${pfNm(m.tgt - m.cur, 2)}%p 미달</span>`);
-    else if (m.better === 'up') h += kv(left > 0 ? '목표까지' : '목표 초과', `<span class="${left > 0 ? 'tg' : 'gd'}">${pfNm(Math.abs(left), d)}억원</span>`);
-    else h += kv(left > 0 ? '목표 초과' : '목표 이내', `<span class="${left > 0 ? 'bd' : 'gd'}">${pfNm(Math.abs(left), d)}%p</span>`);
+    h += chip(`${m.tgtLabel}${m.k === 'liq' ? '(이상)' : ''}`, `${pfNm(m.tgt, d)}${u}`);
+    if (m.k === 'liq') h += chip('기준 대비', m.cur >= m.tgt ? `<span class="gd">+${pfNm(m.cur - m.tgt, 2)}%p 충족</span>` : `<span class="bd">−${pfNm(m.tgt - m.cur, 2)}%p 미달</span>`);
+    else if (m.better === 'up') h += chip(left > 0 ? '목표까지' : '목표 초과', `<span class="${left > 0 ? 'tg' : 'gd'}">${pfNm(Math.abs(left), d)}억원</span>`);
+    else h += chip(left > 0 ? '목표 초과' : '목표 이내', `<span class="${left > 0 ? 'bd' : 'gd'}">${pfNm(Math.abs(left), d)}%p</span>`);
   }
-  if (m.dPrev !== null) h += kv(`${m.pLabel} 대비`, `<span class="${pfDeltaCls(m, m.dPrev)}">${sgn(m.dPrev, d)}</span>`);
-  if (m.dYear) h += kv(`${m.yLabel} 대비`, `<span class="${pfDeltaCls(m, m.dYear.v)}">${sgn(m.dYear.v, d)}${m.dYear.pct !== null ? ` (${m.dYear.pct >= 0 ? '+' : ''}${pfNm(m.dYear.pct, 1)}%)` : ''}</span>`);
-  if (m.k === 'dep' || m.k === 'loan'){
-    const br = (n, o) => `<div class="pfbr2"><div class="pfbt2"><span><b>${n}</b> ${pfNm(o.v)}억원${o.t ? `<em> / 목표 ${pfNm(o.t)}억원</em>` : ''}</span>${o.t ? `<b>${pfNm(o.v / o.t * 100, 1)}%</b>` : '<em>목표 미설정</em>'}</div>${o.t ? `<div class="pfbar2" style="background:${pfAlpha(m.color, .14)}"><i style="width:${Math.min(100, o.v / o.t * 100)}%;background:${m.color}"></i></div>` : ''}</div>`;
-    h += `<div class="pfs-sep"></div>${br('본점', m.hq)}${br('지점', m.br)}`;
-  }
+  if (m.dPrev !== null) h += chip(`${m.pLabel} 대비`, `<span class="${pfDeltaCls(m, m.dPrev)}">${sgn(m.dPrev, d)}</span>`);
+  if (m.dYear) h += chip(`${m.yLabel} 대비`, `<span class="${pfDeltaCls(m, m.dYear.v)}">${sgn(m.dYear.v, d)}${m.dYear.pct !== null ? ` (${m.dYear.pct >= 0 ? '+' : ''}${pfNm(m.dYear.pct, 1)}%)` : ''}</span>`);
   if (m.k === 'liq'){
-    const cu = m.curRow, cmp = (l, row, end) => !row ? kv(l, `<span class="fl">${adm ? `입력 필요 (${pfMd(end).replace(' ', '')})` : '-'}</span>`) : kv(`${l} <em class="pfem">${pfMd(row.base_date).replace(' ', '')}</em>`, `${pfNm(lqRatio(row), 2)}%`);
-    h += `<div class="pfs-sep"></div>${kv('유동자산합계', lqM(cu.asset))}${kv('유동부채합계', lqM(cu.debt))}${kv('기준일', `${pfMd(cu.base_date).replace(' ', '')}${cu.base_date !== perfSel ? ' <span class="bd">(선택일 입력 없음)</span>' : ''}`)}<div class="pfs-sep"></div>${cmp('전월말', m.pmRow, lqMonthEnd(perfSel))}${cmp('전분기말', m.pqRow, lqQuarterEnd(perfSel))}${adm ? '<button class="btn small" data-pf="liq" style="margin-top:12px">＋ 과거 날짜 입력·수정</button>' : ''}`;
+    const cmp = (l, row, end) => !row ? chip(l, `<span class="fl">${adm ? `입력 필요 (${pfMd(end).replace(' ', '')})` : '-'}</span>`) : chip(`${l} <em class="pfem">${pfMd(row.base_date).replace(' ', '')}</em>`, `${pfNm(lqRatio(row), 2)}%`);
+    h += cmp('전월말', m.pmRow, lqMonthEnd(perfSel)) + cmp('전분기말', m.pqRow, lqQuarterEnd(perfSel));
+    if (m.curRow.base_date !== perfSel) h += chip('기준일', `${pfMd(m.curRow.base_date).replace(' ', '')} <span class="bd">(선택일 입력 없음)</span>`);
+    if (adm) h += `<button class="btn small" data-pf="liq" style="align-self:center">＋ 과거 날짜 입력·수정</button>`;
   }
   return h;
 }
@@ -291,9 +308,9 @@ function pfDashHtml(c, adm){
   return `<div class="pfd-tiles">${ms.map(m => pfTile(m, m.k === cur.k, adm)).join('')}</div>
     <div class="pfd-focus"><div class="pfd-main"><div class="pfd-h"><div><b>${cur.name} 추이</b><span class="pfsub" style="margin-left:8px">${cur.rows.length ? `최근 ${cur.rows.length}${cur.k === 'liq' ? '건' : '영업일'}` : ''}${cur.tgt !== null ? ` · ${cur.tgtLabel} ${pfNm(cur.tgt, cur.dec)}${cur.unit === '%' ? '%' : '억원'}${cur.k === 'liq' ? ' 이상' : ''}` : ''}</span></div>
         <span class="pftabs">${['dep', 'loan', 'delinq', 'liq'].map(k => `<button data-pf="tab" data-t="${k}" class="${perfTab === k ? 'on' : ''}">${k === 'liq' ? '유동성' : PF_NAME[k]}</button>`).join('')}</span></div>
+      <div class="pfchips">${pfSide(cur, adm)}</div>
       <div id="pfFocus" class="pfd-chart"></div>
-      <div style="margin-top:6px"><button class="btn small" data-pf="raw" style="min-height:30px;padding:3px 12px;font-size:12.5px">${perfRaw ? '표 닫기' : '표로 보기'}</button></div>${perfRaw ? pfRawTable(cur) : ''}</div>
-      <aside class="pfd-side">${pfSide(cur, adm)}</aside></div>`;
+      <div style="margin-top:6px"><button class="btn small" data-pf="raw" style="min-height:30px;padding:3px 12px;font-size:12.5px">${perfRaw ? '표 닫기' : '표로 보기'}</button></div>${perfRaw ? pfRawTable(cur) : ''}</div></div>`;
 }
 
 function renderPerf(){
