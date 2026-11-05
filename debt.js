@@ -32,7 +32,7 @@ function dbAccel(c){
 // 자산건전성 5단계 + 고정이하분류일(예정일 기능: 미래면 예정 D-n, 지나면 경과)
 const DB_CLASSES = ['정상', '요주의', '고정', '회수의문', '추정손실'];
 const DB_CLASS_COLOR = { '정상': ['#dcfce7', '#166534'], '요주의': ['#fef3c7', '#92400e'], '고정': ['#ffedd5', '#c2410c'], '회수의문': ['#fee2e2', '#b91c1c'], '추정손실': ['#7f1d1d', '#ffffff'] };
-const dbClassChip = (c) => c.asset_class ? `<span class="dbcls" style="background:${DB_CLASS_COLOR[c.asset_class][0]};color:${DB_CLASS_COLOR[c.asset_class][1]}">${esc(c.asset_class)}</span>` : '<span class="muted" style="font-size:12px">건전성 미분류</span>';
+const dbClassChip = (c) => c.asset_class ? `<span class="dbcls" style="background:${DB_CLASS_COLOR[c.asset_class][0]};color:${DB_CLASS_COLOR[c.asset_class][1]}">${esc(c.asset_class)}</span>` : '<span class="muted" style="font-size:12px;margin-left:6px;font-weight:500">건전성 미분류</span>';
 function dbFixed(c){
   if (!c.fixed_below_date) return null;
   const n = dbDiff(c.fixed_below_date);
@@ -67,7 +67,7 @@ function dbNext(c){
   #debtMain{ display:flex; flex-direction:column; gap:10px; min-width:0; } .dbsecT{ font-size:19px; font-weight:800; letter-spacing:-.03em; padding:2px 6px; }
   .dbsum{ padding:12px 18px; font-size:13.5px; color:#44546f; display:flex; gap:6px 16px; flex-wrap:wrap; border-bottom:1px solid var(--line); }
   .dbsum b{ color:var(--ink); } .dbsum .r{ color:var(--danger); font-weight:700; } .dbsum .o{ color:var(--warn); font-weight:700; }
-  .dbhead,.dbrow{ display:grid; grid-template-columns:minmax(120px,.8fr) 108px 118px minmax(150px,1.7fr) minmax(130px,1fr); gap:10px; align-items:center; padding:0 22px; }
+  .dbhead,.dbrow{ display:grid; grid-template-columns:minmax(150px,1fr) 128px 190px 112px minmax(160px,1.3fr) minmax(110px,.8fr); gap:10px; align-items:center; padding:0 22px; }
   .dbhead > *, .dbrow > *{ min-width:0; }
   .dbhead{ font-size:12px; font-weight:700; color:var(--muted); padding-top:10px; padding-bottom:8px; }
   .dbrow{ padding-top:15px; padding-bottom:15px; cursor:pointer; background:#fff; border-radius:22px; box-shadow:var(--sh); margin-bottom:12px; transition:box-shadow .15s, transform .15s; }
@@ -77,7 +77,10 @@ function dbNext(c){
   .dbrow.closed{ opacity:.65; }
   .dbd{ display:inline-block; font-size:13px; font-weight:800; padding:4px 11px; border-radius:99px; background:#eef1f6; color:#4b5563; white-space:nowrap; }
   .dbcls{ display:inline-block; font-size:12px; font-weight:800; padding:2px 9px; border-radius:99px; white-space:nowrap; margin-left:4px; vertical-align:1px; }
-  .dbacc{ font-weight:700; } .dbacc.soon{ color:#b45309; } .dbacc.today{ color:var(--danger); } .dbacc.done{ color:var(--danger); }
+  .dbacc{ font-weight:700; }
+  .dbdt{ font-size:12.5px; line-height:1.35; } .dbdt + .dbdt{ margin-top:6px; } .dbdt .l{ display:block; font-size:11.5px; color:var(--muted); font-weight:600; } .dbdt b{ font-weight:700; font-variant-numeric:tabular-nums; margin-right:4px; } .dbdt .dbacc{ white-space:nowrap; }
+  .dbyd{ font-size:12px; color:var(--muted); margin-top:6px; line-height:1.35; } .dbyd b{ color:var(--ink); font-weight:700; font-variant-numeric:tabular-nums; }
+  .dbmg{ margin-top:5px; padding-top:5px; border-top:1px dashed var(--line); font-size:12.5px; color:#5b21b6; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; } .dbmg .m{ font-weight:700; margin-right:4px; } .dbacc.soon{ color:#b45309; } .dbacc.today{ color:var(--danger); } .dbacc.done{ color:var(--danger); }
   .dbd.r1{ background:var(--warn-soft); color:var(--warn); } .dbd.r2{ background:#ffe4cc; color:#c2570c; } .dbd.r3{ background:var(--danger-soft); color:var(--danger); } .dbd.end{ background:var(--green-soft); color:var(--green); }
   .dbmoney{ font-size:14.5px; font-weight:700; }
   .dblast{ font-size:13px; color:#44546f; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
@@ -97,11 +100,12 @@ function dbNext(c){
   .dblog .bd{ flex:1; min-width:0; } .dblog .hd{ font-size:12.5px; color:var(--muted); font-weight:600; }
   .dblog .tx{ font-size:14.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; margin-top:2px; }
   .dblog .del{ border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:14px; align-self:flex-start; }
-  @media (max-width:760px){
+  @media (max-width:1000px){
     .dbhead{ display:none; }
     .dbrow{ grid-template-columns:1fr auto; gap:6px 10px; padding:14px 16px; border-radius:20px; }
     .dbrow > :nth-child(1){ grid-column:1 / 2; } .dbrow > :nth-child(2){ grid-column:2 / 3; justify-self:end; }
-    .dbrow > :nth-child(3), .dbrow > :nth-child(4), .dbrow > :nth-child(5){ grid-column:1 / 3; }
+    .dbrow > :nth-child(3), .dbrow > :nth-child(4), .dbrow > :nth-child(5), .dbrow > :nth-child(6){ grid-column:1 / 3; }
+    .dbdt{ display:inline-block; vertical-align:top; margin:0 18px 0 0 !important; }
   }`;
   document.head.appendChild(st);
   const d = document.createElement('div');
@@ -163,7 +167,7 @@ function renderDebtMain(){
         <button class="btn small" id="dbRpBtn" type="button" title="연체채권사후관리기록부 출력">🖨 사후관리기록부</button>
       </div>
       <div class="dbsum" id="dbSum"></div>
-      <div class="dbhead"><span>채무자</span><span>연체일수</span><span>연체 원금</span><span>최근 연락·방문</span><span>다음 조치</span></div>
+      <div class="dbhead"><span>채무자 · 자산건전성</span><span>연체</span><span>기한이익상실 · 고정이하분류</span><span>연체 원금</span><span>최근 연락·방문 · 관리</span><span>다음 조치</span></div>
       <div id="dbList"></div></div>`;
     $('dbViewSeg').onclick = (e) => { const b = e.target.closest('[data-v]'); if (!b) return; dbView = b.dataset.v; renderDebt(); };
     $('dbScope').onchange = () => { dbScope = $('dbScope').value; renderDebt(); };
@@ -188,12 +192,14 @@ function renderDebtMain(){
   $('dbList').innerHTML = shown.map(dbRowHtml).join('') || `<div class="blk-empty">${dbView === 'closed' ? '종결된 채권이 없어요.' : debtCases.length ? '조건에 맞는 채권이 없어요.' : '등록된 채권이 없어요. 오른쪽 위 “＋ 채권 등록”으로 시작해요.'}</div>`;
 }
 function dbRowHtml(c){
-  const lg = dbLogs(c)[0], nx = dbNext(c);
+  const lg = dbLogs(c)[0], nx = dbNext(c), a = dbAccel(c), f = dbFixed(c);
+  const dt = (label, date, st) => `<div class="dbdt"><span class="l">${label}</span>${date ? `<b>${esc(date)}</b><span class="dbacc ${st.cls}">${esc(st.short)}</span>` : '<span class="muted">미정</span>'}</div>`;
   return `<div class="dbrow ${c.status === '종결' ? 'closed' : ''}" data-db="${c.id}">
-    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}${dbClassChip(c)}</div><div class="ts">담당 ${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}<br>내부연체 ${c.overdue_since ? esc(c.overdue_since) : '<span class="muted">미입력</span>'}${(() => { const a = dbAccel(c); return a ? `<br><span class="dbacc ${a.cls}">기한이익상실 ${esc(c.acceleration_date)} · ${esc(a.short)}</span>` : '<br><span class="muted">기한이익상실 미정</span>'; })()}${(() => { const f = dbFixed(c); return f ? `<br><span class="dbacc ${f.cls}">고정이하분류 ${esc(c.fixed_below_date)} · ${esc(f.short)}</span>` : ''; })()}</div></div>
-    <div>${dbDaysTag(c)}</div>
+    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}${dbClassChip(c)}</div><div class="ts">담당 ${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</div></div>
+    <div>${dbDaysTag(c)}<div class="dbyd">내부연체 ${c.overdue_since ? `<b>${esc(c.overdue_since)}</b>` : '<span>미입력</span>'}</div></div>
+    <div>${dt('기한이익상실', c.acceleration_date, a)}${dt('고정이하분류', c.fixed_below_date, f)}</div>
     <div class="dbmoney">${c.principal === null ? '<span class="muted">-</span>' : dbWon(c.principal)}</div>
-    <div class="dblast">${lg ? `<span class="m">${DEBT_ICON[lg.kind] || ''} ${esc(dbMd(lg.log_date))}</span>${esc(lg.body)}` : '<span class="muted">이력 없음</span>'}${c.manage_date || c.manage_note ? `<div style="margin-top:3px;color:#5b21b6"><span class="m">🗂 ${esc(dbMd(c.manage_date))}</span>${esc(c.manage_note || '')}</div>` : ''}</div>
+    <div><div class="dblast">${lg ? `<span class="m">${DEBT_ICON[lg.kind] || ''} ${esc(dbMd(lg.log_date))}</span>${esc(lg.body)}` : '<span class="muted">연락·방문 이력 없음</span>'}</div>${c.manage_date || c.manage_note ? `<div class="dbmg"><span class="m">🗂 ${esc(dbMd(c.manage_date))}</span>${esc(c.manage_note || '')}</div>` : ''}</div>
     <div class="dbnx ${c.status === '종결' ? 'none' : nx.cls}">${c.status === '종결' ? '-' : `${nx.txt}${c.next_action_date ? `<small>${esc(dbMd(c.next_action_date))}${c.next_action_note ? ' · ' + esc(c.next_action_note) : ''}</small>` : ''}`}</div></div>`;
 }
 
