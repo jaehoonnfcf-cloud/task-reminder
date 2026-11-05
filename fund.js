@@ -13,7 +13,13 @@ const fdShift = (iso, n) => new Date(Date.parse(iso + 'T12:00:00Z') + n * 864e5)
 const fdClone = (o) => JSON.parse(JSON.stringify(o));
 const fdGet = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
 const fdSet = (o, p, v) => { const ks = p.split('.'), last = ks.pop(); ks.reduce((a, k) => a[k], o)[last] = v; };
-const FD_TERMS = ['1개월', '3개월', '6개월', '12개월', '24개월'];
+const FD_TERMS = ['1개월', '3개월', '6개월', '12개월', '24개월'], FD_TERM_OPTS = [...FD_TERMS, '36개월'];
+// 중앙회 금리표: 기준일자(적용 시작일)별로 입력해 두면, 자금운영 기준일에 맞는 가장 최근 금리표가 적용된다
+const FD_RATE_COLS = [['lump', '일시자금'], ['m1', '정기 1개월'], ['m3', '3개월'], ['m6', '6개월'], ['m12', '12개월'], ['m24', '24개월'], ['m36', '36개월'], ['hwan', '환담보예치금'], ['reserve', '상환준비금']];
+const FD_TERM_KEY = { '1개월': 'm1', '3개월': 'm3', '6개월': 'm6', '12개월': 'm12', '24개월': 'm24', '36개월': 'm36' };
+let fdRates = [], fdRateForm = { eff: '', v: {} };
+const fdRateFor = (day) => fdRates.find(r => r.eff_date <= day) || null;   // fdRates 는 기준일자 내림차순
+const fdPct = (v) => v === null || v === undefined || v === '' ? '-' : `${Number(v)}%`;
 const FD_LOANKINDS = ['일반대출', '예탁금대출', '주택담보대출', '기타'];
 const FD_S1 = {   // 자금조달·운영 행: auto = 다른 항목에서 가져오는 연동값 (기본 모드가 manual 인 행은 엑셀처럼 직접 입력, 연동값은 참고로 표시)
   src: [{ key: 'central', label: '중앙회일시자금', def: 'auto' }, { key: 'ext', label: '대외예치금(농협-요구불)', def: 'manual' }, { key: 'term1', label: '정기예탁금(1개월)', def: 'manual' }, { key: 'recv', label: '사업미수금', def: 'manual', noAuto: true }],
@@ -87,8 +93,9 @@ function fdCalc(d, day){
 // ---------- 불러오기 ----------
 async function loadFund(){
   if (!debtCan()){ fdDays = new Map(); return; }
-  const { data, error } = await sb.from('fund_days').select('day, data, updated_at, updated_by').order('day', { ascending: false }).limit(400);
+  const [{ data, error }, rr] = await Promise.all([sb.from('fund_days').select('day, data, updated_at, updated_by').order('day', { ascending: false }).limit(400), sb.from('fund_rates').select('*').order('eff_date', { ascending: false })]);
   if (error){ console.warn('자금운영 불러오기 실패', error.message); return; }
+  if (!rr.error) fdRates = rr.data || [];
   fdDays = new Map((data || []).map(r => [r.day, r])); fdLoaded = true;
   if (typeof divn !== 'undefined' && divn === 'debt' && typeof dbTab !== 'undefined' && dbTab === 'fund'){
     if (!fdDirty){ fdPick(fdDay || '', true); renderFund(); } else fdRefreshHist();
@@ -131,10 +138,10 @@ function renderFund(){
       <tr class="sub"><td colspan="4">운영</td></tr>${FD_S1.ops.map(s1row).join('')}<tr class="tot"><td class="lab">소 계</td><td class="num" data-o="s1.ops"></td><td></td><td></td></tr>
       <tr class="tot"><td class="lab">차 액</td><td class="num" data-o="s1.diff"></td><td></td><td></td></tr></tbody></table></div></div>
 
-    <div class="fdsec"><h3>2. 중앙회 자금현황 <small>(수신)</small></h3><div class="fdsc"><table class="fdt"><thead><tr><th>계정과목</th><th>금액</th><th>만기일</th><th>금리</th><th></th></tr></thead><tbody>
+    <div class="fdsec"><h3>2. 중앙회 자금현황 <small>(수신)</small> <button class="btn small" type="button" data-act="applyrate" style="margin-left:auto" title="아래 중앙회 금리표에서 이 기준일에 적용되는 금리를 빈 금리 칸에 채워요">금리표 적용</button></h3><div class="fdsc"><table class="fdt"><thead><tr><th>계정과목</th><th>금액</th><th>만기일</th><th>금리</th><th></th></tr></thead><tbody>
       ${d.s2.lump.map((r, i) => `<tr><td>${T(`s2.lump.${i}.name`, r.name, '계정과목')}</td><td>${M(`s2.lump.${i}.amt`, r.amt)}</td><td></td><td>${T(`s2.lump.${i}.rate`, r.rate, '예: 1.8%')}</td><td>${d.s2.lump.length > 1 ? X('s2.lump', i) : ''}</td></tr>`).join('')}
       <tr class="sub"><td class="lab">소 계 (일시자금)</td><td class="num" data-o="s2.lump"></td><td></td><td></td><td></td></tr>
-      ${d.s2.term.map((r, i) => `<tr><td>${S(`s2.term.${i}.months`, r.months, FD_TERMS).replace('<select', '<select style="min-width:110px"')}<span class="muted" style="font-size:12px"> 정기예탁금</span></td><td>${M(`s2.term.${i}.amt`, r.amt)}</td><td>${T(`s2.term.${i}.due`, r.due, '2026-11-13 또는 2027-01-02~')}</td><td>${T(`s2.term.${i}.rate`, r.rate, '2.83~2.93%')}</td><td>${d.s2.term.length > 1 ? X('s2.term', i) : ''}</td></tr>`).join('')}
+      ${d.s2.term.map((r, i) => `<tr><td>${S(`s2.term.${i}.months`, r.months, FD_TERM_OPTS).replace('<select', '<select style="min-width:110px"')}<span class="muted" style="font-size:12px"> 정기예탁금</span></td><td>${M(`s2.term.${i}.amt`, r.amt)}</td><td>${T(`s2.term.${i}.due`, r.due, '2026-11-13 또는 2027-01-02~')}</td><td>${T(`s2.term.${i}.rate`, r.rate, '2.83~2.93%')}</td><td>${d.s2.term.length > 1 ? X('s2.term', i) : ''}</td></tr>`).join('')}
       <tr class="sub"><td class="lab">소 계 (정기예탁금)</td><td class="num" data-o="s2.term"></td><td colspan="3" class="muted" style="font-size:12px" data-o="s2.termBy"></td></tr>
       <tr class="tot"><td class="lab">합 계</td><td class="num" data-o="s2.total"></td><td></td><td></td><td></td></tr>
       <tr><td class="lab">여신 · 정기예탁금범위내대출</td><td>${M('s2.loanIn', d.s2.loanIn)}</td><td></td><td></td><td></td></tr></tbody></table></div>
@@ -163,6 +170,7 @@ function renderFund(){
       <tr class="tot"><td class="lab">합 계</td><td></td><td class="num" data-o="s6.total"></td><td></td><td></td></tr></tbody></table></div>${A('s6.rows')}</div>
 
     <div class="fdsec"><h3>7. 기타사항</h3><textarea data-p="memo" data-t="text" rows="4" placeholder="특이사항·메모">${esc(d.memo || '')}</textarea></div>
+    ${fdRateSection(day)}
     <div class="fdsec"><h3>일자별 요약 <small>(저장된 기준일 · 눌러서 열기)</small></h3><div class="fdsc" id="fdHist"></div></div>`;
   fdRefresh(); fdRefreshHist();
 }
@@ -185,7 +193,7 @@ function fdRefresh(){
   set('s1.src', w(c.s1.srcSum)); set('s1.ops', w(c.s1.opsSum)); set('s1.diff', w(c.s1.diff));
   set('sum.src', w(c.s1.srcSum) + '원'); set('sum.ops', w(c.s1.opsSum) + '원'); set('sum.diff', w(c.s1.diff) + '원'); set('sum.s2', w(c.s2.total) + '원'); set('sum.s3', w(c.s3.total) + '원'); set('sum.s5', `${w(c.s5.total)}원 (${c.s5.n}건)`);
   document.querySelectorAll('#fund [data-o="sum.diff"]').forEach(x => { x.classList.toggle('neg', c.s1.diff < 0); x.classList.toggle('pos', c.s1.diff > 0); });
-  set('s2.lump', w(c.s2.lump)); set('s2.term', w(c.s2.term)); set('s2.total', w(c.s2.total)); set('s2.termBy', FD_TERMS.filter(m => c.s2.termBy[m]).map(m => `${m} ${w(c.s2.termBy[m])}`).join(' · '));
+  set('s2.lump', w(c.s2.lump)); set('s2.term', w(c.s2.term)); set('s2.total', w(c.s2.total)); set('s2.termBy', FD_TERM_OPTS.filter(m => c.s2.termBy[m]).map(m => `${m} ${w(c.s2.termBy[m])}`).join(' · '));
   c.s3.g.forEach((v, i) => set(`s3.g.${i}`, w(v))); set('s3.total', w(c.s3.total));
   const bm = {}; d.s3.sched.forEach(r => { if (r.date) bm[r.date.slice(0, 7)] = (bm[r.date.slice(0, 7)] || 0) + fdN(r.amt); }); set('s3.schedBy', Object.keys(bm).sort().map(k => `${+k.slice(5)}월 ${w(bm[k])}원`).join(' · ') + (c.s3.sched ? ` · 합계 ${w(c.s3.sched)}원` : ''));
   set('s4.total', w(c.s4.total)); set('s4.by', `본점 ${w(c.s4.본점)} · 지점 ${w(c.s4.지점)}`);
@@ -206,6 +214,16 @@ function fdRefreshHist(){
     return `<tr data-day="${k}" class="${k === fdDay ? 'on' : ''}"><td>${k} (${fdDow(k)})</td><td>${w(c.s1.srcSum)}</td><td>${w(c.s1.opsSum)}</td><td style="color:${c.s1.diff < 0 ? 'var(--danger)' : 'inherit'}">${w(c.s1.diff)}</td><td>${w(c.s2.total)}</td><td>${w(c.s3.total)}</td><td>${c.s5.n}건 ${w(c.s5.total)}</td></tr>`; }).join('')}</tbody></table>` : '<div class="muted" style="font-size:13.5px">저장된 기록이 없어요. 위에서 입력하고 저장하면 일자별로 쌓여요.</div>';
 }
 
+function fdRateSection(day){
+  const app = fdRateFor(day), f = fdRateForm, inp = (k) => `<input data-rf="v.${k}" inputmode="decimal" value="${esc(f.v[k] ?? '')}" placeholder="%" style="min-width:64px;text-align:right" />`;
+  return `<div class="fdsec"><h3>중앙회 금리표 <small>(기준일자별로 입력해 두면 위 기준일에 맞는 금리표가 적용돼요)</small></h3>
+    ${app ? `<div class="fdwarn" style="background:#e8f4ff;color:#14407d;margin-bottom:10px">${esc(day)} 적용 금리표 (기준일자 ${esc(app.eff_date)}) — ${FD_RATE_COLS.map(([k, n]) => `${n} <b>${fdPct(app[k])}</b>`).join(' · ')}</div>` : '<div class="fdwarn" style="margin-bottom:10px">이 기준일에 적용되는 금리표가 없어요. 아래에 기준일자와 금리를 입력하세요.</div>'}
+    <div class="fdsc"><table class="fdt" style="min-width:760px"><thead><tr><th>기준일자</th>${FD_RATE_COLS.map(([k, n]) => `<th style="text-align:right">${n}</th>`).join('')}<th></th></tr></thead><tbody>
+      <tr><td><input type="date" data-rf="eff" value="${esc(f.eff)}" /></td>${FD_RATE_COLS.map(([k]) => `<td>${inp(k)}</td>`).join('')}<td style="white-space:nowrap"><button class="btn small primary" type="button" data-act="ratesave">${fdRates.some(r => r.eff_date === f.eff) ? '수정 저장' : '저장'}</button> <button class="btn small" type="button" data-act="ratenew" title="입력칸 비우기">비우기</button></td></tr>
+      ${fdRates.map(r => `<tr class="${app && app.eff_date === r.eff_date ? 'sub' : ''}"><td class="lab">${esc(r.eff_date)}${app && app.eff_date === r.eff_date ? ' <span class="fdauto">적용중</span>' : ''}</td>${FD_RATE_COLS.map(([k]) => `<td class="num">${fdPct(r[k])}</td>`).join('')}<td style="white-space:nowrap"><button class="fdlink" type="button" data-act="rateedit" data-d="${r.eff_date}">수정</button><button class="fdx" type="button" data-act="ratedel" data-d="${r.eff_date}" title="삭제">✕</button></td></tr>`).join('')}</tbody></table></div>
+    ${fdRates.length ? '' : '<div class="fdhint">아직 입력된 금리표가 없어요. 위 입력줄에 기준일자(적용 시작일)와 금리(%)를 넣고 저장하세요.</div>'}
+    <div class="fdhint">1달 단위로 금리가 바뀌면 새 기준일자로 한 줄 추가하세요. 지난 기준일의 자금운영 기록은 그 시점의 금리표를 따라가요. 2번의 ‘금리표 적용’ 버튼으로 금리 칸을 채울 수 있어요.</div></div>`;
+}
 function fdGo(day, force){
   if (fdDirty && !force && !confirm('저장하지 않은 변경이 있어요. 버리고 이동할까요?')){ const i = $('fdDate'); if (i) i.value = fdDay; return; }
   fdPick(day); renderFund();
@@ -225,12 +243,34 @@ function fdWire(el){
       if ((fdDays.has(fdDay) || fdDirty) && !confirm(`지금 화면의 ${fdDays.has(fdDay) ? '저장된 ' : ''}내용을 ${p} (${fdDow(p)}) 기록으로 바꿀까요?\n(저장 전까지는 원래 기록이 그대로 남아 있어요)`)) return;
       fdDraft = Object.assign(fdBlank(), fdClone(fdDays.get(p).data)); fdDirty = true; toast(`📋 ${p} 기록을 불러왔어요. 바뀐 금액만 고쳐서 저장하세요`); return renderFund();
     }
+    if (act === 'applyrate'){
+      const r = fdRateFor(fdDay); if (!r) return alert('적용할 금리표가 없어요. 아래 중앙회 금리표에 먼저 입력하세요.');
+      let n = 0; const txt = (v) => `${Number(v)}%`;
+      if (!d.s2.lump[0].rate && r.lump != null){ d.s2.lump[0].rate = txt(r.lump); n++; }
+      d.s2.term.forEach(t => { const k = FD_TERM_KEY[t.months]; if (k && r[k] != null && !t.rate){ t.rate = txt(r[k]); n++; } });
+      if (!n) return toast('채울 빈 금리 칸이 없어요 (이미 입력된 금리는 그대로 둬요)');
+      fdDirty = true; toast(`${r.eff_date} 금리표로 ${n}칸을 채웠어요`); return fdRerender();
+    }
+    if (act === 'ratenew'){ fdRateForm = { eff: '', v: {} }; return fdRerender(); }
+    if (act === 'rateedit'){ const r = fdRates.find(x => x.eff_date === a.dataset.d); if (!r) return; fdRateForm = { eff: r.eff_date, v: Object.fromEntries(FD_RATE_COLS.map(([k]) => [k, r[k] == null ? '' : String(Number(r[k]))])) }; fdRerender(); const i = document.querySelector('#fund [data-rf="eff"]'); if (i) i.scrollIntoView({ block: 'center' }); return; }
+    if (act === 'ratedel'){ if (!confirm(`${a.dataset.d} 기준 금리표를 삭제할까요?`)) return; const { error } = await sb.from('fund_rates').delete().eq('eff_date', a.dataset.d); if (error) return alert(error.message); toast('삭제했어요'); await loadFund(); return fdRerender(); }
+    if (act === 'ratesave'){
+      const f = fdRateForm; if (!f.eff) return alert('기준일자를 선택해주세요.');
+      const row = { eff_date: f.eff, updated_by: me, updated_at: new Date().toISOString() };
+      for (const [k, n] of FD_RATE_COLS){ const t = String(f.v[k] ?? '').replace(/[^0-9.\-]/g, ''); if (t === '') { row[k] = null; continue; } const v = parseFloat(t); if (!isFinite(v) || v < 0 || v > 30) return alert(`${n} 금리를 확인해주세요 (0~30%).`); row[k] = Math.round(v * 1000) / 1000; }
+      if (FD_RATE_COLS.every(([k]) => row[k] === null)) return alert('금리를 하나 이상 입력해주세요.');
+      a.disabled = true; const { error } = await sb.from('fund_rates').upsert(row, { onConflict: 'eff_date' }); a.disabled = false;
+      if (error) return alert('저장하지 못했어요: ' + error.message);
+      toast('💾 금리표를 저장했어요'); fdRateForm = { eff: '', v: {} }; await loadFund(); return fdRerender();
+    }
     if (act === 'save') return fdSave(a);
     if (act === 'delday'){ if (!confirm(`${fdDay} 기록을 삭제할까요?`)) return; const { error } = await sb.from('fund_days').delete().eq('day', fdDay); if (error) return alert(error.message); toast('삭제했어요'); fdDirty = false; await loadFund(); return renderFund(); }
     if (act === 'print') return fdPrint();
   });
   el.addEventListener('input', (e) => {
-    const t = e.target, p = t.dataset && t.dataset.p; if (!p || !fdDraft) return;
+    const t = e.target, rf = t.dataset && t.dataset.rf;
+    if (rf){ if (rf === 'eff') fdRateForm.eff = t.value; else fdRateForm.v[rf.slice(2)] = t.value; return; }
+    const p = t.dataset && t.dataset.p; if (!p || !fdDraft) return;
     const ty = t.dataset.t; let v;
     if (ty === 'money'){ t.value = fdComma(t.value); v = fdMon(t.value); } else if (ty === 'check') v = t.checked; else v = t.value;
     fdSet(fdDraft, p, v); fdDirty = true;
@@ -238,6 +278,7 @@ function fdWire(el){
     fdRefresh();
   });
   el.addEventListener('change', (e) => {
+    if (e.target.dataset && e.target.dataset.rf){ fdRateForm.eff = e.target.dataset.rf === 'eff' ? e.target.value : fdRateForm.eff; return; }
     if (e.target.id === 'fdDate'){ const v = e.target.value; if (v) fdGo(v); return; }
     const t = e.target; if (t.dataset && t.dataset.p && (t.dataset.t === 'date' || t.tagName === 'SELECT' || t.dataset.t === 'check')){ if (t.dataset.p.startsWith('s5.rows')) fdRerender(); else fdRefresh(); }
   });
@@ -289,6 +330,7 @@ function fdPrint(){
   <h2>6. 자금집행 예정내역 <small>(단위 : 원)</small></h2><table class="t"><thead><tr><th style="width:18%">구 분</th><th style="width:34%">내 역</th><th style="width:20%">금 액</th><th>비 고</th></tr></thead><tbody>
     <tr><td>대출실행</td><td>${+day.slice(5, 7)}월분(미정분 미포함)</td><td class="r">${R(c.s6.loan)}</td><td>${txt(d.s6.loanNote)}</td></tr>
     ${d.s6.rows.filter(r => r.name || fdN(r.amt)).map(r => `<tr><td>${txt(r.kind)}</td><td>${txt(r.name)}</td><td class="r">${R(fdN(r.amt))}</td><td>${txt(r.note)}</td></tr>`).join('')}<tr class="tot"><td colspan="2">합 계</td><td class="r">${w(c.s6.total)}</td><td></td></tr></tbody></table>
-  ${d.memo ? `<h2>7. 기타사항</h2><div class="memo">${esc(d.memo)}</div>` : ''}</body></html>`;
+  ${d.memo ? `<h2>7. 기타사항</h2><div class="memo">${esc(d.memo)}</div>` : ''}
+  ${fdRates.filter(r => r.eff_date <= day).length ? `<h2>중앙회 금리표 <small>(기준일자별 · %)</small></h2><table class="t"><thead><tr><th>기준일자</th>${FD_RATE_COLS.map(([k, n]) => `<th>${n}</th>`).join('')}</tr></thead><tbody>${fdRates.filter(r => r.eff_date <= day).slice(0, 4).map((r, i) => `<tr class="${i === 0 ? 'tot' : ''}"><td class="c nw">${esc(r.eff_date)}</td>${FD_RATE_COLS.map(([k]) => `<td class="c">${fdPct(r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}</body></html>`;
   apPreview(html, '자금운영현황', `자금운영현황_${day}`);
 }

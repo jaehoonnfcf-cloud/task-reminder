@@ -630,3 +630,18 @@ alter publication supabase_realtime add table public.fund_days;
 alter table public.debt_cases add column if not exists asset_class text, add column if not exists fixed_below_date date, add column if not exists manage_date date, add column if not exists manage_note text;
 alter table public.debt_cases add constraint debt_cases_asset_class_check check (asset_class is null or asset_class in ('정상','요주의','고정','회수의문','추정손실'));
 alter table public.debt_cases add constraint debt_cases_manage_note_check check (manage_note is null or char_length(manage_note) <= 500);
+
+-- 자금운영관리 > 중앙회 금리표: 기준일자(적용 시작일)별 금리. 자금운영 기준일에는 기준일자가 그 이하인 가장 최근 금리표가 적용됨. 사후관리 권한자만.
+create table if not exists public.fund_rates (
+  eff_date date primary key,
+  lump numeric(6,3), m1 numeric(6,3), m3 numeric(6,3), m6 numeric(6,3), m12 numeric(6,3), m24 numeric(6,3), m36 numeric(6,3),
+  hwan numeric(6,3), reserve numeric(6,3),
+  updated_by text, updated_at timestamptz not null default now()
+);
+alter table public.fund_rates enable row level security;
+create policy fr_sel on public.fund_rates for select to authenticated using (has_debt());
+create policy fr_ins on public.fund_rates for insert to authenticated with check (has_debt());
+create policy fr_upd on public.fund_rates for update to authenticated using (has_debt()) with check (has_debt());
+create policy fr_del on public.fund_rates for delete to authenticated using (has_debt());
+grant select, insert, update, delete on public.fund_rates to authenticated;
+alter publication supabase_realtime add table public.fund_rates;
