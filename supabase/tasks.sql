@@ -646,7 +646,7 @@ create policy fr_del on public.fund_rates for delete to authenticated using (has
 grant select, insert, update, delete on public.fund_rates to authenticated;
 alter publication supabase_realtime add table public.fund_rates;
 
--- 현황판 규제유동성비율: perf_liq(기준일별 자산합계·부채합계, 백만원). 비율 = 자산 ÷ 부채, 기준 100% 이상. 조회는 팀원 전체, 입력은 관리자.
+-- 현황판 규제유동성비율: perf_liq(기준일별 유동자산합계·유동부채합계, 백만원). 비율 = 유동자산 ÷ 유동부채, 기준 100% 이상. 조회는 팀원 전체, 입력은 관리자.
 create table if not exists public.perf_liq (
   base_date date primary key,
   asset bigint not null check (asset >= 0),
