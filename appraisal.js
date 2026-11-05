@@ -870,9 +870,11 @@ let apPvHtml = '', apPvName = '', apPvTitle = '';
 // 인쇄가 막히는 곳은 'iPhone/iPad 의 홈 화면 앱' 뿐이다. PC 에 설치한 앱(크롬·엣지)과 안드로이드는 인쇄가 된다
 const apIos = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
 const apStandalone = () => apIos() && (navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
-function apPreview(html, title, name){
+let apPvW = 794;   // 미리보기 폭: 세로 A4 794px, 가로 A4 1123px
+function apPreview(html, title, name, landscape){
+  apPvW = landscape ? 1123 : 794; $('apPvFrame').style.width = apPvW + 'px';
   apPvHtml = html; apPvTitle = title; apPvName = name; $('apPvT').textContent = `📄 ${title} 미리보기`;
-  const inject = '<style>@media screen{html{background:#fff}body{width:794px;margin:0;padding:22px 42px;box-sizing:border-box}.page{padding-bottom:18px;margin-bottom:22px;border-bottom:1px dashed #aaa}.page:last-child{border-bottom:0}}</style>';
+  const inject = '<style>@media screen{html{background:#fff}body{width:' + apPvW + 'px;margin:0;padding:22px 42px;box-sizing:border-box}.page{padding-bottom:18px;margin-bottom:22px;border-bottom:1px dashed #aaa}.page:last-child{border-bottom:0}}</style>';
   const fr = $('apPvFrame'), sa = apStandalone();
   // 홈 화면에 추가한 웹앱(스탠드얼론)에서는 브라우저 인쇄가 막혀 있어서, 이미지 공유(공유창의 프린트·카카오톡)로 안내한다
   $('apPvPrint').style.display = sa ? 'none' : '';
@@ -886,9 +888,9 @@ function apPreview(html, title, name){
 }
 function apPvFit(){
   const fr = $('apPvFrame'); if (!fr.contentDocument || !fr.contentDocument.body) return;
-  const k = Math.min(1, (window.innerWidth - 16) / 794), h = fr.contentDocument.documentElement.scrollHeight;
+  const k = Math.min(1, (window.innerWidth - 16) / apPvW), h = fr.contentDocument.documentElement.scrollHeight;
   fr.style.height = h + 'px'; fr.style.transform = `scale(${k})`;
-  const box = $('apPvBox'); box.style.width = Math.round(794 * k) + 'px'; box.style.height = Math.round(h * k) + 'px';
+  const box = $('apPvBox'); box.style.width = Math.round(apPvW * k) + 'px'; box.style.height = Math.round(h * k) + 'px';
 }
 function apClosePv(){ $('apPvOv').style.display = 'none'; $('apPvFrame').srcdoc = ''; document.body.style.overflow = ($('apDetailOv').style.display === 'block' || $('apFormOv').style.display === 'block') ? 'hidden' : ''; }
 async function apPvPrint(){

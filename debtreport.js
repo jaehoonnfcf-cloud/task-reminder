@@ -21,8 +21,9 @@ function dbrReportHtml(opt){
   const condTxt = opt.ids ? '선택 건' : `${opt.status === 'all' ? '진행중·종결 전체' : opt.status === 'closed' ? '종결' : '진행중'} / ${opt.scope === 'all' ? '본점·지점' : opt.scope}`;
   const periodTxt = opt.detail && (opt.from || opt.to) ? ` · 이력 기간 ${opt.from || '처음'} ~ ${opt.to || '현재'}` : '';
 
-  const head = (title, sub) => `<div class="top"><div class="org">${esc(org)}</div>
-    <table class="sign"><tr><th>담당</th><th>과장</th><th>상무</th><th>전무</th><th>조합장</th></tr><tr><td></td><td></td><td></td><td></td><td></td></tr></table></div>
+  const land = !opt.ids;   // 메인 화면 출력(총괄)은 가로 · 결재란 없음 / 건별 출력은 세로 · 결재란 있음
+  const head = (title, sub) => `<div class="top"><div class="org">${esc(org)}</div>${land ? '' : `
+    <table class="sign"><tr><th>담당</th><th>과장</th><th>상무</th><th>전무</th><th>조합장</th></tr><tr><td></td><td></td><td></td><td></td><td></td></tr></table>`}</div>
     <div class="title"><h1>${title}</h1><div class="sub">${sub}</div></div>`;
 
   // ---- 1) 대장 요약표 ----
@@ -40,7 +41,7 @@ function dbrReportHtml(opt){
     }).join('');
     summary = `<div class="page">${head('연체채권사후관리기록부', `기준일 ${esc(today)} (${dbrDow(today)}) · ${esc(condTxt)}`)}
       <div class="sumbar"><span>대상 <b>${cases.length}건</b></span><span>진행중 <b>${act.length}건</b></span><span>연체원금 합계 <b>${esc(dbrNum(sum))}원</b></span><span>30일 이상 <b>${n30}건</b></span><span>90일 이상 <b>${n90}건</b></span><span>조치 지연 <b>${late}건</b></span></div>
-      <table class="t led"><thead><tr><th style="width:5.5%;white-space:nowrap">번호</th><th style="width:6%">구분</th><th style="width:12%">채무자</th><th style="width:11%">연체기준일</th><th style="width:9%;white-space:nowrap">연체일수</th><th style="width:13%">연체원금(원)</th><th style="width:8%">담당자</th><th style="width:18%">최근 연락·방문</th><th style="width:17.5%">다음 조치 예정</th></tr></thead>
+      <table class="t led"><thead><tr><th style="width:5.5%;white-space:nowrap">번호</th><th style="width:6%">구분</th><th style="width:12%">채무자</th><th style="width:11%;white-space:nowrap">연체기준일</th><th style="width:9%;white-space:nowrap">연체일수</th><th style="width:13%">연체원금(원)</th><th style="width:8%">담당자</th><th style="width:18%">최근 연락·방문</th><th style="width:17.5%">다음 조치 예정</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="9" class="c">해당하는 채권이 없습니다.</td></tr>'}</tbody></table>
       <div class="foot">※ 연체일수는 기준일(${esc(today)}) 현재 자동 계산한 값입니다. 상세 이력은 채무자별 상세 면을 참고하세요.</div></div>`;
   }
@@ -65,7 +66,7 @@ function dbrReportHtml(opt){
     }).join('');
   }
 
-  const css = `@page{size:A4;margin:14mm 15mm}*{box-sizing:border-box}body{font-family:${font};color:#111;margin:0;padding:0 1px;font-size:12px;line-height:1.4}
+  const css = `@page{size:${land ? 'A4 landscape' : 'A4'};margin:${land ? '12mm 13mm' : '14mm 15mm'}}*{box-sizing:border-box}body{font-family:${font};color:#111;margin:0;padding:0 1px;font-size:12px;line-height:1.4}
   .brk,.page+.page{page-break-before:always}
   .top{display:flex;justify-content:space-between;align-items:flex-start}.org{font-size:14px;font-weight:700;letter-spacing:6px;color:#444;padding-top:4px}
   .sign{border-collapse:collapse;width:300px;table-layout:fixed}.sign td,.sign th{border:1px solid #333;text-align:center;font-size:11px;padding:0}.sign th{height:20px;background:#f3f3f3}.sign td{height:44px}
@@ -88,7 +89,7 @@ function dbrReportHtml(opt){
 
 function dbrPrint(opt){
   const html = dbrReportHtml(opt);
-  apPreview(html, '연체채권사후관리기록부', opt.ids ? `사후관리기록부_${(debtCases.find(c => c.id === opt.ids[0]) || {}).debtor_name || ''}` : `사후관리기록부_${kstToday()}`);
+  apPreview(html, '연체채권사후관리기록부', opt.ids ? `사후관리기록부_${(debtCases.find(c => c.id === opt.ids[0]) || {}).debtor_name || ''}` : `사후관리기록부_${kstToday()}`, !opt.ids);
 }
 
 // ---------- 출력 옵션 창 ----------
