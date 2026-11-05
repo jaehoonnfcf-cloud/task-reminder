@@ -604,3 +604,6 @@ grant select, insert, update on public.user_prefs to authenticated;
 
 -- 연체채권: 날짜를 2개로 관리 — 내부연체기준일(= 기존 overdue_since, 연체일수 계산 기준) + 기한이익상실일(acceleration_date, 미래 날짜면 '상실 예정일')
 alter table public.debt_cases add column if not exists acceleration_date date;
+
+-- 내부연체기준일은 필수 아님 (특수채권·연체예정채권 등은 비워둠)
+alter table public.debt_cases alter column overdue_since drop not null;

@@ -18,7 +18,9 @@ const dbWon = (n) => {
   return [e && `${e}억`, m && `${m.toLocaleString('ko-KR')}만`, r && `${r.toLocaleString('ko-KR')}`].filter(Boolean).join(' ') + '원';
 };
 const dbDiff = (iso) => Math.round((Date.parse(iso + 'T12:00:00Z') - Date.parse(kstToday() + 'T12:00:00Z')) / 864e5) + 0;   // -0 방지. 오늘 기준 (미래 +, 과거 −)
-const dbDays = (c) => 0 - dbDiff(c.overdue_since);                                  // 연체일수 = 오늘 − 내부연체기준일
+// 연체일수 = 오늘 − 내부연체기준일. 기준일이 없으면(특수채권·연체예정채권 등) 매우 작은 값으로 두어 정렬·집계에서 뒤로/제외되게 한다
+const dbHasSince = (c) => !!c.overdue_since;
+const dbDays = (c) => dbHasSince(c) ? 0 - dbDiff(c.overdue_since) : -99999;
 // 기한이익상실일: 미래 날짜면 '상실 예정일'. d = 오늘 기준 남은 일수(+) / 지난 일수(−)
 function dbAccel(c){
   if (!c.acceleration_date) return null;
@@ -32,6 +34,7 @@ const dbMd = (iso) => iso ? iso.slice(5).replace('-', '/') : '';
 function dbDaysTag(c){
   const d = dbDays(c);
   if (c.status === '종결') return `<span class="dbd end">종결</span>`;
+  if (!dbHasSince(c)) return `<span class="dbd">연체일 미입력</span>`;
   if (d < 0) return `<span class="dbd">연체 전 D${d}</span>`;
   return `<span class="dbd ${d >= 90 ? 'r3' : d >= 30 ? 'r2' : 'r1'}">연체 ${d.toLocaleString('ko-KR')}일</span>`;
 }
@@ -167,7 +170,7 @@ function renderDebtMain(){
 function dbRowHtml(c){
   const lg = dbLogs(c)[0], nx = dbNext(c);
   return `<div class="dbrow ${c.status === '종결' ? 'closed' : ''}" data-db="${c.id}">
-    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}</div><div class="ts">담당 ${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}<br>내부연체 ${esc(c.overdue_since)}${(() => { const a = dbAccel(c); return a ? `<br><span class="dbacc ${a.cls}">기한이익상실 ${esc(c.acceleration_date)} · ${esc(a.short)}</span>` : '<br><span class="muted">기한이익상실 미정</span>'; })()}</div></div>
+    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}</div><div class="ts">담당 ${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}<br>내부연체 ${c.overdue_since ? esc(c.overdue_since) : '<span class="muted">미입력</span>'}${(() => { const a = dbAccel(c); return a ? `<br><span class="dbacc ${a.cls}">기한이익상실 ${esc(c.acceleration_date)} · ${esc(a.short)}</span>` : '<br><span class="muted">기한이익상실 미정</span>'; })()}</div></div>
     <div>${dbDaysTag(c)}</div>
     <div class="dbmoney">${c.principal === null ? '<span class="muted">-</span>' : dbWon(c.principal)}</div>
     <div class="dblast">${lg ? `<span class="m">${DEBT_ICON[lg.kind] || ''} ${esc(dbMd(lg.log_date))}</span>${esc(lg.body)}` : '<span class="muted">이력 없음</span>'}</div>
@@ -188,9 +191,9 @@ function renderDbDetail(){
   const keep = fresh ? { d: editing.body, date: editing.log_date, kind: editing.kind } : { d: ($('dbLogBody') || {}).value || '', date: ($('dbLogDate') || {}).value || kstToday(), kind: cur ? cur.value : '전화' };
   $('dbDetailPanel').innerHTML = `<div class="ph"><h2><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)} ${dbDaysTag(c)}</h2><button class="x" data-d="close">✕</button></div>
     <div class="dbinfo">
-      <div><div class="k">내부연체기준일</div><div class="v">${esc(c.overdue_since)}</div></div>
+      <div><div class="k">내부연체기준일</div><div class="v">${c.overdue_since ? esc(c.overdue_since) : '<span class="muted">미입력</span>'}</div></div>
       <div><div class="k">기한이익상실일</div><div class="v">${c.acceleration_date ? `${esc(c.acceleration_date)}<div class="dbacc ${dbAccel(c).cls}" style="font-size:13px">${esc(dbAccel(c).txt)}</div>` : '<span class="muted">미정</span>'}</div></div>
-      <div><div class="k">연체일수</div><div class="v">${closed ? '-' : dbDays(c) < 0 ? `연체 전 (D${dbDays(c)})` : `${dbDays(c).toLocaleString('ko-KR')}일`}</div></div>
+      <div><div class="k">연체일수</div><div class="v">${closed || !dbHasSince(c) ? '-' : dbDays(c) < 0 ? `연체 전 (D${dbDays(c)})` : `${dbDays(c).toLocaleString('ko-KR')}일`}</div></div>
       <div><div class="k">연체 원금</div><div class="v">${c.principal === null ? '-' : dbWon(c.principal)}</div></div>
       <div><div class="k">담당자</div><div class="v">${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</div></div>
       <div><div class="k">등록</div><div class="v">${esc(nameOf(c.created_by))} · ${esc(String(c.created_at).slice(0, 10))}</div></div>
@@ -267,13 +270,13 @@ function dbOpenForm(id){
   $('dbFormPanel').innerHTML = `<div class="ph"><h2>${c ? '채권 수정' : '채권 등록'}</h2><button class="x" data-f="close">✕</button></div>
     <label>채무자 <span style="color:var(--danger)">*</span></label><input id="dfName" maxlength="100" placeholder="채무자명" />
     <label>구분</label><div class="checks"><label><input type="radio" name="dfScopeR" value="본점" ${(c ? c.scope : '본점') === '본점' ? 'checked' : ''}/> 본점</label><label><input type="radio" name="dfScopeR" value="지점" ${c && c.scope === '지점' ? 'checked' : ''}/> 지점</label></div>
-    <div class="row"><div><label>내부연체기준일 <span style="color:var(--danger)">*</span></label><input id="dfSince" type="date" /></div><div><label>기한이익상실일 <span class="muted" style="font-weight:400">(미래 날짜 = 예정일)</span></label><input id="dfAccel" type="date" /></div></div>
+    <div class="row"><div><label>내부연체기준일 <span class="muted" style="font-weight:400">(특수채권 등은 비워두세요)</span></label><input id="dfSince" type="date" /></div><div><label>기한이익상실일 <span class="muted" style="font-weight:400">(미래 날짜 = 예정일)</span></label><input id="dfAccel" type="date" /></div></div>
     <div class="row"><div><label>연체 원금 (원)</label><input id="dfAmt" inputmode="numeric" placeholder="예: 35,000,000" /></div><div></div></div>
     <label>담당자</label><select id="dfAsg"><option value="">(지정 안 함)</option>${staff.map(m => `<option value="${esc(m.email)}" ${m.email === asg ? 'selected' : ''}>${esc(m.name || m.email)}</option>`).join('')}</select>
     <div class="row"><div><label>다음 조치 예정일</label><input id="dfNxD" type="date" /></div><div><label>다음 조치 내용</label><input id="dfNxN" maxlength="200" placeholder="예: 내용증명 발송" /></div></div>
     <label>메모</label><textarea id="dfMemo" rows="3" maxlength="1000"></textarea>
     <div class="acts" style="margin-top:20px"><button class="btn primary" data-f="save" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" data-f="close" style="min-height:44px">취소</button></div>`;
-  $('dfName').value = c ? c.debtor_name : ''; $('dfSince').value = c ? c.overdue_since : kstToday(); $('dfAccel').value = c && c.acceleration_date ? c.acceleration_date : '';
+  $('dfName').value = c ? c.debtor_name : ''; $('dfSince').value = c ? (c.overdue_since || '') : kstToday(); $('dfAccel').value = c && c.acceleration_date ? c.acceleration_date : '';
   $('dfAmt').value = c && c.principal !== null ? Number(c.principal).toLocaleString('ko-KR') : '';
   $('dfAmt').oninput = () => { $('dfAmt').value = dbComma($('dfAmt').value); };
   $('dfNxD').value = c && c.next_action_date ? c.next_action_date : ''; $('dfNxN').value = c && c.next_action_note ? c.next_action_note : ''; $('dfMemo').value = c && c.memo ? c.memo : '';
@@ -286,10 +289,9 @@ $('dbFormPanel').addEventListener('click', async (ev) => {
   if (b.dataset.f === 'close') return dbCloseForm();
   const name = $('dfName').value.trim(), since = $('dfSince').value;
   if (!name) return alert('채무자를 입력해주세요.');
-  if (!since) return alert('내부연체기준일을 선택해주세요.');
   const accel = $('dfAccel').value || null;
-  if (accel && accel < since && !confirm('기한이익상실일이 내부연체기준일보다 빨라요. 그대로 저장할까요?')) return;
-  const row = { debtor_name: name, scope: (document.querySelector('input[name=dfScopeR]:checked') || {}).value || '본점', overdue_since: since, acceleration_date: accel, principal: dbNum($('dfAmt').value),
+  if (accel && since && accel < since && !confirm('기한이익상실일이 내부연체기준일보다 빨라요. 그대로 저장할까요?')) return;
+  const row = { debtor_name: name, scope: (document.querySelector('input[name=dfScopeR]:checked') || {}).value || '본점', overdue_since: since || null, acceleration_date: accel, principal: dbNum($('dfAmt').value),
     assignee_email: $('dfAsg').value || null, next_action_date: $('dfNxD').value || null, next_action_note: $('dfNxN').value.trim() || null, memo: $('dfMemo').value.trim() || null };
   b.disabled = true; const wasNew = !debtFormId;
   const { data, error } = debtFormId ? await sb.from('debt_cases').update(row).eq('id', debtFormId).select() : await sb.from('debt_cases').insert(row).select();
