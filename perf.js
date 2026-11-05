@@ -63,6 +63,7 @@ function pfPrevBizDay(from = kstToday()){
   .pftk{ position:relative; } .pftk i.tick{ position:absolute; top:-3px; bottom:-3px; width:2px; background:#16181d; opacity:.7; border-radius:2px; } .pftkl{ font-size:11.5px; color:var(--muted); font-weight:700; display:flex; justify-content:space-between; margin-top:4px; }
   .pfd-tiles{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-top:16px; }
   .pft{ appearance:none; -webkit-appearance:none; border:2px solid transparent; background:#f6f7fb; border-radius:22px; padding:16px 18px 12px; text-align:left; cursor:pointer; display:flex; flex-direction:column; gap:8px; font:inherit; color:var(--ink); position:relative; min-width:0; transition:box-shadow .15s, background .15s, border-color .15s; }
+  .pft.warn{ background:#fff0ee; border-color:#f4b9b0; } .pft.warn:hover{ background:#ffe8e5; } .pft.warn.on{ background:#fff0ee; border-color:#d93b2b; box-shadow:0 12px 26px -14px #d93b2b; } .pft.warn .pft-s.bad{ background:#d93b2b; color:#fff; } .pft.warn .pft-b{ border-top-color:#f4c9c3; } .pft.warn .pft-m{ background:#f9d3cd; }
   .pft:hover{ background:#f0f2f8; } .pft.on{ background:#fff; border-color:var(--c); box-shadow:0 12px 26px -14px var(--c); }
   .pft-h{ display:flex; align-items:center; gap:8px; min-width:0; } .pft-dot{ width:10px; height:10px; border-radius:50%; background:var(--c); flex:none; } .pft-n{ font-size:14px; font-weight:800; letter-spacing:-.02em; white-space:nowrap; }
   .pft-s{ margin-left:auto; font-size:11.5px; font-weight:800; border-radius:99px; padding:3px 9px; white-space:nowrap; } .pft-s.ok{ color:#0a7a2a; background:#e4f6ea; } .pft-s.bad{ color:#b42318; background:#fdecec; } .pft-s.neu{ color:#5a6172; background:#eceff5; }
@@ -230,7 +231,7 @@ function pfTile(m, sel, adm){
   const big = m.empty ? '-' : `${pfNm(m.cur, m.dec)}<small>${m.unit}</small>`;
   const d1 = m.dPrev === null ? '' : `<span>${m.pLabel} <b class="${pfDeltaCls(m, m.dPrev)}">${pfSg(m.dPrev, m.k === 'dep' || m.k === 'loan' ? '억' : '%p', m.k === 'dep' || m.k === 'loan' ? 0 : 2)}</b></span>`;
   const d2 = !m.dYear ? '' : `<span>${m.yLabel} <b class="${pfDeltaCls(m, m.dYear.v)}">${pfSg(m.dYear.v, m.k === 'dep' || m.k === 'loan' ? '억' : '%p', m.k === 'dep' || m.k === 'loan' ? 0 : 2)}</b></span>`;
-  return `<button type="button" class="pft ${sel ? 'on' : ''}" data-pf="tab" data-t="${m.k}" style="--c:${c};--ct:${pfAlpha(c, .14)}" aria-pressed="${sel}">
+  return `<button type="button" class="pft ${sel ? 'on' : ''} ${st.cls === 'bad' ? 'warn' : ''}" data-pf="tab" data-t="${m.k}" style="--c:${c};--ct:${pfAlpha(c, .14)}" aria-pressed="${sel}">
     <span class="pft-h"><i class="pft-dot"></i><span class="pft-n">${m.name}</span><span class="pft-s ${st.cls}">${esc(st.txt)}</span></span>
     <span class="pft-v">${big}</span>
     <span class="pft-m"><i style="width:${(frac * 100).toFixed(1)}%"></i>${m.k === 'liq' && !m.empty ? `<u style="left:${LQ_MIN / 120 * 100}%"></u>` : ''}</span>
