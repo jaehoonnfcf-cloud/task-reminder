@@ -121,7 +121,7 @@ function renderFund(){
   const s1row = (r) => `<tr><td class="lab">${esc(r.label)}</td><td style="min-width:200px">${r.noAuto ? M(`s1.amt.${r.key}`, d.s1.amt[r.key]) : `<div data-o="s1m.${r.key}"></div>`}</td><td>${T(`s1.due.${r.key}`, d.s1.due[r.key], '만기일')}</td><td>${T(`s1.note.${r.key}`, d.s1.note[r.key], '비고')}</td></tr>`;
   el.innerHTML = `<div class="fdbar"><button class="btn small" data-n="-1">◀</button><input type="date" id="fdDate" value="${esc(day)}" /><button class="btn small" data-n="1">▶</button><button class="btn small" data-n="0">오늘</button>
       <span class="fdchips">${recent.map(k => `<button data-day="${k}" class="${k === day ? 'on' : ''}" title="저장된 기준일">${k.slice(5).replace('-', '/')}(${fdDow(k)})</button>`).join('')}</span><span style="flex:1"></span>
-      <span class="muted" id="fdState" style="font-size:12.5px"></span><button class="btn small" data-act="print">🖨 인쇄</button>${saved ? '<button class="btn small danger" data-act="delday">이 날짜 삭제</button>' : ''}<button class="btn small primary" data-act="save">💾 저장</button></div>
+      <span class="muted" id="fdState" style="font-size:12.5px"></span>${prev ? `<button class="btn small" data-act="copy" title="${prev} 기록을 지금 화면으로 불러와요">📋 전일자 불러오기 <span class="muted" style="font-weight:500">(${prev.slice(5).replace('-', '/')})</span></button>` : ''}<button class="btn small" data-act="print">🖨 인쇄</button>${saved ? '<button class="btn small danger" data-act="delday">이 날짜 삭제</button>' : ''}<button class="btn small primary" data-act="save">💾 저장</button></div>
     ${!saved ? `<div class="fdwarn">${esc(day)} (${fdDow(day)}) 은(는) 아직 저장된 기록이 없어요. ${prev ? `<button class="btn small" data-act="copy" style="margin-left:6px">직전 기록(${prev.slice(5).replace('-', '/')}) 복사해서 시작</button>` : '아래에 입력하고 저장하세요.'}</div>` : ''}
     <div class="fdsum"><div><div class="k">조달 소계</div><div class="v" data-o="sum.src"></div></div><div><div class="k">운영 소계</div><div class="v" data-o="sum.ops"></div></div><div><div class="k">차액 (조달−운영)</div><div class="v" data-o="sum.diff"></div></div>
       <div><div class="k">중앙회 자금 합계</div><div class="v" data-o="sum.s2"></div></div><div><div class="k">법인자금 합계</div><div class="v" data-o="sum.s3"></div></div><div><div class="k">대출 실행예정 합계</div><div class="v" data-o="sum.s5"></div></div></div>
@@ -220,7 +220,11 @@ function fdWire(el){
     if (act === 'del'){ const arr = fdGet(d, a.dataset.p); arr.splice(+a.dataset.i, 1); fdDirty = true; return fdRerender(); }
     if (act === 'mode'){ d.s1.mode[a.dataset.k] = a.dataset.m; fdDirty = true; return fdRefresh(); }
     if (act === 'loanmode'){ d.s6.loanMode = a.dataset.m; if (a.dataset.m === 'manual' && !fdN(d.s6.loanAmt)) d.s6.loanAmt = fdCalc(d, fdDay).s5.month; fdDirty = true; return fdRefresh(); }
-    if (act === 'copy'){ const p = fdPrevSaved(fdDay); if (!p) return; const src = fdClone(fdDays.get(p).data); fdDraft = Object.assign(fdBlank(), src); fdDirty = true; toast(`${p} 기록을 복사했어요. 바뀐 금액만 고쳐서 저장하세요`); return renderFund(); }
+    if (act === 'copy'){
+      const p = fdPrevSaved(fdDay); if (!p) return alert('불러올 이전 기록이 없어요.');
+      if ((fdDays.has(fdDay) || fdDirty) && !confirm(`지금 화면의 ${fdDays.has(fdDay) ? '저장된 ' : ''}내용을 ${p} (${fdDow(p)}) 기록으로 바꿀까요?\n(저장 전까지는 원래 기록이 그대로 남아 있어요)`)) return;
+      fdDraft = Object.assign(fdBlank(), fdClone(fdDays.get(p).data)); fdDirty = true; toast(`📋 ${p} 기록을 불러왔어요. 바뀐 금액만 고쳐서 저장하세요`); return renderFund();
+    }
     if (act === 'save') return fdSave(a);
     if (act === 'delday'){ if (!confirm(`${fdDay} 기록을 삭제할까요?`)) return; const { error } = await sb.from('fund_days').delete().eq('day', fdDay); if (error) return alert(error.message); toast('삭제했어요'); fdDirty = false; await loadFund(); return renderFund(); }
     if (act === 'print') return fdPrint();
