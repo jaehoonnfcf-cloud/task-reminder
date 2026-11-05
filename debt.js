@@ -106,6 +106,7 @@ async function loadDebt(){
   debtCases = data || [];
   dbBadge();
   if (typeof loadSurvey === 'function') await loadSurvey();
+  if (typeof loadFund === 'function') await loadFund();
   if (divn === 'debt') renderDebt();
   const ae = document.activeElement;
   if (debtOpenId && !(ae && $('dbDetailOv').contains(ae) && /INPUT|TEXTAREA|SELECT/.test(ae.tagName))) renderDbDetail();
@@ -123,10 +124,13 @@ document.getElementById('dbTabs').addEventListener('click', (e) => {
   dbTab = b.dataset.t; try { localStorage.setItem('dbTab', dbTab); } catch (x) {}
   if (typeof render === 'function') render(); else renderDebt();
 });
-let dbTab = (() => { try { return localStorage.getItem('dbTab') === 'survey' ? 'survey' : 'debt'; } catch (e) { return 'debt'; } })();
+let dbTab = (() => { try { const t = localStorage.getItem('dbTab'); return t === 'survey' || t === 'fund' ? t : 'debt'; } catch (e) { return 'debt'; } })();
 function renderDebt(){
+  $('dbTabFund').style.display = debtCan() ? '' : 'none';   // 자금운영관리는 사후관리 권한자·관리자만
+  if (dbTab === 'fund' && !debtCan()) dbTab = 'debt';
   document.querySelectorAll('#dbTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === dbTab));
-  $('debtMain').style.display = dbTab === 'debt' ? '' : 'none'; $('survey').style.display = dbTab === 'survey' ? 'flex' : 'none';
+  $('debtMain').style.display = dbTab === 'debt' ? '' : 'none'; $('survey').style.display = dbTab === 'survey' ? 'flex' : 'none'; $('fund').style.display = dbTab === 'fund' ? 'flex' : 'none';
+  if (dbTab === 'fund') return typeof renderFund === 'function' ? renderFund() : undefined;
   if (dbTab === 'survey') return typeof renderSurvey === 'function' ? renderSurvey() : undefined;
   renderDebtMain();
 }

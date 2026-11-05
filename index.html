@@ -498,7 +498,7 @@
     <div id="appraisal"></div>
     <div id="rti"></div>
     <div id="event"></div>
-    <div id="debt"><div class="seg" id="dbTabs"><button data-t="debt">📞 <span class="svlf">연체채권관리</span><span class="svls">연체채권</span></button><button data-t="survey">🏭 <span class="svlf">정책자금실태조사</span><span class="svls">실태조사</span></button></div><div id="debtMain"></div><div id="survey"></div></div>
+    <div id="debt"><div class="seg" id="dbTabs"><button data-t="debt">📞 <span class="svlf">연체채권관리</span><span class="svls">연체채권</span></button><button data-t="survey">🏭 <span class="svlf">정책자금실태조사</span><span class="svls">실태조사</span></button><button data-t="fund" id="dbTabFund" style="display:none">💰 <span class="svlf">자금운영관리</span><span class="svls">자금</span></button></div><div id="debtMain"></div><div id="survey"></div><div id="fund"></div></div>
     <div id="personal" style="display:none">
       <div id="pcal"></div>
       <div id="ptiles"></div>
@@ -851,10 +851,11 @@
     const myOpen = (d) => tasks.filter(t => taskDiv(t) === d && isOpen(t) && isMine(t)).length;
     $('nCredit').textContent = myOpen('credit') || ''; $('nDeposit').textContent = myOpen('deposit') || '';
     $('nCredit').style.display = myOpen('credit') ? '' : 'none'; $('nDeposit').style.display = myOpen('deposit') ? '' : 'none';
-    const w = !home && !ev && (personal || canWrite(divn));   // debt 도 canWrite('debt'), 현황판에는 새 업무 버튼 없음
+    const fundTab = debt && typeof dbTab !== 'undefined' && dbTab === 'fund';
+    const w = !home && !ev && !fundTab && (personal || canWrite(divn));   // debt 도 canWrite('debt'), 현황판에는 새 업무 버튼 없음
     $('newBtn').style.display = w ? '' : 'none';
     $('newBtn').textContent = debt ? (typeof dbTab !== 'undefined' && dbTab === 'survey' ? '＋ 조사 대상 등록' : '＋ 연체채권 등록') : personal ? '＋ 개인 할 일' : appr ? (typeof apTab !== 'undefined' && apTab === 'rti' ? '＋ 새 RTI 계산' : '＋ 새 감정평가 의뢰') : '＋ 새 업무';
-    $('roPill').style.display = w || home || ev ? 'none' : '';
+    $('roPill').style.display = w || home || ev || fundTab ? 'none' : '';
     $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
     renderRecentComments();
   }
@@ -1050,6 +1051,7 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'perf_year' }, () => { if (typeof schedulePerf === 'function') schedulePerf(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personal_events' }, () => { if (typeof schedulePcal === 'function') schedulePcal(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'fund_days' }, () => { if (typeof loadFund === 'function' && typeof divn !== 'undefined' && divn === 'debt') loadFund(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'event_bookings' }, () => { if (typeof scheduleEvent === 'function') scheduleEvent(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rti_calcs' }, () => { if (typeof scheduleRti === 'function') scheduleRti(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rti_settings' }, () => { if (typeof scheduleRti === 'function') scheduleRti(); })
@@ -1697,6 +1699,7 @@
 <script src="debt.js?v=11"></script>
 <script src="debtreport.js?v=9"></script>
 <script src="survey.js?v=10"></script>
+<script src="fund.js?v=2"></script>
 <script src="rti.js?v=5"></script>
 <script src="event.js?v=4"></script>
 <script src="perf.js?v=8"></script>

@@ -607,3 +607,21 @@ alter table public.debt_cases add column if not exists acceleration_date date;
 
 -- 내부연체기준일은 필수 아님 (특수채권·연체예정채권 등은 비워둠)
 alter table public.debt_cases alter column overdue_since drop not null;
+
+-- 사후관리 > 자금운영관리: 기준일자별 자금운영현황 한 건(JSON) — 자금조달·운영 / 중앙회 / 법인자금 / 대외예치금 / 대출실행예정 / 자금집행예정 / 기타사항.
+-- 조회·입력·삭제 모두 사후관리 권한자(has_debt = perm_debt 또는 관리자)만.
+create table if not exists public.fund_days (
+  day date primary key,
+  data jsonb not null default '{}'::jsonb,
+  created_by text not null default auth.email(),
+  updated_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.fund_days enable row level security;
+create policy fd_sel on public.fund_days for select to authenticated using (has_debt());
+create policy fd_ins on public.fund_days for insert to authenticated with check (has_debt());
+create policy fd_upd on public.fund_days for update to authenticated using (has_debt()) with check (has_debt());
+create policy fd_del on public.fund_days for delete to authenticated using (has_debt());
+grant select, insert, update, delete on public.fund_days to authenticated;
+alter publication supabase_realtime add table public.fund_days;
