@@ -57,7 +57,8 @@ function pfPrevBizDay(from = kstToday()){
   .pfk .big{ font-size:32px; font-weight:800; letter-spacing:-.04em; margin-top:6px; font-variant-numeric:tabular-nums; line-height:1.15; }
   .pfk .big small{ font-size:13px; font-weight:700; color:var(--muted); margin-left:6px; letter-spacing:0; white-space:nowrap; display:inline-block; }
   .pfk.l{ background:#e9f8f1; } .pfk.l .t > span:first-child{ color:#0e7a4f; } .pfk.l .pill{ color:#0e7a4f; background:#fff; } .pfk.l .pill.bad{ color:#b42318 !important; }
-  .pfkpis > .pfk{ display:flex; flex-direction:column; } .pfkpis > .pfk .pfbrs{ margin-top:auto; padding-top:12px; }
+  .pfkpis > .pfk{ display:flex; flex-direction:column; justify-content:space-between; gap:12px; }
+  .pfplus{ border:0; cursor:pointer; width:26px; height:26px; border-radius:50%; background:#fff; color:#0e7a4f; font-weight:800; font-size:16px; line-height:1; box-shadow:0 1px 3px rgba(20,24,40,.15); flex:none; }
   .pfliq{ margin:0; } .pflqg{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px 26px; align-items:start; margin-top:4px; } @media (max-width:760px){ .pflqg{ grid-template-columns:1fr; } } .pflqg .col{ min-width:0; }
   .pftk{ position:relative; } .pftk i.tick{ position:absolute; top:-3px; bottom:-3px; width:2px; background:#16181d; opacity:.7; border-radius:2px; } .pftkl{ font-size:11.5px; color:var(--muted); font-weight:700; display:flex; justify-content:space-between; margin-top:4px; }
   .pfbar{ height:10px; background:#fff; border-radius:99px; margin-top:10px; overflow:hidden; } .pfbar i{ display:block; height:100%; border-radius:99px; }
@@ -134,7 +135,7 @@ function pfKpi(cls, title, val, tgt, dPrev, dYear, hq, br, hqT, brT, chart){
   return `<div class="pfk ${cls}"><div class="t"><span>${title} (합산)</span>${rate !== null ? `<span class="pill ${rate >= 100 ? 'ok' : ''}">달성률 ${pfP(rate, 1)}%</span>` : '<span class="pill">목표 미설정</span>'}</div>
     <div class="big">${pfE(val)}${tgt ? `<small>/ 목표 ${pfE(tgt)}</small>` : ''}</div>
     ${rate !== null ? `<div class="pfbar"><i style="width:${Math.min(100, rate)}%;background:linear-gradient(90deg,${col[0]},${col[1]})"></i></div>` : ''}
-    <div class="pfrow"><span>${left !== null ? (left > 0 ? `목표까지 <b class="tg">${pfE(left)}</b>` : `목표 초과 <b class="gd">${pfE(-left)}</b>`) : '&nbsp;'}</span><span>${dPrev === null ? '' : `전 영업일 대비 <span class="${pfCls(dPrev)}">${pfSignedE(dPrev)} ${dPrev > 0 ? '증가' : dPrev < 0 ? '감소' : ''}</span>`}</span></div>
+    <div class="pfrow"><span>${left !== null ? (left > 0 ? `목표까지 <b class="tg">${pfE(left)}</b>` : `목표 초과 <b class="gd">${pfE(-left)}</b>`) : '&nbsp;'}</span><span>${dPrev === null ? '' : `전일 대비 <span class="${pfCls(dPrev)}">${pfSignedE(dPrev)} ${dPrev > 0 ? '증가' : dPrev < 0 ? '감소' : ''}</span>`}</span></div>
     <div class="pfrow"><span>${dYear === null ? '&nbsp;' : `${dYear.label} 대비`}</span>${dYear === null ? '' : `<b class="${pfCls(dYear.v)}">${pfSignedE(dYear.v)} ${dYear.v > 0 ? '증가' : dYear.v < 0 ? '감소' : ''} (${dYear.pct >= 0 ? '+' : ''}${pfP(dYear.pct, 1)}%)</b>`}</div>
     <div class="pfbrs">${pfBr('본점', hq, hqT, col[1])}${pfBr('지점', br, brT, col[1])}</div>${chart || ''}</div>`;
 }
@@ -200,11 +201,12 @@ function pfLiqCard(adm){
     const d = ratio - lqRatio(r);
     return `<div class="pfrow"><span>${label} <b>${pfP(lqRatio(r))}%</b> <em style="font-style:normal;color:var(--muted)">(${pfMd(r.base_date).replace(' ', '')})</em></span><b class="${pfCls(d)}">${pfSigned(Math.round(d * 100) / 100, '%p')} ${d > 0 ? '상승' : d < 0 ? '하락' : ''}</b></div>`;
   };
-  return `<div class="pfk l pfliq"><div class="t"><span>규제유동성비율</span><span class="pill ${ok ? 'ok' : 'bad'}">${ok ? `기준 충족 +${pfP(gap)}%p` : `기준 미달 −${pfP(-gap)}%p`}</span></div>
-    <div class="pflqg"><div class="col"><div class="big" style="color:${ok ? 'inherit' : '#b42318'}">${pfP(ratio)}%<small>/ 기준 ${LQ_MIN}% 이상</small></div>
-        <div class="pfbar pftk"><i style="width:${Math.min(100, ratio / 120 * 100)}%;background:${ok ? 'linear-gradient(90deg,#86efac,#12a150)' : 'linear-gradient(90deg,#fca5a5,#e5484d)'}"></i><i class="tick" style="left:${LQ_MIN / 120 * 100}%"></i></div><div class="pftkl"><span>0%</span><span>기준 100%</span><span>120%</span></div>
-        ${stale ? `<div class="pfrow"><span class="bd">※ ${pfMd(sel).replace(' ', '')} 입력값이 없어 ${pfMd(cur.base_date).replace(' ', '')} 값이에요</span></div>` : ''}</div>
-      <div class="col"><div class="pfrow"><span>유동자산합계</span><b>${lqM(cur.asset)}</b></div><div class="pfrow"><span>유동부채합계</span><b>${lqM(cur.debt)}</b></div><div class="pfrow"><span>${pfMd(cur.base_date).replace(' ', '')} 기준 (전 영업일)</span><span class="fl">유동자산 ÷ 유동부채</span></div><div style="margin-top:10px;padding-top:8px;border-top:1px dashed rgba(60,70,110,.22)">${cmp('전월말', pm, lqMonthEnd(sel))}${cmp('전분기말', pq, lqQuarterEnd(sel))}<div class="pfrow"><span class="fl">${ok ? '기준(100%) 이상을 유지하고 있어요' : '기준(100%) 미만이에요 — 점검이 필요해요'}</span></div></div></div></div>${adm ? '<div style="margin-top:10px"><button class="btn small" data-pf="liq">＋ 입력</button></div>' : ''}</div>`;
+  return `<div class="pfk l pfliq"><div class="t"><span>규제유동성비율</span><span class="pill ${ok ? 'ok' : 'bad'}">${ok ? `충족 +${pfP(gap)}%p` : `미달 −${pfP(-gap)}%p`}</span>${adm ? '<button class="pfplus" data-pf="liq" title="유동자산·유동부채 입력/수정">＋</button>' : ''}</div>
+    <div><div class="big" style="color:${ok ? 'inherit' : '#b42318'}">${pfP(ratio)}%<small>/ 기준 ${LQ_MIN}% 이상</small></div>
+      <div class="pfbar pftk"><i style="width:${Math.min(100, ratio / 120 * 100)}%;background:${ok ? 'linear-gradient(90deg,#86efac,#12a150)' : 'linear-gradient(90deg,#fca5a5,#e5484d)'}"></i><i class="tick" style="left:${LQ_MIN / 120 * 100}%"></i></div><div class="pftkl"><span>0%</span><span>기준 100%</span><span>120%</span></div>
+      ${stale ? `<div class="pfrow"><span class="bd">※ ${pfMd(sel).replace(' ', '')} 입력값이 없어 ${pfMd(cur.base_date).replace(' ', '')} 값이에요</span></div>` : ''}</div>
+    <div><div class="pfrow" style="margin-top:0"><span>유동자산합계</span><b>${lqM(cur.asset)}</b></div><div class="pfrow"><span>유동부채합계</span><b>${lqM(cur.debt)}</b></div></div>
+    <div class="pfbrs" style="margin:0;gap:0">${cmp('전월말', pm, lqMonthEnd(sel))}${cmp('전분기말', pq, lqQuarterEnd(sel))}</div></div>`;
 }
 function renderPerf(){
   const el = $('perf'); if (!el) return;
@@ -251,13 +253,13 @@ function renderPerf(){
     <div class="pfh"><b>📊 여수신 현황</b><span class="pftag">${pfMd(r.base_date)}(${pfDow(r.base_date)}) 기준</span><span class="m" style="color:var(--muted);font-size:13px">단위: 억원, %</span><span class="sp"></span>
       <span class="pfnav"><button data-pf="prev" title="이전 영업일" ${c.i > 0 ? '' : 'disabled'}>◀</button><button data-pf="next" title="다음 영업일" ${c.i < perfRows.length - 1 ? '' : 'disabled'}>▶</button></span>${btns}</div>
     <div class="pfkpis">
-      ${pfKpi('b', '수신', c.dep, c.depT, c.pDep === null ? null : c.dep - c.pDep, yearVs(c.dep, Y.prev_dep, `전년말(${pfE(Y.prev_dep)})`), Number(r.dep_hq), Number(r.dep_br), Y.dep_hq_t, Y.dep_br_t)}
-      ${pfKpi('p', '여신', c.loan, c.loanT, c.pLoan === null ? null : c.loan - c.pLoan, yearVs(c.loan, Y.prev_loan, `전년말(${pfE(Y.prev_loan)})`), Number(r.loan_hq), Number(r.loan_br), Y.loan_hq_t, Y.loan_br_t)}
+      ${pfKpi('b', '수신', c.dep, c.depT, c.pDep === null ? null : c.dep - c.pDep, yearVs(c.dep, Y.prev_dep, '전년말'), Number(r.dep_hq), Number(r.dep_br), Y.dep_hq_t, Y.dep_br_t)}
+      ${pfKpi('p', '여신', c.loan, c.loanT, c.pLoan === null ? null : c.loan - c.pLoan, yearVs(c.loan, Y.prev_loan, '전년말'), Number(r.loan_hq), Number(r.loan_br), Y.loan_hq_t, Y.loan_br_t)}
       <div class="pfk r"><div class="t"><span>연체율</span>${dT !== null ? `<span class="pill ${ok ? 'ok' : ''}">${ok ? `목표 달성 −${pfP(dT - dd)}%p` : `목표 초과 +${pfP(dd - dT)}%p`}</span>` : '<span class="pill">목표 미설정</span>'}</div>
         <div class="big">${pfP(dd)}%${dT !== null ? `<small>/ 목표 ${pfP(dT)}%</small>` : ''}</div>
         ${dT !== null ? `<div class="pfbar"><i style="width:${ok ? 100 : Math.min(100, dT / dd * 100)}%;background:${ok ? 'linear-gradient(90deg,#86efac,#12a150)' : 'linear-gradient(90deg,#fca5a5,#e5484d)'}"></i></div>` : ''}
-        <div class="pfrow"><span>${dT !== null ? (ok ? '목표 이내' : `목표(낮을수록 좋음)까지 <b class="tg">${pfP(dd - dT)}%p</b>`) : '&nbsp;'}</span><span>${dPrevDq === null ? '' : `전 영업일 <span class="${pfCls(dPrevDq, true)}">${pfSigned(dPrevDq, '%p')} ${dPrevDq > 0 ? '상승' : dPrevDq < 0 ? '하락' : ''}</span>`}</span></div>
-        <div class="pfrow"><span>${dYearDq === null ? '&nbsp;' : `전년말(${pfP(Y.prev_delinq)}%) 대비`}</span>${dYearDq === null ? '' : `<b class="${pfCls(dYearDq, true)}">${pfSigned(dYearDq, '%p')} ${dYearDq < 0 ? '개선' : dYearDq > 0 ? '악화' : ''}</b>`}</div></div>
+        <div class="pfrow"><span>${dT !== null ? (ok ? '목표 이내' : `목표(낮을수록 좋음)까지 <b class="tg">${pfP(dd - dT)}%p</b>`) : '&nbsp;'}</span><span>${dPrevDq === null ? '' : `전일 <span class="${pfCls(dPrevDq, true)}">${pfSigned(dPrevDq, '%p')} ${dPrevDq > 0 ? '상승' : dPrevDq < 0 ? '하락' : ''}</span>`}</span></div>
+        <div class="pfrow"><span>${dYearDq === null ? '&nbsp;' : '전년말 대비'}</span>${dYearDq === null ? '' : `<b class="${pfCls(dYearDq, true)}">${pfSigned(dYearDq, '%p')} ${dYearDq < 0 ? '개선' : dYearDq > 0 ? '악화' : ''}</b>`}</div></div>
       ${pfLiqCard(adm)}
     </div>
     <div class="pftrend3">${[['dep', '수신', '#2f55c8'], ['loan', '여신', '#5b3fc4'], ['delinq', '연체율', '#b42318'], ['liq', '규제유동성비율', '#0e7a4f']].map(([k, n, col]) => `<div class="pfmini"><div class="pfh"><div class="tt" style="color:${col}">${n} 추이</div><span class="sp"></span><span class="m" style="color:var(--muted);font-size:12px">${k === 'liq' ? '기준 100%' : pfTgtTxt(k, c)}</span></div>${pfChart(k, 340, 150)}</div>`).join('')}</div>
