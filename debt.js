@@ -18,7 +18,15 @@ const dbWon = (n) => {
   return [e && `${e}억`, m && `${m.toLocaleString('ko-KR')}만`, r && `${r.toLocaleString('ko-KR')}`].filter(Boolean).join(' ') + '원';
 };
 const dbDiff = (iso) => Math.round((Date.parse(iso + 'T12:00:00Z') - Date.parse(kstToday() + 'T12:00:00Z')) / 864e5) + 0;   // -0 방지. 오늘 기준 (미래 +, 과거 −)
-const dbDays = (c) => 0 - dbDiff(c.overdue_since);                                  // 연체일수 = 오늘 − 연체기준일
+const dbDays = (c) => 0 - dbDiff(c.overdue_since);                                  // 연체일수 = 오늘 − 내부연체기준일
+// 기한이익상실일: 미래 날짜면 '상실 예정일'. d = 오늘 기준 남은 일수(+) / 지난 일수(−)
+function dbAccel(c){
+  if (!c.acceleration_date) return null;
+  const n = dbDiff(c.acceleration_date);
+  if (n > 0) return { cls: 'soon', txt: `상실 예정 D-${n}`, short: `예정 D-${n}`, d: n };
+  if (n === 0) return { cls: 'today', txt: '오늘 기한이익상실', short: '오늘 상실', d: 0 };
+  return { cls: 'done', txt: `기한이익상실 ${-n}일 경과`, short: `상실 ${-n}일 경과`, d: n };
+}
 const dbLogs = (c) => [...(c.debt_logs || [])].sort((a, b) => String(b.log_date).localeCompare(String(a.log_date)) || b.id - a.id);
 const dbMd = (iso) => iso ? iso.slice(5).replace('-', '/') : '';
 function dbDaysTag(c){
@@ -27,6 +35,7 @@ function dbDaysTag(c){
   if (d < 0) return `<span class="dbd">연체 전 D${d}</span>`;
   return `<span class="dbd ${d >= 90 ? 'r3' : d >= 30 ? 'r2' : 'r1'}">연체 ${d.toLocaleString('ko-KR')}일</span>`;
 }
+const dbAccelKey = (c) => { const a = dbAccel(c); return !a ? 1e6 : a.d >= 0 ? a.d : 1e4 - a.d; };   // 예정(가까운 순) → 이미 상실(최근 순) → 미정
 function dbNext(c){
   if (!c.next_action_date) return { cls: 'none', txt: '예정일 미정' };
   const n = dbDiff(c.next_action_date);
@@ -51,6 +60,7 @@ function dbNext(c){
   .dbrow .ts{ font-size:12.5px; color:var(--muted); margin-top:2px; white-space:normal; line-height:1.4; }
   .dbrow.closed{ opacity:.65; }
   .dbd{ display:inline-block; font-size:13px; font-weight:800; padding:4px 11px; border-radius:99px; background:#eef1f6; color:#4b5563; white-space:nowrap; }
+  .dbacc{ font-weight:700; } .dbacc.soon{ color:#b45309; } .dbacc.today{ color:var(--danger); } .dbacc.done{ color:var(--danger); }
   .dbd.r1{ background:var(--warn-soft); color:var(--warn); } .dbd.r2{ background:#ffe4cc; color:#c2570c; } .dbd.r3{ background:var(--danger-soft); color:var(--danger); } .dbd.end{ background:var(--green-soft); color:var(--green); }
   .dbmoney{ font-size:14.5px; font-weight:700; }
   .dblast{ font-size:13px; color:#44546f; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
@@ -125,7 +135,7 @@ function renderDebtMain(){
       <div class="toolbar">
         <div class="seg" id="dbViewSeg"><button data-v="active">진행중 <span id="dbNA"></span></button><button data-v="closed">종결 <span id="dbNB"></span></button></div>
         <select id="dbScope"><option value="all">본점·지점</option><option value="본점">본점</option><option value="지점">지점</option></select>
-        <select id="dbSort"><option value="next">다음 조치 임박순</option><option value="days">연체일수 많은순</option><option value="new">최근 등록순</option></select>
+        <select id="dbSort"><option value="next">다음 조치 임박순</option><option value="days">연체일수 많은순</option><option value="accel">기한이익상실 임박순</option><option value="new">최근 등록순</option></select>
         <label class="chk"><input type="checkbox" id="dbMine" /> 내 담당만</label>
         <input id="dbQ" class="search" type="search" placeholder="🔍 채무자 검색" />
         <button class="btn small" id="dbRpBtn" type="button" title="연체채권사후관리기록부 출력">🖨 사후관리기록부</button>
@@ -147,17 +157,17 @@ function renderDebtMain(){
   const shown = debtCases.filter(c => (dbView === 'closed' ? c.status === '종결' : c.status !== '종결') && (dbScope === 'all' || c.scope === dbScope)
     && (!dbMine || c.assignee_email === me) && (!dbQ || (c.debtor_name || '').toLowerCase().includes(dbQ)));
   const nx = (c) => c.next_action_date || '9999-12-31';
-  shown.sort(dbSort === 'days' ? (a, b) => dbDays(b) - dbDays(a) : dbSort === 'new' ? (a, b) => b.id - a.id : (a, b) => nx(a).localeCompare(nx(b)) || dbDays(b) - dbDays(a));
+  shown.sort(dbSort === 'days' ? (a, b) => dbDays(b) - dbDays(a) : dbSort === 'accel' ? (a, b) => dbAccelKey(a) - dbAccelKey(b) || dbDays(b) - dbDays(a) : dbSort === 'new' ? (a, b) => b.id - a.id : (a, b) => nx(a).localeCompare(nx(b)) || dbDays(b) - dbDays(a));
   const act = shown.filter(c => c.status !== '종결');
   const late = act.filter(c => c.next_action_date && dbDiff(c.next_action_date) < 0).length, tod = act.filter(c => c.next_action_date && dbDiff(c.next_action_date) === 0).length;
-  const sum = act.reduce((s, c) => s + Number(c.principal || 0), 0);
-  $('dbSum').innerHTML = `<span><b>${shown.length}건</b></span>${act.length && sum ? `<span>연체 원금 합계 <b>${dbWon(sum)}</b></span>` : ''}${late ? `<span class="r">조치 지연 ${late}건</span>` : ''}${tod ? `<span class="o">오늘 조치 ${tod}건</span>` : ''}`;
+  const sum = act.reduce((s, c) => s + Number(c.principal || 0), 0), accSoon = act.filter(c => { const a = dbAccel(c); return a && a.d >= 0 && a.d <= 30; }).length;
+  $('dbSum').innerHTML = `<span><b>${shown.length}건</b></span>${act.length && sum ? `<span>연체 원금 합계 <b>${dbWon(sum)}</b></span>` : ''}${late ? `<span class="r">조치 지연 ${late}건</span>` : ''}${tod ? `<span class="o">오늘 조치 ${tod}건</span>` : ''}${accSoon ? `<span class="o">기한이익상실 예정 ${accSoon}건 (30일 내)</span>` : ''}`;
   $('dbList').innerHTML = shown.map(dbRowHtml).join('') || `<div class="blk-empty">${dbView === 'closed' ? '종결된 채권이 없어요.' : debtCases.length ? '조건에 맞는 채권이 없어요.' : '등록된 채권이 없어요. 오른쪽 위 “＋ 채권 등록”으로 시작해요.'}</div>`;
 }
 function dbRowHtml(c){
   const lg = dbLogs(c)[0], nx = dbNext(c);
   return `<div class="dbrow ${c.status === '종결' ? 'closed' : ''}" data-db="${c.id}">
-    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}</div><div class="ts">담당 ${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')} · 기준일 ${esc(c.overdue_since)}</div></div>
+    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}</div><div class="ts">담당 ${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}<br>내부연체 ${esc(c.overdue_since)}${(() => { const a = dbAccel(c); return a ? `<br><span class="dbacc ${a.cls}">기한이익상실 ${esc(c.acceleration_date)} · ${esc(a.short)}</span>` : '<br><span class="muted">기한이익상실 미정</span>'; })()}</div></div>
     <div>${dbDaysTag(c)}</div>
     <div class="dbmoney">${c.principal === null ? '<span class="muted">-</span>' : dbWon(c.principal)}</div>
     <div class="dblast">${lg ? `<span class="m">${DEBT_ICON[lg.kind] || ''} ${esc(dbMd(lg.log_date))}</span>${esc(lg.body)}` : '<span class="muted">이력 없음</span>'}</div>
@@ -178,7 +188,8 @@ function renderDbDetail(){
   const keep = fresh ? { d: editing.body, date: editing.log_date, kind: editing.kind } : { d: ($('dbLogBody') || {}).value || '', date: ($('dbLogDate') || {}).value || kstToday(), kind: cur ? cur.value : '전화' };
   $('dbDetailPanel').innerHTML = `<div class="ph"><h2><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)} ${dbDaysTag(c)}</h2><button class="x" data-d="close">✕</button></div>
     <div class="dbinfo">
-      <div><div class="k">연체기준일</div><div class="v">${esc(c.overdue_since)}</div></div>
+      <div><div class="k">내부연체기준일</div><div class="v">${esc(c.overdue_since)}</div></div>
+      <div><div class="k">기한이익상실일</div><div class="v">${c.acceleration_date ? `${esc(c.acceleration_date)}<div class="dbacc ${dbAccel(c).cls}" style="font-size:13px">${esc(dbAccel(c).txt)}</div>` : '<span class="muted">미정</span>'}</div></div>
       <div><div class="k">연체일수</div><div class="v">${closed ? '-' : dbDays(c) < 0 ? `연체 전 (D${dbDays(c)})` : `${dbDays(c).toLocaleString('ko-KR')}일`}</div></div>
       <div><div class="k">연체 원금</div><div class="v">${c.principal === null ? '-' : dbWon(c.principal)}</div></div>
       <div><div class="k">담당자</div><div class="v">${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</div></div>
@@ -256,12 +267,13 @@ function dbOpenForm(id){
   $('dbFormPanel').innerHTML = `<div class="ph"><h2>${c ? '채권 수정' : '채권 등록'}</h2><button class="x" data-f="close">✕</button></div>
     <label>채무자 <span style="color:var(--danger)">*</span></label><input id="dfName" maxlength="100" placeholder="채무자명" />
     <label>구분</label><div class="checks"><label><input type="radio" name="dfScopeR" value="본점" ${(c ? c.scope : '본점') === '본점' ? 'checked' : ''}/> 본점</label><label><input type="radio" name="dfScopeR" value="지점" ${c && c.scope === '지점' ? 'checked' : ''}/> 지점</label></div>
-    <div class="row"><div><label>연체기준일 <span style="color:var(--danger)">*</span></label><input id="dfSince" type="date" /></div><div><label>연체 원금 (원)</label><input id="dfAmt" inputmode="numeric" placeholder="예: 35,000,000" /></div></div>
+    <div class="row"><div><label>내부연체기준일 <span style="color:var(--danger)">*</span></label><input id="dfSince" type="date" /></div><div><label>기한이익상실일 <span class="muted" style="font-weight:400">(미래 날짜 = 예정일)</span></label><input id="dfAccel" type="date" /></div></div>
+    <div class="row"><div><label>연체 원금 (원)</label><input id="dfAmt" inputmode="numeric" placeholder="예: 35,000,000" /></div><div></div></div>
     <label>담당자</label><select id="dfAsg"><option value="">(지정 안 함)</option>${staff.map(m => `<option value="${esc(m.email)}" ${m.email === asg ? 'selected' : ''}>${esc(m.name || m.email)}</option>`).join('')}</select>
     <div class="row"><div><label>다음 조치 예정일</label><input id="dfNxD" type="date" /></div><div><label>다음 조치 내용</label><input id="dfNxN" maxlength="200" placeholder="예: 내용증명 발송" /></div></div>
     <label>메모</label><textarea id="dfMemo" rows="3" maxlength="1000"></textarea>
     <div class="acts" style="margin-top:20px"><button class="btn primary" data-f="save" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" data-f="close" style="min-height:44px">취소</button></div>`;
-  $('dfName').value = c ? c.debtor_name : ''; $('dfSince').value = c ? c.overdue_since : kstToday();
+  $('dfName').value = c ? c.debtor_name : ''; $('dfSince').value = c ? c.overdue_since : kstToday(); $('dfAccel').value = c && c.acceleration_date ? c.acceleration_date : '';
   $('dfAmt').value = c && c.principal !== null ? Number(c.principal).toLocaleString('ko-KR') : '';
   $('dfAmt').oninput = () => { $('dfAmt').value = dbComma($('dfAmt').value); };
   $('dfNxD').value = c && c.next_action_date ? c.next_action_date : ''; $('dfNxN').value = c && c.next_action_note ? c.next_action_note : ''; $('dfMemo').value = c && c.memo ? c.memo : '';
@@ -274,8 +286,10 @@ $('dbFormPanel').addEventListener('click', async (ev) => {
   if (b.dataset.f === 'close') return dbCloseForm();
   const name = $('dfName').value.trim(), since = $('dfSince').value;
   if (!name) return alert('채무자를 입력해주세요.');
-  if (!since) return alert('연체기준일을 선택해주세요.');
-  const row = { debtor_name: name, scope: (document.querySelector('input[name=dfScopeR]:checked') || {}).value || '본점', overdue_since: since, principal: dbNum($('dfAmt').value),
+  if (!since) return alert('내부연체기준일을 선택해주세요.');
+  const accel = $('dfAccel').value || null;
+  if (accel && accel < since && !confirm('기한이익상실일이 내부연체기준일보다 빨라요. 그대로 저장할까요?')) return;
+  const row = { debtor_name: name, scope: (document.querySelector('input[name=dfScopeR]:checked') || {}).value || '본점', overdue_since: since, acceleration_date: accel, principal: dbNum($('dfAmt').value),
     assignee_email: $('dfAsg').value || null, next_action_date: $('dfNxD').value || null, next_action_note: $('dfNxN').value.trim() || null, memo: $('dfMemo').value.trim() || null };
   b.disabled = true; const wasNew = !debtFormId;
   const { data, error } = debtFormId ? await sb.from('debt_cases').update(row).eq('id', debtFormId).select() : await sb.from('debt_cases').insert(row).select();

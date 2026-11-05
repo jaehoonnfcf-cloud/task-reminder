@@ -601,3 +601,6 @@ create policy up_sel on public.user_prefs for select to authenticated using (ema
 create policy up_ins on public.user_prefs for insert to authenticated with check (email = auth.email() and is_member());
 create policy up_upd on public.user_prefs for update to authenticated using (email = auth.email()) with check (email = auth.email());
 grant select, insert, update on public.user_prefs to authenticated;
+
+-- 연체채권: 날짜를 2개로 관리 — 내부연체기준일(= 기존 overdue_since, 연체일수 계산 기준) + 기한이익상실일(acceleration_date, 미래 날짜면 '상실 예정일')
+alter table public.debt_cases add column if not exists acceleration_date date;

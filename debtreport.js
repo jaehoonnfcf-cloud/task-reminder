@@ -5,6 +5,7 @@
 const dbrNum = (n) => n === null || n === undefined || n === '' ? '-' : Number(n).toLocaleString('ko-KR');
 const dbrDow = (d) => d ? ['일', '월', '화', '수', '목', '금', '토'][new Date(d + 'T12:00:00Z').getUTCDay()] : '';
 const dbrDate = (d) => d ? `${d} (${dbrDow(d)})` : '-';
+const dbrAcc = (c) => { const a = dbAccel(c); return a ? `${c.acceleration_date.slice(2)} <small>${a.d > 0 ? '예정 D-' + a.d : a.d === 0 ? '오늘' : '+' + (-a.d) + '일'}</small>` : '<span class="mu">미정</span>'; };
 const dbrNo = (c) => `채권-${String(c.id).padStart(4, '0')}`;
 const dbrDays = (c) => c.status === '종결' ? '-' : dbDays(c) < 0 ? `D${dbDays(c)}` : `${dbDays(c).toLocaleString('ko-KR')}일`;
 
@@ -35,15 +36,15 @@ function dbrReportHtml(opt){
     const late = act.filter(c => c.next_action_date && c.next_action_date < today).length;
     const rows = cases.map((c, i) => {
       const lg = dbLogs(c)[0], nx = c.status === '종결' ? null : c.next_action_date;
-      return `<tr class="${c.status === '종결' ? 'end' : ''}"><td class="c">${i + 1}</td><td class="c">${esc(c.scope)}</td><td class="nm">${esc(c.debtor_name)}</td><td class="c">${esc(c.overdue_since)}</td><td class="r">${esc(dbrDays(c))}</td><td class="r">${esc(dbrNum(c.principal))}</td><td class="c">${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</td>
+      return `<tr class="${c.status === '종결' ? 'end' : ''}"><td class="c">${i + 1}</td><td class="c">${esc(c.scope)}</td><td class="nm">${esc(c.debtor_name)}</td><td class="c nw">${esc(c.overdue_since)}</td><td class="c nw">${dbrAcc(c)}</td><td class="r">${esc(dbrDays(c))}</td><td class="r">${esc(dbrNum(c.principal))}</td><td class="c">${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</td>
         <td>${lg ? `<b>${esc(lg.log_date.slice(5).replace('-', '/'))}</b> ${esc(lg.kind)}<div class="sm">${esc(lg.body)}</div>` : '<span class="mu">-</span>'}</td>
         <td>${c.status === '종결' ? `<span class="mu">종결${c.closed_at ? ' ' + esc(String(c.closed_at).slice(0, 10)) : ''}</span>` : nx ? `<b${nx < today ? ' class="lt"' : ''}>${esc(nx.slice(5).replace('-', '/'))}</b>${nx < today ? ' (지연)' : ''}${c.next_action_note ? `<div class="sm">${esc(c.next_action_note)}</div>` : ''}` : '<span class="mu">미정</span>'}</td></tr>`;
     }).join('');
     summary = `<div class="page">${head('연체채권사후관리기록부', `기준일 ${esc(today)} (${dbrDow(today)}) · ${esc(condTxt)}`)}
       <div class="sumbar"><span>대상 <b>${cases.length}건</b></span><span>진행중 <b>${act.length}건</b></span><span>연체원금 합계 <b>${esc(dbrNum(sum))}원</b></span><span>30일 이상 <b>${n30}건</b></span><span>90일 이상 <b>${n90}건</b></span><span>조치 지연 <b>${late}건</b></span></div>
-      <table class="t led"><thead><tr><th style="width:5.5%;white-space:nowrap">번호</th><th style="width:6%">구분</th><th style="width:12%">채무자</th><th style="width:11%;white-space:nowrap">연체기준일</th><th style="width:9%;white-space:nowrap">연체일수</th><th style="width:13%">연체원금(원)</th><th style="width:8%">담당자</th><th style="width:18%">최근 연락·방문</th><th style="width:17.5%">다음 조치 예정</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="9" class="c">해당하는 채권이 없습니다.</td></tr>'}</tbody></table>
-      <div class="foot">※ 연체일수는 기준일(${esc(today)}) 현재 자동 계산한 값입니다. 상세 이력은 채무자별 상세 면을 참고하세요.</div></div>`;
+      <table class="t led"><thead><tr><th style="width:4.5%;white-space:nowrap">번호</th><th style="width:5%">구분</th><th style="width:10%">채무자</th><th style="width:10%;white-space:nowrap">내부연체기준일</th><th style="width:12%;white-space:nowrap">기한이익상실일</th><th style="width:7%;white-space:nowrap">연체일수</th><th style="width:11%">연체원금(원)</th><th style="width:7%">담당자</th><th style="width:17%">최근 연락·방문</th><th style="width:16.5%">다음 조치 예정</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="10" class="c">해당하는 채권이 없습니다.</td></tr>'}</tbody></table>
+      <div class="foot">※ 연체일수는 내부연체기준일 기준으로 ${esc(today)} 현재 자동 계산한 값이며, 기한이익상실일이 미래이면 상실 예정일입니다. 상세 이력은 채무자별 상세 면을 참고하세요.</div></div>`;
   }
 
   // ---- 2) 채무자별 상세 ----
@@ -55,7 +56,8 @@ function dbrReportHtml(opt){
       return `<div class="page brk">${head('연체채권사후관리기록부', `관리번호 <b>${esc(dbrNo(c))}</b> · 기준일 ${esc(today)} (${dbrDow(today)})`)}
         <div class="cust"><div><div class="l">채무자</div><div class="n">${esc(c.debtor_name)}</div></div><div class="tag">${esc(c.scope)} · ${closed ? '종결' : '진행중'}</div></div>
         <h2>기본 사항</h2>
-        <table class="t"><tr><td class="k">연체기준일</td><td>${esc(dbrDate(c.overdue_since))}</td><td class="k">연체일수</td><td>${esc(dbrDays(c))}</td></tr>
+        <table class="t"><tr><td class="k">내부연체기준일</td><td>${esc(dbrDate(c.overdue_since))}</td><td class="k">연체일수</td><td>${esc(dbrDays(c))}</td></tr>
+          <tr><td class="k">기한이익상실일</td><td colspan="3">${c.acceleration_date ? `${esc(dbrDate(c.acceleration_date))} <b>(${esc(dbAccel(c).txt)})</b>` : '미정'}</td></tr>
           <tr><td class="k">연체 원금</td><td>${c.principal === null ? '-' : `${esc(dbrNum(c.principal))}원`}</td><td class="k">담당자</td><td>${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</td></tr>
           <tr><td class="k">등록</td><td>${esc(nameOf(c.created_by))} · ${esc(String(c.created_at).slice(0, 10))}</td><td class="k">${closed ? '종결일' : '다음 조치 예정'}</td><td>${closed ? esc(c.closed_at ? String(c.closed_at).slice(0, 10) : '-') : c.next_action_date ? `${esc(dbrDate(c.next_action_date))}${nx && nx.d < 0 ? ` <b class="lt">(${nx.txt})</b>` : ''}${c.next_action_note ? `<div class="sm">${esc(c.next_action_note)}</div>` : ''}` : '미정'}</td></tr></table>
         ${c.memo ? `<h2>메모</h2><div class="memo">${esc(c.memo)}</div>` : ''}
