@@ -2,7 +2,7 @@
 // 목표(A)와 전년말 기준값은 연 1회 관리자가 설정한다. 달성률·차액·합산은 화면에서 자동 계산한다.
 // index.html 의 전역(sb, $, esc, me, isAdmin, kstToday, toast, divn, calMain)을 함께 쓴다.
 
-let perfRows = [], perfYears = {}, perfSel = null, perfTab = 'dep', perfTable = false, perfTimer = null;
+let perfLiq = [], perfRows = [], perfYears = {}, perfSel = null, perfTab = 'dep', perfTable = false, perfTimer = null;
 let perfFormDate = null;
 
 const pfNum = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); return d ? Number(d) : null; };
@@ -52,6 +52,9 @@ function pfPrevBizDay(from = kstToday()){
   .pfk.b .pill{ color:#2f55c8; } .pfk.p .pill{ color:#5b3fc4; } .pfk.r .pill{ color:#b42318; } .pfk .pill.ok{ color:var(--green) !important; }
   .pfk .big{ font-size:32px; font-weight:800; letter-spacing:-.04em; margin-top:6px; font-variant-numeric:tabular-nums; line-height:1.15; }
   .pfk .big small{ font-size:13px; font-weight:700; color:var(--muted); margin-left:6px; letter-spacing:0; white-space:nowrap; display:inline-block; }
+  .pfk.l{ background:#e9f8f1; } .pfk.l .t > span:first-child{ color:#0e7a4f; } .pfk.l .pill{ color:#0e7a4f; background:#fff; } .pfk.l .pill.bad{ color:#b42318 !important; }
+  .pfliq{ margin-top:14px; } .pflqg{ display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr); gap:6px 26px; align-items:start; margin-top:4px; } .pflqg .col{ min-width:0; }
+  .pftk{ position:relative; } .pftk i.tick{ position:absolute; top:-3px; bottom:-3px; width:2px; background:#16181d; opacity:.7; border-radius:2px; } .pftkl{ font-size:11.5px; color:var(--muted); font-weight:700; display:flex; justify-content:space-between; margin-top:4px; }
   .pfbar{ height:10px; background:#fff; border-radius:99px; margin-top:10px; overflow:hidden; } .pfbar i{ display:block; height:100%; border-radius:99px; }
   .pfrow{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:#5a6172; margin-top:6px; font-weight:600; } .pfrow b{ color:var(--ink); }
   .pfrow .gd{ color:var(--green); font-weight:800; } .pfrow .bd{ color:#e5484d; font-weight:800; } .pfrow .tg{ color:var(--accent); font-weight:800; } .pfrow .fl{ color:var(--muted); font-weight:700; }
@@ -72,6 +75,7 @@ function pfPrevBizDay(from = kstToday()){
   .pfempty{ text-align:center; padding:26px 10px 10px; color:var(--muted); font-size:14px; line-height:1.6; }
   .pfform{ display:grid; grid-template-columns:1fr 1fr; gap:4px 14px; } .pfform input{ text-align:right; font-weight:700; } .pfform input[type=date]{ text-align:left; }
   .pfsub{ font-size:12px; color:var(--muted); font-weight:600; margin-top:2px; }
+  @media (max-width:900px){ .pflqg{ grid-template-columns:1fr; } }
   @media (max-width:760px){
     .pfcard{ padding:16px 14px 18px; border-radius:22px; }
     .pfkpis{ grid-template-columns:1fr; gap:10px; } .pfk .big{ font-size:30px; }
@@ -81,18 +85,22 @@ function pfPrevBizDay(from = kstToday()){
   document.head.appendChild(st);
   const d = document.createElement('div');
   d.innerHTML = `<div class="ov" id="pfOvIn"><div class="panel" style="max-width:520px" id="pfInPanel"></div></div>
-    <div class="ov" id="pfOvTg"><div class="panel" style="max-width:560px" id="pfTgPanel"></div></div>`;
+    <div class="ov" id="pfOvTg"><div class="panel" style="max-width:560px" id="pfTgPanel"></div></div>
+    <div class="ov" id="pfOvLq"><div class="panel" style="max-width:520px" id="pfLqPanel"></div></div>`;
   document.body.appendChild(d);
   $('pfOvIn').addEventListener('click', (e) => { if (e.target === $('pfOvIn')) pfCloseIn(); });
   $('pfOvTg').addEventListener('click', (e) => { if (e.target === $('pfOvTg')) pfCloseTg(); });
+  $('pfOvLq').addEventListener('click', (e) => { if (e.target === $('pfOvLq')) pfCloseLq(); });
 })();
 
 async function loadPerf(){
-  const [d, y] = await Promise.all([
+  const [d, y, lq] = await Promise.all([
     sb.from('perf_daily').select('*').order('base_date', { ascending: false }).limit(400),
     sb.from('perf_year').select('*'),
+    sb.from('perf_liq').select('*').order('base_date', { ascending: true }),
   ]);
   if (d.error || y.error){ console.warn('실적 불러오기 실패', (d.error || y.error).message); return; }
+  if (!lq.error) perfLiq = lq.data || [];
   perfRows = (d.data || []).sort((a, b) => a.base_date.localeCompare(b.base_date));
   perfYears = Object.fromEntries((y.data || []).map(r => [r.year, r]));
   if (!perfSel || !perfRows.some(r => r.base_date === perfSel)) perfSel = perfRows.length ? perfRows[perfRows.length - 1].base_date : null;
@@ -150,6 +158,35 @@ function pfChart(tab = perfTab, W = 640, H = 170){
 }
 const pfTgtTxt = (tab, c) => { const t = tab === 'dep' ? c.depT : tab === 'loan' ? c.loanT : (c.Y.delinq_t ?? null); return t === null || t === undefined ? '' : `목표 ${tab === 'delinq' ? pfP(t) + '%' : pfE(t)}`; };
 
+// ---------- 규제유동성비율 (자산합계 ÷ 부채합계, 100% 이상 유지) — 전 영업일 기준, 전월말·전분기말과 비교 ----------
+const LQ_MIN = 100;
+const lqRatio = (r) => r ? Number(r.asset) / Number(r.debt) * 100 : null;
+const lqAt = (d) => { let x = null; for (const r of perfLiq){ if (r.base_date <= d) x = r; else break; } return x; };   // 그 날짜 이하의 가장 최근 입력
+const lqMonthEnd = (iso) => new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, 0)).toISOString().slice(0, 10);   // 전월 말일
+const lqQuarterEnd = (iso) => new Date(Date.UTC(+iso.slice(0, 4), Math.floor((+iso.slice(5, 7) - 1) / 3) * 3, 0)).toISOString().slice(0, 10);   // 직전 분기 말일
+const lqM = (n) => Number(n).toLocaleString('ko-KR') + '백만원';
+function pfLiqSpark(cur){
+  const rows = perfLiq.filter(r => r.base_date <= cur.base_date).slice(-12); if (rows.length < 2) return '';
+  const W = 300, H = 70, v = rows.map(lqRatio), lo = Math.min(...v, LQ_MIN) - 2, hi = Math.max(...v, LQ_MIN) + 2, x = (k) => 6 + (W - 12) * k / (rows.length - 1), y = (a) => 6 + (H - 12) * (1 - (a - lo) / (hi - lo));
+  const col = lqRatio(cur) >= LQ_MIN ? '#12a150' : '#e5484d';
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" style="margin-top:8px"><line x1="0" x2="${W}" y1="${y(LQ_MIN)}" y2="${y(LQ_MIN)}" stroke="#16181d" stroke-dasharray="4 4" opacity=".4"/><text x="${W - 2}" y="${y(LQ_MIN) - 3}" font-size="9" fill="#555" text-anchor="end">기준 100%</text><polyline points="${v.map((a, k) => `${x(k)},${y(a)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linejoin="round"/>${v.map((a, k) => `<circle cx="${x(k)}" cy="${y(a)}" r="${k === v.length - 1 ? 4 : 2.2}" fill="${col}"/>`).join('')}</svg>`;
+}
+function pfLiqCard(adm){
+  const sel = perfSel, cur = lqAt(sel), btn = adm ? '<button class="btn small" data-pf="liq" style="margin-left:auto">＋ 입력</button>' : '';
+  if (!cur) return `<div class="pfk l pfliq"><div class="t"><span>규제유동성비율</span>${btn}</div><div class="pfsub" style="margin-top:8px;font-size:13px">${adm ? '아직 입력된 값이 없어요. “＋ 입력”으로 전 영업일의 자산합계·부채합계(백만원)를 넣으면 비율이 계산돼요. 전월말·전분기말 값도 같은 방법으로 입력하면 비교가 표시돼요.' : '관리자가 입력하면 표시돼요.'}</div></div>`;
+  const ratio = lqRatio(cur), ok = ratio >= LQ_MIN, gap = ratio - LQ_MIN, stale = cur.base_date !== sel;
+  const pm = lqAt(lqMonthEnd(sel)), pq = lqAt(lqQuarterEnd(sel)), cmp = (label, r, endDate) => {
+    if (!r) return `<div class="pfrow"><span>${label}</span><span class="fl">${adm ? `입력 필요 (${pfMd(endDate).replace(' ', '')} 기준)` : '-'}</span></div>`;
+    const d = ratio - lqRatio(r);
+    return `<div class="pfrow"><span>${label} <b>${pfP(lqRatio(r))}%</b> <em style="font-style:normal;color:var(--muted)">(${pfMd(r.base_date).replace(' ', '')})</em></span><b class="${pfCls(d)}">${pfSigned(Math.round(d * 100) / 100, '%p')} ${d > 0 ? '상승' : d < 0 ? '하락' : ''}</b></div>`;
+  };
+  return `<div class="pfk l pfliq"><div class="t"><span>규제유동성비율</span><span class="pill ${ok ? 'ok' : 'bad'}">${ok ? `기준 충족 +${pfP(gap)}%p` : `기준 미달 −${pfP(-gap)}%p`}</span>${btn}</div>
+    <div class="pflqg"><div class="col"><div class="big" style="color:${ok ? 'inherit' : '#b42318'}">${pfP(ratio)}%<small>/ 기준 ${LQ_MIN}% 이상</small></div>
+        <div class="pfbar pftk"><i style="width:${Math.min(100, ratio / 120 * 100)}%;background:${ok ? 'linear-gradient(90deg,#86efac,#12a150)' : 'linear-gradient(90deg,#fca5a5,#e5484d)'}"></i><i class="tick" style="left:${LQ_MIN / 120 * 100}%"></i></div><div class="pftkl"><span>0%</span><span>기준 100%</span><span>120%</span></div>
+        ${stale ? `<div class="pfrow"><span class="bd">※ ${pfMd(sel).replace(' ', '')} 입력값이 없어 ${pfMd(cur.base_date).replace(' ', '')} 값이에요</span></div>` : ''}</div>
+      <div class="col"><div class="pfrow"><span>자산합계</span><b>${lqM(cur.asset)}</b></div><div class="pfrow"><span>부채합계</span><b>${lqM(cur.debt)}</b></div><div class="pfrow"><span>${pfMd(cur.base_date).replace(' ', '')} 기준 (전 영업일)</span><span class="fl">자산 ÷ 부채</span></div>${pfLiqSpark(cur)}</div>
+      <div class="col">${cmp('전월말', pm, lqMonthEnd(sel))}${cmp('전분기말', pq, lqQuarterEnd(sel))}<div class="pfrow"><span class="fl">${ok ? '기준(100%) 이상을 유지하고 있어요' : '기준(100%) 미만이에요 — 점검이 필요해요'}</span></div></div></div></div>`;
+}
 function renderPerf(){
   const el = $('perf'); if (!el) return;
   if (!el.dataset.ready){
@@ -163,6 +200,7 @@ function renderPerf(){
       else if (a === 'table'){ perfTable = !perfTable; renderPerf(); }
       else if (a === 'input') pfOpenIn();
       else if (a === 'goal') pfOpenTg();
+      else if (a === 'liq') pfOpenLq();
     });
   }
   const adm = isAdmin(), c = pfCalc();
@@ -202,6 +240,7 @@ function renderPerf(){
         <div class="pfrow"><span>${dT !== null ? (ok ? '목표 이내' : `목표(낮을수록 좋음)까지 <b class="tg">${pfP(dd - dT)}%p</b>`) : '&nbsp;'}</span><span>${dPrevDq === null ? '' : `전 영업일 <span class="${pfCls(dPrevDq, true)}">${pfSigned(dPrevDq, '%p')} ${dPrevDq > 0 ? '상승' : dPrevDq < 0 ? '하락' : ''}</span>`}</span></div>
         <div class="pfrow"><span>${dYearDq === null ? '&nbsp;' : `전년말(${pfP(Y.prev_delinq)}%) 대비`}</span>${dYearDq === null ? '' : `<b class="${pfCls(dYearDq, true)}">${pfSigned(dYearDq, '%p')} ${dYearDq < 0 ? '개선' : dYearDq > 0 ? '악화' : ''}</b>`}</div></div>
     </div>
+    ${pfLiqCard(adm)}
     <div class="pftrend3">${[['dep', '수신', '#2f55c8'], ['loan', '여신', '#5b3fc4'], ['delinq', '연체율', '#b42318']].map(([k, n, col]) => `<div class="pfmini"><div class="pfh"><div class="tt" style="color:${col}">${n} 추이</div><span class="sp"></span><span class="m" style="color:var(--muted);font-size:12px">${pfTgtTxt(k, c)}</span></div>${pfChart(k, 420, 150)}</div>`).join('')}</div>
     <div class="pftrend1 pfmini"><div class="pfh"><div class="tt">추이 (최근 ${Math.min(20, c.i + 1)}영업일)</div><span class="sp"></span><span class="pftabs">${[['dep', '수신'], ['loan', '여신'], ['delinq', '연체율']].map(([k, n]) => `<button data-pf="tab" data-t="${k}" class="${perfTab === k ? 'on' : ''}">${n}</button>`).join('')}</span></div><div class="m" style="color:var(--muted);font-size:12px;margin-top:2px">${pfTgtTxt(perfTab, c)}</div>${pfChart(perfTab, 340, 170)}</div>
     <div class="pfh" style="margin-top:18px"><b style="font-size:15px">상세표</b><span class="m" style="color:var(--muted);font-size:13px">보고용 양식</span><span class="sp"></span><button class="btn small" data-pf="table">${perfTable ? '접기 ▴' : '펼치기 ▾'}</button></div>
@@ -295,4 +334,51 @@ $('pfTgPanel').addEventListener('click', async (ev) => {
   b.disabled = false;
   if (error) return alert(error.message);
   pfCloseTg(); toast(`⚙ ${year}년 목표·전년말 기준값을 저장했어요`); await loadPerf();
+});
+
+// ---------- 규제유동성비율 입력 (관리자) ----------
+function pfOpenLq(date){
+  if (!isAdmin()) return;
+  const d = date || pfPrevBizDay(), recent = [...perfLiq].reverse().slice(0, 8);
+  $('pfLqPanel').innerHTML = `<div class="ph"><h2>규제유동성비율 입력</h2><button class="x" data-q="close">✕</button></div>
+    <div class="pfsub">단위: 백만원 · 같은 날짜를 다시 저장하면 덮어써요 · 전월말·전분기말 값도 그 날짜로 입력해두면 비교에 쓰여요</div>
+    <label>기준일 <span style="color:var(--danger)">*</span> <span class="muted" style="font-weight:500">(기본값: 전 영업일)</span></label><input id="pqDate" type="date" />
+    <div class="pfform"><div><label>자산합계 (백만원)</label><input id="pqAsset" inputmode="numeric" placeholder="예: 53,435" /></div><div><label>부채합계 (백만원)</label><input id="pqDebt" inputmode="numeric" placeholder="예: 56,233" /></div></div>
+    <div id="pqRatio" style="margin-top:10px;font-size:15px;font-weight:800"></div><div id="pqInfo" class="pfsub" style="margin-top:4px"></div>
+    ${recent.length ? `<div class="pfsub" style="margin-top:14px;font-weight:800;color:#44546f">최근 입력 (눌러서 고치기)</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${recent.map(r => `<button class="btn small" data-q="pick" data-d="${r.base_date}">${pfMd(r.base_date).replace(' ', '')} · ${pfP(lqRatio(r))}%</button>`).join('')}</div>` : ''}
+    <div class="acts" style="margin-top:20px;justify-content:space-between"><div style="display:flex;gap:8px"><button class="btn primary" data-q="save" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" data-q="close" style="min-height:44px">취소</button></div><button class="btn danger" data-q="del" id="pqDel" style="display:none">이 날짜 삭제</button></div>`;
+  $('pqDate').value = d;
+  const upd = () => {
+    const a = pfNum($('pqAsset').value), b = pfNum($('pqDebt').value), v = $('pqDate').value, row = perfLiq.find(r => r.base_date === v);
+    $('pqRatio').innerHTML = a !== null && b ? `비율 <span style="color:${a / b * 100 >= LQ_MIN ? '#12a150' : '#e5484d'}">${pfP(a / b * 100)}%</span> <span class="muted" style="font-weight:500">(기준 ${LQ_MIN}% 이상)</span>` : '';
+    $('pqInfo').textContent = row ? `✏️ ${v}(${pfDow(v)}) 값이 이미 있어요. 고쳐서 저장하면 덮어써요.` : (v ? `${v}(${pfDow(v)})${pfIsHoliday(v) ? ' · 휴일' : ''}` : '');
+    $('pqDel').style.display = row ? '' : 'none';
+  };
+  const fill = () => { const row = perfLiq.find(r => r.base_date === $('pqDate').value); $('pqAsset').value = row ? Number(row.asset).toLocaleString('ko-KR') : ''; $('pqDebt').value = row ? Number(row.debt).toLocaleString('ko-KR') : ''; upd(); };
+  fill(); $('pqDate').onchange = fill;
+  ['pqAsset', 'pqDebt'].forEach(id => { $(id).oninput = () => { const n = pfNum($(id).value); $(id).value = n === null ? '' : n.toLocaleString('ko-KR'); upd(); }; });
+  $('pfOvLq').style.display = 'block'; document.body.style.overflow = 'hidden';
+  setTimeout(() => { try { $('pqAsset').focus(); } catch (x) {} }, 50);
+}
+function pfCloseLq(){ $('pfOvLq').style.display = 'none'; document.body.style.overflow = ''; }
+$('pfLqPanel').addEventListener('click', async (ev) => {
+  const b = ev.target.closest('[data-q]'); if (!b) return;
+  if (b.dataset.q === 'close') return pfCloseLq();
+  if (b.dataset.q === 'pick') return pfOpenLq(b.dataset.d);
+  const date = $('pqDate').value;
+  if (b.dataset.q === 'del'){
+    if (!confirm(`${date} 값을 삭제할까요?`)) return;
+    const { error } = await sb.from('perf_liq').delete().eq('base_date', date);
+    if (error) return alert(error.message);
+    pfCloseLq(); toast('삭제했어요'); return loadPerf();
+  }
+  const asset = pfNum($('pqAsset').value), debt = pfNum($('pqDebt').value);
+  if (!date) return alert('기준일을 선택해주세요.');
+  if (asset === null || !debt) return alert('자산합계와 부채합계(0보다 큰 값)를 입력해주세요.');
+  if (date > kstToday()) return alert('오늘 이후 날짜는 입력할 수 없어요.');
+  b.disabled = true;
+  const { error } = await sb.from('perf_liq').upsert({ base_date: date, asset, debt, entered_by: me, updated_at: new Date().toISOString() }, { onConflict: 'base_date' });
+  b.disabled = false;
+  if (error) return alert(error.message);
+  pfCloseLq(); toast('📊 규제유동성비율을 저장했어요'); await loadPerf();
 });

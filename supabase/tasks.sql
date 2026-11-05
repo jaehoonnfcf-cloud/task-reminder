@@ -645,3 +645,20 @@ create policy fr_upd on public.fund_rates for update to authenticated using (has
 create policy fr_del on public.fund_rates for delete to authenticated using (has_debt());
 grant select, insert, update, delete on public.fund_rates to authenticated;
 alter publication supabase_realtime add table public.fund_rates;
+
+-- 현황판 규제유동성비율: perf_liq(기준일별 자산합계·부채합계, 백만원). 비율 = 자산 ÷ 부채, 기준 100% 이상. 조회는 팀원 전체, 입력은 관리자.
+create table if not exists public.perf_liq (
+  base_date date primary key,
+  asset bigint not null check (asset >= 0),
+  debt bigint not null check (debt > 0),
+  entered_by text not null default auth.email(),
+  updated_at timestamptz not null default now()
+);
+alter table public.perf_liq enable row level security;
+create policy pl_sel on public.perf_liq for select to authenticated using (is_member());
+create policy pl_ins on public.perf_liq for insert to authenticated with check (is_admin() and entered_by = auth.email());
+create policy pl_upd on public.perf_liq for update to authenticated using (is_admin()) with check (is_admin());
+create policy pl_del on public.perf_liq for delete to authenticated using (is_admin());
+grant select, insert, update, delete on public.perf_liq to authenticated;
+grant select on public.perf_liq to service_role;
+alter publication supabase_realtime add table public.perf_liq;

@@ -1048,6 +1048,7 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, scheduleMembers)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, () => { if (typeof scheduleCal === 'function') { scheduleCal(); schedulePcal(); } })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'perf_daily' }, () => { if (typeof schedulePerf === 'function') schedulePerf(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'perf_liq' }, () => { if (typeof schedulePerf === 'function') schedulePerf(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'perf_year' }, () => { if (typeof schedulePerf === 'function') schedulePerf(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'personal_events' }, () => { if (typeof schedulePcal === 'function') schedulePcal(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
@@ -1702,7 +1703,7 @@
 <script src="fund.js?v=3"></script>
 <script src="rti.js?v=5"></script>
 <script src="event.js?v=4"></script>
-<script src="perf.js?v=8"></script>
+<script src="perf.js?v=9"></script>
 <script src="cover.js?v=1"></script>
 </body>
 </html>
