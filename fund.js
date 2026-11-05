@@ -19,6 +19,9 @@ const FD_RATE_COLS = [['lump', '일시자금'], ['m1', '정기 1개월'], ['m3',
 const FD_TERM_KEY = { '1개월': 'm1', '3개월': 'm3', '6개월': 'm6', '12개월': 'm12', '24개월': 'm24', '36개월': 'm36' };
 let fdRates = [], fdRateForm = { eff: '', v: {} };
 const fdRateFor = (day) => fdRates.find(r => r.eff_date <= day) || null;   // fdRates 는 기준일자 내림차순
+// 금리표 머리글: 정기예탁금 아래에 1~36개월이 묶여 보이는 2단 표
+const FD_RATE_HEAD = (right, extra = '') => `<tr><th rowspan="2" style="vertical-align:bottom">기준일자</th><th rowspan="2" style="${right}vertical-align:bottom">일시자금</th><th colspan="6" style="text-align:center;border-bottom:1px solid var(--line)">정기예탁금</th><th rowspan="2" style="${right}vertical-align:bottom">환담보예치금</th><th rowspan="2" style="${right}vertical-align:bottom">상환준비금</th>${extra}</tr>
+  <tr>${['1개월', '3개월', '6개월', '12개월', '24개월', '36개월'].map(n => `<th style="${right}">${n}</th>`).join('')}</tr>`;
 const fdPct = (v) => v === null || v === undefined || v === '' ? '-' : `${Number(v)}%`;
 const FD_LOANKINDS = ['일반대출', '예탁금대출', '주택담보대출', '기타'];
 const FD_S1 = {   // 자금조달·운영 행: auto = 다른 항목에서 가져오는 연동값 (기본 모드가 manual 인 행은 엑셀처럼 직접 입력, 연동값은 참고로 표시)
@@ -218,7 +221,7 @@ function fdRateSection(day){
   const app = fdRateFor(day), f = fdRateForm, inp = (k) => `<input data-rf="v.${k}" inputmode="decimal" value="${esc(f.v[k] ?? '')}" placeholder="%" style="min-width:64px;text-align:right" />`;
   return `<div class="fdsec"><h3>중앙회 금리표 <small>(기준일자별로 입력해 두면 위 기준일에 맞는 금리표가 적용돼요)</small></h3>
     ${app ? `<div class="fdwarn" style="background:#e8f4ff;color:#14407d;margin-bottom:10px">${esc(day)} 적용 금리표 (기준일자 ${esc(app.eff_date)}) — ${FD_RATE_COLS.map(([k, n]) => `${n} <b>${fdPct(app[k])}</b>`).join(' · ')}</div>` : '<div class="fdwarn" style="margin-bottom:10px">이 기준일에 적용되는 금리표가 없어요. 아래에 기준일자와 금리를 입력하세요.</div>'}
-    <div class="fdsc"><table class="fdt" style="min-width:760px"><thead><tr><th>기준일자</th>${FD_RATE_COLS.map(([k, n]) => `<th style="text-align:right">${n}</th>`).join('')}<th></th></tr></thead><tbody>
+    <div class="fdsc"><table class="fdt" style="min-width:760px"><thead>${FD_RATE_HEAD('text-align:right;', '<th rowspan="2"></th>')}</thead><tbody>
       <tr><td><input type="date" data-rf="eff" value="${esc(f.eff)}" /></td>${FD_RATE_COLS.map(([k]) => `<td>${inp(k)}</td>`).join('')}<td style="white-space:nowrap"><button class="btn small primary" type="button" data-act="ratesave">${fdRates.some(r => r.eff_date === f.eff) ? '수정 저장' : '저장'}</button> <button class="btn small" type="button" data-act="ratenew" title="입력칸 비우기">비우기</button></td></tr>
       ${fdRates.map(r => `<tr class="${app && app.eff_date === r.eff_date ? 'sub' : ''}"><td class="lab">${esc(r.eff_date)}${app && app.eff_date === r.eff_date ? ' <span class="fdauto">적용중</span>' : ''}</td>${FD_RATE_COLS.map(([k]) => `<td class="num">${fdPct(r[k])}</td>`).join('')}<td style="white-space:nowrap"><button class="fdlink" type="button" data-act="rateedit" data-d="${r.eff_date}">수정</button><button class="fdx" type="button" data-act="ratedel" data-d="${r.eff_date}" title="삭제">✕</button></td></tr>`).join('')}</tbody></table></div>
     ${fdRates.length ? '' : '<div class="fdhint">아직 입력된 금리표가 없어요. 위 입력줄에 기준일자(적용 시작일)와 금리(%)를 넣고 저장하세요.</div>'}
@@ -331,6 +334,6 @@ function fdPrint(){
     <tr><td>대출실행</td><td>${+day.slice(5, 7)}월분(미정분 미포함)</td><td class="r">${R(c.s6.loan)}</td><td>${txt(d.s6.loanNote)}</td></tr>
     ${d.s6.rows.filter(r => r.name || fdN(r.amt)).map(r => `<tr><td>${txt(r.kind)}</td><td>${txt(r.name)}</td><td class="r">${R(fdN(r.amt))}</td><td>${txt(r.note)}</td></tr>`).join('')}<tr class="tot"><td colspan="2">합 계</td><td class="r">${w(c.s6.total)}</td><td></td></tr></tbody></table>
   ${d.memo ? `<h2>7. 기타사항</h2><div class="memo">${esc(d.memo)}</div>` : ''}
-  ${fdRates.filter(r => r.eff_date <= day).length ? `<h2>중앙회 금리표 <small>(기준일자별 · %)</small></h2><table class="t"><thead><tr><th>기준일자</th>${FD_RATE_COLS.map(([k, n]) => `<th>${n}</th>`).join('')}</tr></thead><tbody>${fdRates.filter(r => r.eff_date <= day).slice(0, 4).map((r, i) => `<tr class="${i === 0 ? 'tot' : ''}"><td class="c nw">${esc(r.eff_date)}</td>${FD_RATE_COLS.map(([k]) => `<td class="c">${fdPct(r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}</body></html>`;
+  ${fdRates.filter(r => r.eff_date <= day).length ? `<h2>중앙회 금리표 <small>(기준일자별 · %)</small></h2><table class="t"><thead>${FD_RATE_HEAD('', '').replace(/border-bottom:1px solid var\(--line\)/, 'border-bottom:1px solid #444')}</thead><tbody>${fdRates.filter(r => r.eff_date <= day).slice(0, 4).map((r, i) => `<tr class="${i === 0 ? 'tot' : ''}"><td class="c nw">${esc(r.eff_date)}</td>${FD_RATE_COLS.map(([k]) => `<td class="c">${fdPct(r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}</body></html>`;
   apPreview(html, '자금운영현황', `자금운영현황_${day}`);
 }
