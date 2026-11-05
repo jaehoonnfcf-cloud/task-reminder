@@ -625,3 +625,8 @@ create policy fd_upd on public.fund_days for update to authenticated using (has_
 create policy fd_del on public.fund_days for delete to authenticated using (has_debt());
 grant select, insert, update, delete on public.fund_days to authenticated;
 alter publication supabase_realtime add table public.fund_days;
+
+-- 연체채권: 자산건전성(정상·요주의·고정·회수의문·추정손실) / 고정이하분류일(미래면 예정일) / 관리일자·관리내역(채권별 1건씩)
+alter table public.debt_cases add column if not exists asset_class text, add column if not exists fixed_below_date date, add column if not exists manage_date date, add column if not exists manage_note text;
+alter table public.debt_cases add constraint debt_cases_asset_class_check check (asset_class is null or asset_class in ('정상','요주의','고정','회수의문','추정손실'));
+alter table public.debt_cases add constraint debt_cases_manage_note_check check (manage_note is null or char_length(manage_note) <= 500);
