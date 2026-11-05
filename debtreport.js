@@ -100,6 +100,7 @@ function dbrOpenDialog(){
   if (!ov){
     ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'dbrOv'; ov.style.zIndex = '35';
     ov.innerHTML = `<div class="panel" style="max-width:480px"><div class="ph"><h2>🖨 연체채권사후관리기록부 출력</h2><button class="x" data-r="close">✕</button></div>
+      <div class="muted" style="font-size:12.5px;margin:2px 0 6px">화면에서 고른 구분(본점·지점)이 기본으로 선택돼요. 여기서 바꿀 수도 있어요.</div>
       <label>대상</label><div class="checks"><label><input type="radio" name="dbrSt" value="active" checked /> 진행중</label><label><input type="radio" name="dbrSt" value="closed" /> 종결</label><label><input type="radio" name="dbrSt" value="all" /> 전체</label></div>
       <label style="margin-top:10px">구분</label><div class="checks"><label><input type="radio" name="dbrSc" value="all" checked /> 본점·지점</label><label><input type="radio" name="dbrSc" value="본점" /> 본점</label><label><input type="radio" name="dbrSc" value="지점" /> 지점</label></div>
       <label style="margin-top:10px">출력 내용</label><div class="checks"><label><input type="checkbox" id="dbrSum" checked /> 대장 요약표</label><label><input type="checkbox" id="dbrDet" checked /> 채무자별 상세 (연락·방문 이력)</label></div>
@@ -124,5 +125,8 @@ function dbrOpenDialog(){
       ov.style.display = 'none'; dbrPrint(opt);
     });
   }
+  // 메인 화면에서 고른 구분(본점/지점)·진행중/종결을 기본값으로 가져온다
+  const setR = (name, v) => { const x = ov.querySelector(`[name=${name}][value="${v}"]`); if (x) x.checked = true; };
+  setR('dbrSc', dbScope); setR('dbrSt', dbView === 'closed' ? 'closed' : 'active');
   ov.style.display = 'block'; ov._cnt();
 }
