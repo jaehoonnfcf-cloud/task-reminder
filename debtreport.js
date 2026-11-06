@@ -60,6 +60,7 @@ function dbrReportHtml(opt){
         <div class="cust"><div><div class="l">채무자</div><div class="n">${esc(c.debtor_name)}</div></div><div class="tag">${esc(c.scope)} · ${closed ? '종결' : '진행중'}</div></div>
         <h2>기본 사항</h2>
         <table class="t"><tr><td class="k">내부연체기준일</td><td>${c.overdue_since ? esc(dbrDate(c.overdue_since)) : '미입력'}</td><td class="k">연체일수</td><td>${esc(dbrDays(c))}</td></tr>
+          <tr><td class="k">타행연체일자</td><td colspan="3">${c.other_bank_since ? `${esc(dbrDate(c.other_bank_since))}${dbOtherEarly(c) ? ' <b>(내부연체기준일보다 빠름)</b>' : ''}` : '없음'}</td></tr>
           <tr><td class="k">자산건전성</td><td>${c.asset_class ? `<b>${esc(c.asset_class)}</b>` : '미분류'}</td><td class="k">요주의 분류일</td><td>${c.caution_date ? `${esc(dbrDate(c.caution_date))} <b>(${esc(dbCaution(c).txt)})</b>` : '미정'}</td></tr>
           <tr><td class="k">고정이하분류일</td><td>${c.fixed_below_date ? `${esc(dbrDate(c.fixed_below_date))} <b>(${esc(dbFixed(c).txt)})</b>` : '미정'}</td><td class="k">기한이익상실일</td><td>${c.acceleration_date ? `${esc(dbrDate(c.acceleration_date))} <b>(${esc(dbAccel(c).txt)})</b>` : '미정'}</td></tr>
           <tr><td class="k">연체 원금</td><td>${c.principal === null ? '-' : `${esc(dbrNum(c.principal))}원`}</td><td class="k">담당자</td><td>${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</td></tr>
