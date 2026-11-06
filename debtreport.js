@@ -7,7 +7,13 @@ const dbrDow = (d) => d ? ['일', '월', '화', '수', '목', '금', '토'][new 
 const dbrDate = (d) => d ? `${d} (${dbrDow(d)})` : '-';
 const dbrAcc = (c) => { const a = dbAccel(c); return a ? `${c.acceleration_date.slice(2)} <small>${a.d > 0 ? '예정 D-' + a.d : a.d === 0 ? '오늘' : '+' + (-a.d) + '일'}</small>` : '<span class="mu">미정</span>'; };
 const dbrFix = (c) => { const f = dbFixed(c); return f ? `${c.fixed_below_date.slice(2)} <small>${f.d > 0 ? '예정 D-' + f.d : f.d === 0 ? '오늘' : '+' + (-f.d) + '일'}</small>` : ''; };
-const dbrCls = (c) => dbSpecial(c) ? '<b>특수채권</b>' : `${c.asset_class ? `<b>${esc(c.asset_class)}</b>` : '<span class="mu">미분류</span>'}${c.caution_date ? `<div class="sm">요주의 ${dbCaution(c).short.startsWith('D') ? c.caution_date.slice(2) + ' <small>예정 ' + dbCaution(c).short + '</small>' : c.caution_date.slice(2) + ' <small>' + (dbCaution(c).d === 0 ? '오늘' : '+' + (-dbCaution(c).d) + '일') + '</small>'}</div>` : ''}${c.fixed_below_date ? `<div class="sm">고정이하 ${dbrFix(c)}</div>` : ''}`;
+const dbrCls = (c) => dbSpecial(c) ? '<b>특수채권</b>' : c.asset_class ? `<b>${esc(c.asset_class)}</b>` : '<span class="mu">미분류</span>';
+const dbrClsOld = (c) => dbSpecial(c) ? '<b>특수채권</b>' : `${c.asset_class ? `<b>${esc(c.asset_class)}</b>` : '<span class="mu">미분류</span>'}${c.caution_date ? `<div class="sm">요주의 ${dbCaution(c).short.startsWith('D') ? c.caution_date.slice(2) + ' <small>예정 ' + dbCaution(c).short + '</small>' : c.caution_date.slice(2) + ' <small>' + (dbCaution(c).d === 0 ? '오늘' : '+' + (-dbCaution(c).d) + '일') + '</small>'}</div>` : ''}${c.fixed_below_date ? `<div class="sm">고정이하 ${dbrFix(c)}</div>` : ''}`;
+const dbrDot = (d) => d ? d.slice(2).replace(/-/g, '.') : '';
+const dbrSt = (st) => !st ? '' : st.d > 0 ? `D-${st.d}` : st.d === 0 ? '오늘' : `+${-st.d}일`;
+// 건전성 변경 일정 3줄: 요주의 / 고정이하 / 기한이익상실 (날짜가 줄바꿈되지 않도록 한 줄 고정)
+const dbrSch = (c) => dbSpecial(c) ? `<div class="ln">편입 ${c.special_date ? dbrDot(c.special_date) : '-'}</div>` : dbMiles(c).map(m => `<div class="ln"><span class="lb">${m.label}</span> ${m.st ? `<b>${dbrDot(m.date)}</b> <small${m.need ? ' class="lt"' : ''}>${m.need ? '변경필요' : dbrSt(m.st)}</small>` : '<span class="mu">-</span>'}</div>`).join('');
+const dbrSince = (c) => dbSpecial(c) ? '<b>특수채권</b>' : `<div class="ln"><span class="lb">내부</span> ${c.overdue_since ? `<b>${dbrDot(c.overdue_since)}</b>` : '<span class="mu">-</span>'}</div><div class="ln"><span class="lb">타행</span> ${c.other_bank_since ? `<b${dbOtherEarly(c) ? ' class="lt"' : ''}>${dbrDot(c.other_bank_since)}</b>` : '<span class="mu">-</span>'}</div>`;
 const dbrNo = (c) => `채권-${String(c.id).padStart(4, '0')}`;
 const dbrDays = (c) => c.status === '종결' || !dbHasSince(c) ? '-' : dbDays(c) < 0 ? `D${dbDays(c)}` : `${dbDays(c).toLocaleString('ko-KR')}일`;
 
@@ -38,14 +44,14 @@ function dbrReportHtml(opt){
     const late = act.filter(c => c.next_action_date && c.next_action_date < today).length;
     const rows = cases.map((c, i) => {
       const lg = dbLogs(c)[0], nx = c.status === '종결' ? null : c.next_action_date;
-      return `<tr class="${c.status === '종결' ? 'end' : ''}"><td class="c">${i + 1}</td><td class="c">${esc(c.scope)}</td><td class="nm">${esc(c.debtor_name)}</td><td class="c nw">${dbSpecial(c) ? `<b>특수채권</b><div class="sm">편입 ${c.special_date ? esc(c.special_date) : '-'}</div>` : c.overdue_since ? esc(c.overdue_since) : '<span class="mu">미입력</span>'}</td><td class="c nw">${dbSpecial(c) ? '-' : dbrAcc(c)}</td><td class="r">${esc(dbrDays(c))}</td><td class="r">${esc(dbrNum(c.principal))}</td><td class="c">${dbrCls(c)}</td><td class="c">${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</td>
+      return `<tr class="${c.status === '종결' ? 'end' : ''}"><td class="c">${i + 1}</td><td class="c">${esc(c.scope)}</td><td class="nm">${esc(c.debtor_name)}</td><td class="nw">${dbrSince(c)}</td><td class="r nw">${esc(dbrDays(c))}</td><td class="r">${esc(dbrNum(c.principal))}</td><td class="c nw">${dbrCls(c)}</td><td class="nw sch">${dbrSch(c)}</td><td class="c">${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</td>
         <td>${lg ? `<b>${esc(lg.log_date.slice(5).replace('-', '/'))}</b> ${esc(lg.kind)}<div class="sm">${esc(lg.body)}</div>` : '<span class="mu">-</span>'}</td>
-        <td>${c.manage_date || c.manage_note ? `<b>${c.manage_date ? esc(c.manage_date.slice(5).replace('-', '/')) : ''}</b><div class="sm">${esc(c.manage_note || '')}</div>` : '<span class="mu">-</span>'}</td>
+        <td>${c.manage_note ? esc(c.manage_note) : '<span class="mu">-</span>'}</td>
         <td>${c.status === '종결' ? `<span class="mu">종결${c.closed_at ? ' ' + esc(String(c.closed_at).slice(0, 10)) : ''}</span>` : nx ? `<b${nx < today ? ' class="lt"' : ''}>${esc(nx.slice(5).replace('-', '/'))}</b>${nx < today ? ' (지연)' : ''}${c.next_action_note ? `<div class="sm">${esc(c.next_action_note)}</div>` : ''}` : '<span class="mu">미정</span>'}</td></tr>`;
     }).join('');
     summary = `<div class="page">${head('연체채권사후관리기록부', `기준일 ${esc(today)} (${dbrDow(today)}) · ${esc(condTxt)}`)}
       <div class="sumbar"><span>대상 <b>${cases.length}건</b></span><span>진행중 <b>${act.length}건</b></span><span>연체원금 합계 <b>${esc(dbrNum(sum))}원</b></span><span>30일 이상 <b>${n30}건</b></span><span>90일 이상 <b>${n90}건</b></span><span>조치 지연 <b>${late}건</b></span></div>
-      <table class="t led"><thead><tr><th style="width:3.5%;white-space:nowrap">번호</th><th style="width:4.5%">구분</th><th style="width:8.5%">채무자</th><th style="width:8.5%;white-space:nowrap">내부연체기준일</th><th style="width:9.5%;white-space:nowrap">기한이익상실일</th><th style="width:6%;white-space:nowrap">연체일수</th><th style="width:9.5%">연체원금(원)</th><th style="width:10.5%">자산건전성<br><small>(고정이하분류일)</small></th><th style="width:6%">담당자</th><th style="width:13.5%">최근 연락·방문</th><th style="width:13%">관리일자·관리내역</th><th style="width:6.5%">다음 조치</th></tr></thead>
+      <table class="t led"><thead><tr><th style="width:3%">번호</th><th style="width:4%">구분</th><th style="width:8%">채무자</th><th style="width:8%">연체기준일<br><small>(내부/타행)</small></th><th style="width:5.5%">연체일수</th><th style="width:9%">연체원금(원)</th><th style="width:7.5%;white-space:nowrap">자산건전성</th><th style="width:15%">건전성 변경 일정<br><small>(요주의/고정이하/기한이익상실)</small></th><th style="width:5%">담당자</th><th style="width:13%">최근 연락·방문</th><th style="width:13%">관리내역</th><th style="width:9%">다음 조치</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="12" class="c">해당하는 채권이 없습니다.</td></tr>'}</tbody></table>
       <div class="foot">※ 연체일수는 내부연체기준일 기준으로 ${esc(today)} 현재 자동 계산한 값이며, 기한이익상실일이 미래이면 상실 예정일입니다. 상세 이력은 채무자별 상세 면을 참고하세요.</div></div>`;
   }
@@ -65,7 +71,7 @@ function dbrReportHtml(opt){
           <tr><td class="k">고정이하분류일</td><td>${c.fixed_below_date ? `${esc(dbrDate(c.fixed_below_date))} <b>(${esc(dbFixed(c).txt)})</b>` : '미정'}</td><td class="k">기한이익상실일</td><td>${c.acceleration_date ? `${esc(dbrDate(c.acceleration_date))} <b>(${esc(dbAccel(c).txt)})</b>` : '미정'}</td></tr>`}
           <tr><td class="k">연체 원금</td><td>${c.principal === null ? '-' : `${esc(dbrNum(c.principal))}원`}</td><td class="k">담당자</td><td>${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</td></tr>
           <tr><td class="k">등록</td><td>${esc(nameOf(c.created_by))} · ${esc(String(c.created_at).slice(0, 10))}</td><td class="k">${closed ? '종결일' : '다음 조치 예정'}</td><td>${closed ? esc(c.closed_at ? String(c.closed_at).slice(0, 10) : '-') : c.next_action_date ? `${esc(dbrDate(c.next_action_date))}${nx && nx.d < 0 ? ` <b class="lt">(${nx.txt})</b>` : ''}${c.next_action_note ? `<div class="sm">${esc(c.next_action_note)}</div>` : ''}` : '미정'}</td></tr></table>
-        ${c.manage_date || c.manage_note ? `<h2>관리일자 · 관리내역</h2><div class="memo"><b>${c.manage_date ? esc(dbrDate(c.manage_date)) : '-'}</b>${c.manage_note ? `\n${esc(c.manage_note)}` : ''}</div>` : ''}
+        ${c.manage_note ? `<h2>관리내역</h2><div class="memo">${esc(c.manage_note)}</div>` : ''}
         ${c.memo ? `<h2>메모</h2><div class="memo">${esc(c.memo)}</div>` : ''}
         <h2>연락·방문 이력 <span class="cnt">(${logs.length}건${periodTxt ? ' · ' + (opt.from || '처음') + ' ~ ' + (opt.to || '현재') : ''})</span></h2>
         <table class="t log"><thead><tr><th style="width:6%">번호</th><th style="width:17%">일자</th><th style="width:9%">구분</th><th>내용</th><th style="width:11%">작성자</th></tr></thead>
@@ -83,7 +89,7 @@ function dbrReportHtml(opt){
   .sumbar{display:flex;flex-wrap:wrap;gap:4px 18px;margin:10px 0 8px;padding:7px 12px;border:1px solid #444;background:#f7f7f7;font-size:12px}.sumbar b{font-size:13px}
   table.t{width:calc(100% - 1px);border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:4px 7px;vertical-align:middle}
   table.t th{background:#eee;text-align:center;font-weight:700;font-size:11.5px}table.t td.k{background:#f3f3f3;font-weight:700;text-align:center;white-space:nowrap;width:15%;font-size:12px}
-  table.led td{font-size:11.5px}table.led td.nm{font-weight:700}.c{text-align:center}.r{text-align:right}tr{page-break-inside:avoid}thead{display:table-header-group}
+  table.led td{font-size:11.5px}.ln{white-space:nowrap;line-height:1.5;text-align:left}.ln .lb{color:#666;font-size:10px;display:inline-block;min-width:3.6em}.ln small{font-size:10.5px;color:#444}.ln small.lt,.ln b.lt{color:#b42318}table.led td.sch{padding-left:5px}table.led th small{font-weight:400;font-size:9px}table.led td.nm{font-weight:700}.c{text-align:center}.r{text-align:right}tr{page-break-inside:avoid}thead{display:table-header-group}
   tr.end td{background:#f4f4f4;color:#666}.sm{font-size:10.5px;color:#444;margin-top:1px;word-break:break-all}.mu{color:#888}.lt{color:#b42318}
   .cust{margin-top:12px;border:2px solid #111;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
   .cust .l{font-size:12px;color:#555;margin-bottom:3px}.cust .n{font-size:23px;font-weight:800;letter-spacing:1px;word-break:keep-all}
