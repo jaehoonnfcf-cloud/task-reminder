@@ -60,8 +60,7 @@ function dbMiles(c){
   const cls = c.asset_class || '', closed = c.status === '종결';
   const it = [
     { k: 'caution', label: '요주의', date: c.caution_date, st: dbCaution(c), col: '#b45309', bg: '#fef3c7' },
-    { k: 'fixed', label: '고정이하', date: c.fixed_below_date, st: dbFixed(c), col: '#c2410c', bg: '#ffedd5' },
-    { k: 'accel', label: '기한이익상실', date: c.acceleration_date, st: dbAccel(c), col: '#6d28d9', bg: '#ede9fe' }];
+    { k: 'fixed', label: '고정이하', date: c.fixed_below_date, st: dbFixed(c), col: '#c2410c', bg: '#ffedd5' }];
   it[0].need = !closed && !!it[0].st && it[0].st.d <= 0 && (cls === '' || cls === '정상');
   it[1].need = !closed && !!it[1].st && it[1].st.d <= 0 && !DB_LOW.includes(cls);
   if (!closed){ let best = null; it.forEach(m => { if (m.st && m.st.d >= 0 && (!best || m.st.d < best.st.d)) best = m; }); if (best) best.nx = true; }
@@ -69,12 +68,21 @@ function dbMiles(c){
 }
 const dbNeed = (c) => dbMiles(c).filter(m => m.need);
 const dbClsKey = (c) => { if (dbSpecial(c)) return 2e6; if (dbNeed(c).length) return -1; const a = dbMiles(c); return Math.min(dbSchedKey(a[0].st), dbSchedKey(a[1].st)); };
+// 연체 · 기한이익상실 묶음 (건전성 분류와 별개의 관점)
+function dbAccelHtml(c, big){
+  const a = dbAccel(c), st = !a ? 'none' : a.d > 0 ? 'fut' : a.d === 0 ? 'today' : 'past';
+  return `<div class="dbac ${st} ${big ? 'big' : ''}"><span class="l">기한이익상실</span><b>${a ? esc(dbShortDate(c.acceleration_date)) : '-'}</b><span class="bd">${a ? esc(a.d > 0 ? `예정 D-${a.d}` : a.d === 0 ? '오늘 상실' : `상실 ${-a.d}일 경과`) : '미정'}</span></div>`;
+}
+function dbOverdueHtml(c){
+  if (dbSpecial(c)) return dbDaysTag(c);
+  return `${dbDaysTag(c)}<div class="dbl"><span>내부연체</span>${c.overdue_since ? `<b>${esc(dbShortDate(c.overdue_since))}</b>` : '<em>미입력</em>'}</div><div class="dbl ${dbOtherEarly(c) ? 'early' : ''}"><span>타행연체</span>${c.other_bank_since ? `<b>${esc(dbShortDate(c.other_bank_since))}</b>` : '<em>없음</em>'}</div>${dbAccelHtml(c)}`;
+}
 const dbSpDays = (c) => c.special_date ? -dbDiff(c.special_date) : null;
 function dbMileHtml(c, big){
   if (dbSpecial(c)) return `<div class="dbsp ${big ? 'big' : ''}"><span class="l">특수채권편입일자</span><b>${c.special_date ? esc(c.special_date) : '<span class="muted">미입력</span>'}</b>${c.special_date && dbSpDays(c) >= 0 ? `<span class="bd">편입 ${dbSpDays(c).toLocaleString('ko-KR')}일 경과</span>` : ''}</div>`;
   return `<div class="dbms ${big ? 'big' : ''}">${dbMiles(c).map(m => {
     const st = m.st, state = !st ? 'none' : m.need ? 'need' : m.nx ? 'nx' : st.d >= 0 ? 'fut' : 'past';
-    const badge = !st ? '미정' : m.need ? '⚠ 변경 필요' : st.d > 0 ? `D-${st.d}` : st.d === 0 ? '오늘' : m.k === 'accel' ? `상실 ${-st.d}일 경과` : `✓ ${-st.d}일 경과`;
+    const badge = !st ? '미정' : m.need ? '⚠ 변경 필요' : st.d > 0 ? `D-${st.d}` : st.d === 0 ? '오늘' : `✓ ${-st.d}일 경과`;
     return `<div class="dbm ${state}" style="--mc:${m.col};--mb:${m.bg}"><span class="l">${m.label}${m.nx ? ' <i>다음</i>' : ''}</span><b>${st ? esc(dbShortDate(m.date)) : '-'}</b><span class="bd">${esc(badge)}</span></div>`;
   }).join('')}</div>`;
 }
@@ -113,7 +121,7 @@ function dbNext(c){
   #debtMain{ display:flex; flex-direction:column; gap:10px; min-width:0; } .dbsecT{ font-size:19px; font-weight:800; letter-spacing:-.03em; padding:2px 6px; }
   .dbsum{ padding:12px 18px; font-size:13.5px; color:#44546f; display:flex; gap:6px 16px; flex-wrap:wrap; border-bottom:1px solid var(--line); }
   .dbsum b{ color:var(--ink); } .dbsum .r{ color:var(--danger); font-weight:700; } .dbsum .o{ color:var(--warn); font-weight:700; }
-  .dbhead,.dbrow{ display:grid; grid-template-columns:minmax(130px,1fr) 118px 300px 104px minmax(140px,1.1fr) minmax(100px,.8fr); gap:10px; align-items:center; padding:0 22px; }
+  .dbhead,.dbrow{ display:grid; grid-template-columns:minmax(130px,1fr) 190px 250px 104px minmax(140px,1.1fr) minmax(100px,.8fr); gap:10px; align-items:center; padding:0 22px; }
   .dbhead > *, .dbrow > *{ min-width:0; }
   .dbhead{ font-size:12px; font-weight:700; color:var(--muted); padding-top:10px; padding-bottom:8px; }
   .dbrow{ padding-top:15px; padding-bottom:15px; cursor:pointer; background:#fff; border-radius:22px; box-shadow:var(--sh); margin-bottom:12px; transition:box-shadow .15s, transform .15s; }
@@ -130,7 +138,11 @@ function dbNext(c){
   .dbob{ margin-top:2px; white-space:nowrap; } .dbob.early{ color:#d93b2b; } .dbob.early b{ color:#d93b2b; } .dbob i{ font-style:normal; font-size:10px; font-weight:800; background:#d93b2b; color:#fff; border-radius:99px; padding:0 6px; }
   .dbd.sp{ background:#ede9fe; color:#6d28d9; }
   .dbsp{ border:1.5px solid #d9ccf7; background:#f7f3ff; border-radius:12px; padding:8px 12px; display:flex; flex-direction:column; gap:1px; } .dbsp .l{ font-size:11.5px; font-weight:800; color:#6d28d9; } .dbsp b{ font-size:15px; font-weight:800; font-variant-numeric:tabular-nums; } .dbsp .bd{ font-size:12px; font-weight:700; color:var(--muted); } .dbsp.big{ padding:12px 16px; } .dbsp.big b{ font-size:19px; }
-  .dbms{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .dbl{ display:flex; align-items:baseline; gap:6px; margin-top:5px; font-size:12.5px; white-space:nowrap; } .dbl span{ color:var(--muted); font-size:11.5px; min-width:4.2em; } .dbl b{ font-weight:700; font-variant-numeric:tabular-nums; } .dbl em{ font-style:normal; color:var(--muted); } .dbl.early b{ color:#d93b2b; }
+  .dbac{ margin-top:7px; border:1.5px solid var(--line); border-radius:12px; padding:6px 10px 7px; display:flex; flex-wrap:wrap; align-items:baseline; gap:0 8px; line-height:1.35; background:#fff; } .dbac .l{ width:100%; font-size:11px; font-weight:800; color:#6d28d9; } .dbac b{ font-size:13.5px; font-weight:800; font-variant-numeric:tabular-nums; } .dbac .bd{ font-size:11.5px; font-weight:700; color:var(--muted); white-space:nowrap; }
+  .dbac.fut{ background:#f5f0ff; border-color:#6d28d9; } .dbac.fut .bd{ color:#6d28d9; } .dbac.today{ background:#fff0ee; border-color:#d93b2b; } .dbac.today .bd{ color:#d93b2b; } .dbac.past{ background:#f3eefc; border-color:#d9ccf7; } .dbac.past .bd{ color:#6d28d9; } .dbac.none{ border-style:dashed; background:transparent; } .dbac.big{ padding:10px 14px 11px; border-radius:16px; } .dbac.big b{ font-size:18px; } .dbac.big .l{ font-size:12.5px; } .dbac.big .bd{ font-size:13px; }
+  .dbgrp{ margin-top:16px; } .dbgrp .gt{ font-size:13px; font-weight:800; color:#44546f; margin-bottom:8px; } .dbov2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px 14px; align-items:start; } .dbov2 .k{ font-size:12px; color:var(--muted); font-weight:600; } .dbov2 .v{ font-size:15px; font-weight:600; margin-top:2px; }
+  .dbms{ display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
   .dbm{ border:1.5px solid var(--line); border-radius:12px; padding:6px 8px 7px; background:#fff; min-width:0; display:flex; flex-direction:column; gap:1px; line-height:1.3; }
   .dbm .l{ font-size:11px; font-weight:800; color:var(--mc); white-space:nowrap; } .dbm .l i{ font-style:normal; font-size:10px; background:var(--mc); color:#fff; border-radius:99px; padding:0 6px; margin-left:2px; }
   .dbm b{ font-size:13.5px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.01em; } .dbm .bd{ font-size:11.5px; font-weight:700; color:var(--muted); white-space:nowrap; }
@@ -164,8 +176,8 @@ function dbNext(c){
   @media (max-width:1000px){
     .dbhead{ display:none; }
     .dbrow{ grid-template-columns:1fr auto; gap:6px 10px; padding:14px 16px; border-radius:20px; }
-    .dbrow > :nth-child(1){ grid-column:1 / 2; } .dbrow > :nth-child(2){ grid-column:2 / 3; justify-self:end; }
-    .dbrow > :nth-child(3), .dbrow > :nth-child(4), .dbrow > :nth-child(5), .dbrow > :nth-child(6){ grid-column:1 / 3; }
+    .dbrow > :nth-child(1){ grid-column:1 / 3; }
+    .dbrow > :nth-child(2), .dbrow > :nth-child(3), .dbrow > :nth-child(4), .dbrow > :nth-child(5), .dbrow > :nth-child(6){ grid-column:1 / 3; }
     
   }`;
   document.head.appendChild(st);
@@ -229,7 +241,7 @@ function renderDebtMain(){
         <button class="btn small" id="dbRpBtn" type="button" title="연체채권사후관리기록부 출력">🖨 사후관리기록부</button>
       </div>
       <div class="dbsum" id="dbSum"></div>
-      <div class="dbhead"><span>채무자 · 자산건전성</span><span>연체</span><span>건전성 변경 일정 <small style="font-weight:500">요주의 → 고정이하 · 기한이익상실</small></span><span>연체 원금</span><span>최근 연락·방문 · 관리</span><span>다음 조치</span></div>
+      <div class="dbhead"><span>채무자 · 자산건전성</span><span>연체 · 기한이익상실</span><span>건전성 분류 <small style="font-weight:500">요주의 → 고정이하</small></span><span>연체 원금</span><span>최근 연락·방문 · 관리</span><span>다음 조치</span></div>
       <div id="dbList"></div></div>`;
     $('dbViewSeg').onclick = (e) => { const b = e.target.closest('[data-v]'); if (!b) return; dbView = b.dataset.v; renderDebt(); };
     $('dbScope').onchange = () => { dbScope = $('dbScope').value; renderDebt(); };
@@ -258,7 +270,7 @@ function dbRowHtml(c){
   const lg = dbLogs(c)[0], nx = dbNext(c);
   return `<div class="dbrow ${c.status === '종결' ? 'closed' : ''}" data-db="${c.id}">
     <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}${dbClassChip(c)}</div><div class="ts">담당 ${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</div></div>
-    <div>${dbDaysTag(c)}${dbSpecial(c) ? '' : `<div class="dbyd">내부연체<br>${c.overdue_since ? `<b>${esc(dbShortDate(c.overdue_since))}</b>` : '<span>미입력</span>'}</div><div class="dbyd dbob ${dbOtherEarly(c) ? 'early' : ''}">타행연체 ${c.other_bank_since ? `<b>${esc(dbShortDate(c.other_bank_since))}</b>` : '<span>없음</span>'}</div>`}</div>
+    <div>${dbOverdueHtml(c)}</div>
     <div>${dbMileHtml(c)}</div>
     <div class="dbmoney">${c.principal === null ? '<span class="muted">-</span>' : dbWon(c.principal)}</div>
     <div><div class="dblast">${lg ? `<span class="m">${DEBT_ICON[lg.kind] || ''} ${esc(dbMd(lg.log_date))}</span>${esc(lg.body)}` : '<span class="muted">연락·방문 이력 없음</span>'}</div>${c.manage_date || c.manage_note ? `<div class="dbmg"><span class="m">🗂 ${esc(dbMd(c.manage_date))}</span>${esc(c.manage_note || '')}</div>` : ''}</div>
@@ -278,12 +290,14 @@ function renderDbDetail(){
   // 작성 중인 이력은 다시 그려도 유지 (수정을 막 시작한 때만 기존 값으로 채움)
   const keep = fresh ? { d: editing.body, date: editing.log_date, kind: editing.kind } : { d: ($('dbLogBody') || {}).value || '', date: ($('dbLogDate') || {}).value || kstToday(), kind: cur ? cur.value : '전화' };
   $('dbDetailPanel').innerHTML = `<div class="ph"><h2><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)} ${dbDaysTag(c)}</h2><button class="x" data-d="close">✕</button></div>
-    <div class="dbcur"><span class="k">${dbSpecial(c) ? '채권구분' : '현재 자산건전성'}</span>${dbClassChip(c)}${dbNextMsg(c)}</div>
-    <div style="margin-top:10px">${dbMileHtml(c, true)}</div>
-    <div class="dbinfo">
-      ${dbSpecial(c) ? '' : `<div><div class="k">내부연체기준일</div><div class="v">${c.overdue_since ? esc(c.overdue_since) : '<span class="muted">미입력</span>'}</div></div>
+    ${dbSpecial(c) ? `<div class="dbcur"><span class="k">채권구분</span>${dbClassChip(c)}</div><div style="margin-top:10px">${dbMileHtml(c, true)}</div>` : `
+    <div class="dbgrp"><div class="gt">⏱ 연체 · 기한이익상실</div><div class="dbov2">
+      <div><div class="k">내부연체기준일</div><div class="v">${c.overdue_since ? esc(c.overdue_since) : '<span class="muted">미입력</span>'}</div></div>
       <div><div class="k">타행연체일자</div><div class="v">${c.other_bank_since ? `${esc(c.other_bank_since)}${dbOtherEarly(c) ? '<div class="dbacc done" style="font-size:13px">내부연체기준일보다 빠름 — 건전성 기준일</div>' : ''}` : '<span class="muted">없음</span>'}</div></div>
-      <div><div class="k">연체일수</div><div class="v">${closed || !dbHasSince(c) ? '-' : dbDays(c) < 0 ? `연체 전 (D${dbDays(c)})` : `${dbDays(c).toLocaleString('ko-KR')}일`}</div></div>`}
+      <div><div class="k">연체일수</div><div class="v">${closed || !dbHasSince(c) ? '-' : dbDays(c) < 0 ? `연체 전 (D${dbDays(c)})` : `${dbDays(c).toLocaleString('ko-KR')}일`}</div></div>
+      <div>${dbAccelHtml(c, true)}</div></div></div>
+    <div class="dbgrp"><div class="gt">🏷 건전성 분류</div><div class="dbcur" style="margin-top:0"><span class="k">현재</span>${dbClassChip(c)}${dbNextMsg(c)}</div><div style="margin-top:10px">${dbMileHtml(c, true)}</div></div>`}
+    <div class="dbinfo">
       <div><div class="k">연체 원금</div><div class="v">${c.principal === null ? '-' : dbWon(c.principal)}</div></div>
       <div><div class="k">담당자</div><div class="v">${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</div></div>
       <div><div class="k">등록</div><div class="v">${esc(nameOf(c.created_by))} · ${esc(String(c.created_at).slice(0, 10))}</div></div>
@@ -363,11 +377,13 @@ function dbOpenForm(id){
     <label>구분</label><div class="checks"><label><input type="radio" name="dfScopeR" value="본점" ${(c ? c.scope : '본점') === '본점' ? 'checked' : ''}/> 본점</label><label><input type="radio" name="dfScopeR" value="지점" ${c && c.scope === '지점' ? 'checked' : ''}/> 지점</label></div>
     <label>채권구분</label><div class="checks"><label><input type="radio" name="dfTypeR" value="일반" ${!c || !dbSpecial(c) ? 'checked' : ''}/> 일반채권</label><label><input type="radio" name="dfTypeR" value="특수" ${c && dbSpecial(c) ? 'checked' : ''}/> 특수채권</label></div>
     <div id="dfSpBox" class="dbfs" style="display:none"><div class="t">🏷 특수채권</div><label>특수채권편입일자 <span style="color:var(--danger)">*</span></label><input id="dfSpD" type="date" /><div class="hint">특수채권은 연체일자·건전성·기한이익상실 관리가 필요 없어요. 편입일자만 입력하면 끝이에요.</div></div>
-    <div id="dfGenBox">
-    <div class="row"><div><label>내부연체기준일 <span class="muted" style="font-weight:400">(특수채권 등은 비워두세요)</span></label><input id="dfSince" type="date" /></div><div><label>타행연체일자 <span class="muted" style="font-weight:400">(빠르면 건전성에 영향)</span></label><input id="dfOb" type="date" /></div></div>
     <div class="row"><div><label>연체 원금 (원)</label><input id="dfAmt" inputmode="numeric" placeholder="예: 35,000,000" /></div><div></div></div>
-    <div class="dbfs"><div class="t">📅 건전성 변경 · 기한이익상실 일정 <span class="muted" style="font-weight:400">(미래 날짜 = 예정일)</span></div>
-      <div class="row"><div><label>현재 자산건전성</label><select id="dfCls"><option value="">(미분류)</option>${DB_CLASSES.map(k => `<option>${k}</option>`).join('')}</select></div><div><label>기한이익상실일</label><input id="dfAccel" type="date" /></div></div>
+    <div id="dfGenBox">
+    <div class="dbfs"><div class="t">⏱ 연체 · 기한이익상실 <span class="muted" style="font-weight:400">(기한이익상실일은 미래 날짜 = 예정일)</span></div>
+      <div class="row"><div><label>내부연체기준일 <span class="muted" style="font-weight:400">(비워도 돼요)</span></label><input id="dfSince" type="date" /></div><div><label>타행연체일자 <span class="muted" style="font-weight:400">(빠르면 건전성에 영향)</span></label><input id="dfOb" type="date" /></div></div>
+      <div class="row"><div><label>기한이익상실일</label><input id="dfAccel" type="date" /></div><div></div></div></div>
+    <div class="dbfs"><div class="t">🏷 건전성 분류 <span class="muted" style="font-weight:400">(분류일은 미래 날짜 = 예정일)</span></div>
+      <div class="row"><div><label>현재 자산건전성</label><select id="dfCls"><option value="">(미분류)</option>${DB_CLASSES.map(k => `<option>${k}</option>`).join('')}</select></div><div></div></div>
       <div class="row"><div><label>요주의 분류일 <span class="muted" style="font-weight:400">(예정)</span></label><input id="dfCau" type="date" /></div><div><label>고정이하 분류일 <span class="muted" style="font-weight:400">(예정)</span></label><input id="dfFix" type="date" /></div></div>
       <button type="button" class="btn small" id="dfAuto" style="margin-top:10px">⚡ 연체기준일로 자동 계산</button>
       <div class="hint">내부연체기준일과 타행연체일자 중 빠른 날짜를 기준으로 요주의 +1개월, 고정이하 +3개월을 채워요. 참고용이니 조합 기준에 맞게 고쳐서 쓰세요.</div></div>

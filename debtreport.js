@@ -13,7 +13,8 @@ const dbrDot = (d) => d ? d.slice(2).replace(/-/g, '.') : '';
 const dbrSt = (st) => !st ? '' : st.d > 0 ? `D-${st.d}` : st.d === 0 ? '오늘' : `+${-st.d}일`;
 // 건전성 변경 일정 3줄: 요주의 / 고정이하 / 기한이익상실 (날짜가 줄바꿈되지 않도록 한 줄 고정)
 const dbrSch = (c) => dbSpecial(c) ? `<div class="ln">편입 ${c.special_date ? dbrDot(c.special_date) : '-'}</div>` : dbMiles(c).map(m => `<div class="ln"><span class="lb">${m.label}</span> ${m.st ? `<b>${dbrDot(m.date)}</b> <small${m.need ? ' class="lt"' : ''}>${m.need ? '변경필요' : dbrSt(m.st)}</small>` : '<span class="mu">-</span>'}</div>`).join('');
-const dbrSince = (c) => dbSpecial(c) ? '<b>특수채권</b>' : `<div class="ln"><span class="lb">내부</span> ${c.overdue_since ? `<b>${dbrDot(c.overdue_since)}</b>` : '<span class="mu">-</span>'}</div><div class="ln"><span class="lb">타행</span> ${c.other_bank_since ? `<b${dbOtherEarly(c) ? ' class="lt"' : ''}>${dbrDot(c.other_bank_since)}</b>` : '<span class="mu">-</span>'}</div>`;
+const dbrAccL = (c) => { const a = dbAccel(c); return `<div class="ln"><span class="lb">기한이익</span> ${a ? `<b>${dbrDot(c.acceleration_date)}</b> <small>${dbrSt(a)}</small>` : '<span class="mu">-</span>'}</div>`; };
+const dbrSince = (c) => dbSpecial(c) ? '<b>특수채권</b>' : `<div class="ln"><span class="lb">내부</span> ${c.overdue_since ? `<b>${dbrDot(c.overdue_since)}</b>` : '<span class="mu">-</span>'}</div><div class="ln"><span class="lb">타행</span> ${c.other_bank_since ? `<b${dbOtherEarly(c) ? ' class="lt"' : ''}>${dbrDot(c.other_bank_since)}</b>` : '<span class="mu">-</span>'}</div>${dbrAccL(c)}`;
 const dbrNo = (c) => `채권-${String(c.id).padStart(4, '0')}`;
 const dbrDays = (c) => c.status === '종결' || !dbHasSince(c) ? '-' : dbDays(c) < 0 ? `D${dbDays(c)}` : `${dbDays(c).toLocaleString('ko-KR')}일`;
 
@@ -51,7 +52,7 @@ function dbrReportHtml(opt){
     }).join('');
     summary = `<div class="page">${head('연체채권사후관리기록부', `기준일 ${esc(today)} (${dbrDow(today)}) · ${esc(condTxt)}`)}
       <div class="sumbar"><span>대상 <b>${cases.length}건</b></span><span>진행중 <b>${act.length}건</b></span><span>연체원금 합계 <b>${esc(dbrNum(sum))}원</b></span><span>30일 이상 <b>${n30}건</b></span><span>90일 이상 <b>${n90}건</b></span><span>조치 지연 <b>${late}건</b></span></div>
-      <table class="t led"><thead><tr><th style="width:3%">번호</th><th style="width:4%">구분</th><th style="width:8%">채무자</th><th style="width:8%">연체기준일<br><small>(내부/타행)</small></th><th style="width:5.5%">연체일수</th><th style="width:9%">연체원금(원)</th><th style="width:7.5%;white-space:nowrap">자산건전성</th><th style="width:15%">건전성 변경 일정<br><small>(요주의/고정이하/기한이익상실)</small></th><th style="width:5%">담당자</th><th style="width:13%">최근 연락·방문</th><th style="width:13%">관리내역</th><th style="width:9%">다음 조치</th></tr></thead>
+      <table class="t led"><thead><tr><th style="width:3.5%;white-space:nowrap">번호</th><th style="width:4%">구분</th><th style="width:8%">채무자</th><th style="width:10%">연체·기한이익상실<br><small>(내부/타행/기한)</small></th><th style="width:5%;white-space:nowrap">연체일수</th><th style="width:9%">연체원금(원)</th><th style="width:7.5%;white-space:nowrap">자산건전성</th><th style="width:12%">건전성 분류일<br><small>(요주의/고정이하)</small></th><th style="width:5%">담당자</th><th style="width:14%">최근 연락·방문</th><th style="width:12%">관리내역</th><th style="width:9%">다음 조치</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="12" class="c">해당하는 채권이 없습니다.</td></tr>'}</tbody></table>
       <div class="foot">※ 연체일수는 내부연체기준일 기준으로 ${esc(today)} 현재 자동 계산한 값이며, 기한이익상실일이 미래이면 상실 예정일입니다. 상세 이력은 채무자별 상세 면을 참고하세요.</div></div>`;
   }
