@@ -12,7 +12,7 @@ const dbrClsOld = (c) => dbSpecial(c) ? '<b>특수채권</b>' : `${c.asset_class
 const dbrDot = (d) => d ? d.slice(2).replace(/-/g, '.') : '';
 const dbrSt = (st) => !st ? '' : st.d > 0 ? `D-${st.d}` : st.d === 0 ? '오늘' : `+${-st.d}일`;
 // 건전성 변경 일정 3줄: 요주의 / 고정이하 / 기한이익상실 (날짜가 줄바꿈되지 않도록 한 줄 고정)
-const dbrSch = (c) => dbSpecial(c) ? `<div class="ln">편입 ${c.special_date ? dbrDot(c.special_date) : '-'}</div>` : dbMiles(c).map(m => `<div class="ln"><span class="lb">${m.label}</span> ${m.st ? `<b>${dbrDot(m.date)}</b> <small${m.need ? ' class="lt"' : ''}>${m.need ? '변경필요' : dbrSt(m.st)}</small>` : '<span class="mu">-</span>'}</div>`).join('');
+const dbrSch = (c) => dbSpecial(c) ? `<div class="ln">편입 ${c.special_date ? dbrDot(c.special_date) : '-'}</div>` : dbMiles(c).map(m => `<div class="ln"><span class="lb">${m.label}</span> ${m.st ? `<b>${dbrDot(m.date)}</b> <small>${dbrSt(m.st)}</small>` : '<span class="mu">-</span>'}</div>`).join('');
 const dbrAccL = (c) => { const a = dbAccel(c); return `<div class="ln"><span class="lb">기한이익</span> ${a ? `<b>${dbrDot(c.acceleration_date)}</b> <small>${dbrSt(a)}</small>` : '<span class="mu">-</span>'}</div>`; };
 const dbrSince = (c) => dbSpecial(c) ? '<b>특수채권</b>' : `<div class="ln"><span class="lb">내부</span> ${c.overdue_since ? `<b>${dbrDot(c.overdue_since)}</b>` : '<span class="mu">-</span>'}</div><div class="ln"><span class="lb">타행</span> ${c.other_bank_since ? `<b${dbOtherEarly(c) ? ' class="lt"' : ''}>${dbrDot(c.other_bank_since)}</b>` : '<span class="mu">-</span>'}</div>${dbrAccL(c)}`;
 const dbrNo = (c) => `채권-${String(c.id).padStart(4, '0')}`;
