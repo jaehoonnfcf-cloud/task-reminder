@@ -664,3 +664,4 @@ grant select on public.perf_liq to service_role;
 alter publication supabase_realtime add table public.perf_liq;
 alter table public.debt_cases add column if not exists caution_date date;  -- 요주의 분류일(예정일)
 alter table public.debt_cases add column if not exists other_bank_since date;  -- 타행연체일자
+alter table public.debt_cases add column if not exists bond_type text not null default '일반', add column if not exists special_date date;  -- 일반/특수채권, 특수채권편입일자
