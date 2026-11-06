@@ -121,7 +121,7 @@ function dbNext(c){
   #debtMain{ display:flex; flex-direction:column; gap:10px; min-width:0; } .dbsecT{ font-size:19px; font-weight:800; letter-spacing:-.03em; padding:2px 6px; }
   .dbsum{ padding:12px 18px; font-size:13.5px; color:#44546f; display:flex; gap:6px 16px; flex-wrap:wrap; border-bottom:1px solid var(--line); }
   .dbsum b{ color:var(--ink); } .dbsum .r{ color:var(--danger); font-weight:700; } .dbsum .o{ color:var(--warn); font-weight:700; }
-  .dbhead,.dbrow{ display:grid; grid-template-columns:minmax(130px,1fr) 190px 250px 104px minmax(140px,1.1fr) minmax(100px,.8fr); gap:10px; align-items:center; padding:0 22px; }
+  .dbhead,.dbrow{ display:grid; grid-template-columns:minmax(170px,1.1fr) 190px 250px minmax(150px,1.2fr) minmax(100px,.8fr); gap:10px; align-items:center; padding:0 22px; }
   .dbhead > *, .dbrow > *{ min-width:0; }
   .dbhead{ font-size:12px; font-weight:700; color:var(--muted); padding-top:10px; padding-bottom:8px; }
   .dbrow{ padding-top:15px; padding-bottom:15px; cursor:pointer; background:#fff; border-radius:22px; box-shadow:var(--sh); margin-bottom:12px; transition:box-shadow .15s, transform .15s; }
@@ -155,6 +155,7 @@ function dbNext(c){
   .dbnm{ font-size:13.5px; color:#44546f; } .dbnm b{ color:var(--ink); } .dbnm .soon,.dbnm .today{ color:var(--warn); } .dbnm.bad{ color:#d93b2b; font-weight:800; } .dbnm.mu{ color:var(--muted); }
   .dbfs{ margin-top:14px; padding:12px 14px 14px; border:1.5px solid var(--line); border-radius:16px; background:#fafbfd; } .dbfs .t{ font-size:13.5px; font-weight:800; margin-bottom:2px; } .dbfs .hint{ font-size:12px; color:var(--muted); line-height:1.45; margin-top:8px; }
   .dbd.r1{ background:var(--warn-soft); color:var(--warn); } .dbd.r2{ background:#ffe4cc; color:#c2570c; } .dbd.r3{ background:var(--danger-soft); color:var(--danger); } .dbd.end{ background:var(--green-soft); color:var(--green); }
+  .dbpr{ font-size:17px; font-weight:800; letter-spacing:-.02em; margin-top:5px; font-variant-numeric:tabular-nums; } .dbpr .muted{ font-size:13px; font-weight:500; }
   .dbmoney{ font-size:14.5px; font-weight:700; }
   .dblast{ font-size:13px; color:#44546f; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
   .dblast .m{ color:var(--muted); font-weight:600; margin-right:4px; }
@@ -177,7 +178,7 @@ function dbNext(c){
     .dbhead{ display:none; }
     .dbrow{ grid-template-columns:1fr auto; gap:6px 10px; padding:14px 16px; border-radius:20px; }
     .dbrow > :nth-child(1){ grid-column:1 / 3; }
-    .dbrow > :nth-child(2), .dbrow > :nth-child(3), .dbrow > :nth-child(4), .dbrow > :nth-child(5), .dbrow > :nth-child(6){ grid-column:1 / 3; }
+    .dbrow > :nth-child(2), .dbrow > :nth-child(3), .dbrow > :nth-child(4), .dbrow > :nth-child(5){ grid-column:1 / 3; }
     
   }`;
   document.head.appendChild(st);
@@ -241,7 +242,7 @@ function renderDebtMain(){
         <button class="btn small" id="dbRpBtn" type="button" title="연체채권사후관리기록부 출력">🖨 사후관리기록부</button>
       </div>
       <div class="dbsum" id="dbSum"></div>
-      <div class="dbhead"><span>채무자 · 자산건전성</span><span>연체 · 기한이익상실</span><span>건전성 분류 <small style="font-weight:500">요주의 → 고정이하</small></span><span>연체 원금</span><span>최근 연락·방문 · 관리</span><span>다음 조치</span></div>
+      <div class="dbhead"><span>채무자 · 연체원금</span><span>연체 · 기한이익상실</span><span>건전성 분류 <small style="font-weight:500">요주의 → 고정이하</small></span><span>최근 연락·방문 · 관리</span><span>다음 조치</span></div>
       <div id="dbList"></div></div>`;
     $('dbViewSeg').onclick = (e) => { const b = e.target.closest('[data-v]'); if (!b) return; dbView = b.dataset.v; renderDebt(); };
     $('dbScope').onchange = () => { dbScope = $('dbScope').value; renderDebt(); };
@@ -269,10 +270,9 @@ function renderDebtMain(){
 function dbRowHtml(c){
   const lg = dbLogs(c)[0], nx = dbNext(c);
   return `<div class="dbrow ${c.status === '종결' ? 'closed' : ''}" data-db="${c.id}">
-    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}${dbClassChip(c)}</div><div class="ts">담당 ${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</div></div>
+    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}${dbClassChip(c)}</div><div class="dbpr">${c.principal === null ? '<span class="muted">원금 -</span>' : dbWon(c.principal)}</div><div class="ts">담당 ${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</div></div>
     <div>${dbOverdueHtml(c)}</div>
     <div>${dbMileHtml(c)}</div>
-    <div class="dbmoney">${c.principal === null ? '<span class="muted">-</span>' : dbWon(c.principal)}</div>
     <div><div class="dblast">${lg ? `<span class="m">${DEBT_ICON[lg.kind] || ''} ${esc(dbMd(lg.log_date))}</span>${esc(lg.body)}` : '<span class="muted">연락·방문 이력 없음</span>'}</div>${c.manage_date || c.manage_note ? `<div class="dbmg"><span class="m">🗂 ${esc(dbMd(c.manage_date))}</span>${esc(c.manage_note || '')}</div>` : ''}</div>
     <div class="dbnx ${c.status === '종결' ? 'none' : nx.cls}">${c.status === '종결' ? '-' : `${nx.txt}${c.next_action_date ? `<small>${esc(dbMd(c.next_action_date))}${c.next_action_note ? ' · ' + esc(c.next_action_note) : ''}</small>` : ''}`}</div></div>`;
 }
