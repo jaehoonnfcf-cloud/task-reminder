@@ -71,7 +71,7 @@ const dbClsKey = (c) => { if (dbSpecial(c)) return 2e6; if (dbNeed(c).length) re
 // 연체 · 기한이익상실 묶음 (건전성 분류와 별개의 관점)
 function dbAccelHtml(c, big){
   const a = dbAccel(c), st = !a ? 'none' : a.d > 0 ? 'fut' : a.d === 0 ? 'today' : 'past';
-  return `<div class="dbac ${st} ${big ? 'big' : ''}"><span class="l">기한이익상실</span><b>${a ? esc(dbShortDate(c.acceleration_date)) : '-'}</b><span class="bd">${a ? esc(a.d > 0 ? `예정 D-${a.d}` : a.d === 0 ? '오늘 상실' : `상실 ${-a.d}일 경과`) : '미정'}</span></div>`;
+  return `<div class="dbac ${st} ${big ? 'big' : ''}"><span class="l">기한이익상실${a && a.d >= 0 ? ' <i>예정</i>' : ''}</span><b>${a ? esc(dbShortDate(c.acceleration_date)) : '-'}</b><span class="bd">${a ? esc(a.d > 0 ? `D-${a.d}` : a.d === 0 ? '오늘 상실' : `상실 ${-a.d}일 경과`) : '미정'}</span></div>`;
 }
 function dbOverdueHtml(c){
   if (dbSpecial(c)) return dbDaysTag(c);
@@ -83,7 +83,7 @@ function dbMileHtml(c, big){
   return `<div class="dbms ${big ? 'big' : ''}">${dbMiles(c).map(m => {
     const st = m.st, state = !st ? 'none' : m.need ? 'need' : m.nx ? 'nx' : st.d >= 0 ? 'fut' : 'past';
     const badge = !st ? '미정' : m.need ? '⚠ 변경 필요' : st.d > 0 ? `D-${st.d}` : st.d === 0 ? '오늘' : `✓ ${-st.d}일 경과`;
-    return `<div class="dbm ${state}" style="--mc:${m.col};--mb:${m.bg}"><span class="l">${m.label}${m.nx ? ' <i>다음</i>' : ''}</span><b>${st ? esc(dbShortDate(m.date)) : '-'}</b><span class="bd">${esc(badge)}</span></div>`;
+    return `<div class="dbm ${state}" style="--mc:${m.col};--mb:${m.bg}"><span class="l">${m.label}${st && st.d >= 0 ? ' <i>예정</i>' : ''}</span><b>${st ? esc(dbShortDate(m.date)) : '-'}</b><span class="bd">${esc(badge)}</span></div>`;
   }).join('')}</div>`;
 }
 function dbNextMsg(c){
@@ -91,7 +91,7 @@ function dbNextMsg(c){
   const m = dbMiles(c), need = m.filter(x => x.need);
   if (need.length) return `<span class="dbnm bad">⚠ ${need.map(x => x.label).join('·')} 분류일이 지났어요 — 자산건전성을 변경해주세요</span>`;
   const nx = m.find(x => x.nx);
-  return nx ? `<span class="dbnm">다음 일정 · <b>${nx.label}</b> ${esc(dbShortDate(nx.date))} <b class="${nx.st.cls}">${nx.st.d === 0 ? '오늘' : 'D-' + nx.st.d}</b></span>` : '<span class="dbnm mu">건전성 변경 일정이 아직 없어요</span>';
+  return nx ? `<span class="dbnm">예정 · <b>${nx.label}</b> ${esc(dbShortDate(nx.date))} <b class="${nx.st.cls}">${nx.st.d === 0 ? '오늘' : 'D-' + nx.st.d}</b></span>` : '<span class="dbnm mu">건전성 변경 일정이 아직 없어요</span>';
 }
 const dbLogs = (c) => [...(c.debt_logs || [])].sort((a, b) => String(b.log_date).localeCompare(String(a.log_date)) || b.id - a.id);
 const dbMd = (iso) => iso ? iso.slice(5).replace('-', '/') : '';
@@ -139,7 +139,7 @@ function dbNext(c){
   .dbd.sp{ background:#ede9fe; color:#6d28d9; }
   .dbsp{ border:1.5px solid #d9ccf7; background:#f7f3ff; border-radius:12px; padding:8px 12px; display:flex; flex-direction:column; gap:1px; } .dbsp .l{ font-size:11.5px; font-weight:800; color:#6d28d9; } .dbsp b{ font-size:15px; font-weight:800; font-variant-numeric:tabular-nums; } .dbsp .bd{ font-size:12px; font-weight:700; color:var(--muted); } .dbsp.big{ padding:12px 16px; } .dbsp.big b{ font-size:19px; }
   .dbl{ display:flex; align-items:baseline; gap:6px; margin-top:5px; font-size:12.5px; white-space:nowrap; } .dbl span{ color:var(--muted); font-size:11.5px; min-width:4.2em; } .dbl b{ font-weight:700; font-variant-numeric:tabular-nums; } .dbl em{ font-style:normal; color:var(--muted); } .dbl.early b{ color:#d93b2b; }
-  .dbac{ margin-top:7px; border:1.5px solid var(--line); border-radius:12px; padding:6px 10px 7px; display:flex; flex-wrap:wrap; align-items:baseline; gap:0 8px; line-height:1.35; background:#fff; } .dbac .l{ width:100%; font-size:11px; font-weight:800; color:#6d28d9; } .dbac b{ font-size:13.5px; font-weight:800; font-variant-numeric:tabular-nums; } .dbac .bd{ font-size:11.5px; font-weight:700; color:var(--muted); white-space:nowrap; }
+  .dbac{ margin-top:7px; border:1.5px solid var(--line); border-radius:12px; padding:6px 10px 7px; display:flex; flex-wrap:wrap; align-items:baseline; gap:0 8px; line-height:1.35; background:#fff; } .dbac .l{ width:100%; font-size:11px; font-weight:800; color:#6d28d9; } .dbac .l i{ font-style:normal; font-size:10px; background:#6d28d9; color:#fff; border-radius:99px; padding:0 6px; margin-left:2px; } .dbac b{ font-size:13.5px; font-weight:800; font-variant-numeric:tabular-nums; } .dbac .bd{ font-size:11.5px; font-weight:700; color:var(--muted); white-space:nowrap; }
   .dbac.fut{ background:#f5f0ff; border-color:#6d28d9; } .dbac.fut .bd{ color:#6d28d9; } .dbac.today{ background:#fff0ee; border-color:#d93b2b; } .dbac.today .bd{ color:#d93b2b; } .dbac.past{ background:#f3eefc; border-color:#d9ccf7; } .dbac.past .bd{ color:#6d28d9; } .dbac.none{ border-style:dashed; background:transparent; } .dbac.big{ padding:10px 14px 11px; border-radius:16px; } .dbac.big b{ font-size:18px; } .dbac.big .l{ font-size:12.5px; } .dbac.big .bd{ font-size:13px; }
   .dbgrp{ margin-top:16px; } .dbgrp .gt{ font-size:13px; font-weight:800; color:#44546f; margin-bottom:8px; } .dbov2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px 14px; align-items:start; } .dbov2 .k{ font-size:12px; color:var(--muted); font-weight:600; } .dbov2 .v{ font-size:15px; font-weight:600; margin-top:2px; }
   .dbms{ display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
