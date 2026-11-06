@@ -662,3 +662,4 @@ create policy pl_del on public.perf_liq for delete to authenticated using (is_ad
 grant select, insert, update, delete on public.perf_liq to authenticated;
 grant select on public.perf_liq to service_role;
 alter publication supabase_realtime add table public.perf_liq;
+alter table public.debt_cases add column if not exists caution_date date;  -- 요주의 분류일(예정일)

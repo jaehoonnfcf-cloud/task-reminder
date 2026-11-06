@@ -7,7 +7,7 @@ const dbrDow = (d) => d ? ['일', '월', '화', '수', '목', '금', '토'][new 
 const dbrDate = (d) => d ? `${d} (${dbrDow(d)})` : '-';
 const dbrAcc = (c) => { const a = dbAccel(c); return a ? `${c.acceleration_date.slice(2)} <small>${a.d > 0 ? '예정 D-' + a.d : a.d === 0 ? '오늘' : '+' + (-a.d) + '일'}</small>` : '<span class="mu">미정</span>'; };
 const dbrFix = (c) => { const f = dbFixed(c); return f ? `${c.fixed_below_date.slice(2)} <small>${f.d > 0 ? '예정 D-' + f.d : f.d === 0 ? '오늘' : '+' + (-f.d) + '일'}</small>` : ''; };
-const dbrCls = (c) => `${c.asset_class ? `<b>${esc(c.asset_class)}</b>` : '<span class="mu">미분류</span>'}${c.fixed_below_date ? `<div class="sm">고정이하 ${dbrFix(c)}</div>` : ''}`;
+const dbrCls = (c) => `${c.asset_class ? `<b>${esc(c.asset_class)}</b>` : '<span class="mu">미분류</span>'}${c.caution_date ? `<div class="sm">요주의 ${dbCaution(c).short.startsWith('D') ? c.caution_date.slice(2) + ' <small>예정 ' + dbCaution(c).short + '</small>' : c.caution_date.slice(2) + ' <small>' + (dbCaution(c).d === 0 ? '오늘' : '+' + (-dbCaution(c).d) + '일') + '</small>'}</div>` : ''}${c.fixed_below_date ? `<div class="sm">고정이하 ${dbrFix(c)}</div>` : ''}`;
 const dbrNo = (c) => `채권-${String(c.id).padStart(4, '0')}`;
 const dbrDays = (c) => c.status === '종결' || !dbHasSince(c) ? '-' : dbDays(c) < 0 ? `D${dbDays(c)}` : `${dbDays(c).toLocaleString('ko-KR')}일`;
 
@@ -60,8 +60,8 @@ function dbrReportHtml(opt){
         <div class="cust"><div><div class="l">채무자</div><div class="n">${esc(c.debtor_name)}</div></div><div class="tag">${esc(c.scope)} · ${closed ? '종결' : '진행중'}</div></div>
         <h2>기본 사항</h2>
         <table class="t"><tr><td class="k">내부연체기준일</td><td>${c.overdue_since ? esc(dbrDate(c.overdue_since)) : '미입력'}</td><td class="k">연체일수</td><td>${esc(dbrDays(c))}</td></tr>
-          <tr><td class="k">자산건전성</td><td>${c.asset_class ? `<b>${esc(c.asset_class)}</b>` : '미분류'}</td><td class="k">고정이하분류일</td><td>${c.fixed_below_date ? `${esc(dbrDate(c.fixed_below_date))} <b>(${esc(dbFixed(c).txt)})</b>` : '미정'}</td></tr>
-          <tr><td class="k">기한이익상실일</td><td colspan="3">${c.acceleration_date ? `${esc(dbrDate(c.acceleration_date))} <b>(${esc(dbAccel(c).txt)})</b>` : '미정'}</td></tr>
+          <tr><td class="k">자산건전성</td><td>${c.asset_class ? `<b>${esc(c.asset_class)}</b>` : '미분류'}</td><td class="k">요주의 분류일</td><td>${c.caution_date ? `${esc(dbrDate(c.caution_date))} <b>(${esc(dbCaution(c).txt)})</b>` : '미정'}</td></tr>
+          <tr><td class="k">고정이하분류일</td><td>${c.fixed_below_date ? `${esc(dbrDate(c.fixed_below_date))} <b>(${esc(dbFixed(c).txt)})</b>` : '미정'}</td><td class="k">기한이익상실일</td><td>${c.acceleration_date ? `${esc(dbrDate(c.acceleration_date))} <b>(${esc(dbAccel(c).txt)})</b>` : '미정'}</td></tr>
           <tr><td class="k">연체 원금</td><td>${c.principal === null ? '-' : `${esc(dbrNum(c.principal))}원`}</td><td class="k">담당자</td><td>${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</td></tr>
           <tr><td class="k">등록</td><td>${esc(nameOf(c.created_by))} · ${esc(String(c.created_at).slice(0, 10))}</td><td class="k">${closed ? '종결일' : '다음 조치 예정'}</td><td>${closed ? esc(c.closed_at ? String(c.closed_at).slice(0, 10) : '-') : c.next_action_date ? `${esc(dbrDate(c.next_action_date))}${nx && nx.d < 0 ? ` <b class="lt">(${nx.txt})</b>` : ''}${c.next_action_note ? `<div class="sm">${esc(c.next_action_note)}</div>` : ''}` : '미정'}</td></tr></table>
         ${c.manage_date || c.manage_note ? `<h2>관리일자 · 관리내역</h2><div class="memo"><b>${c.manage_date ? esc(dbrDate(c.manage_date)) : '-'}</b>${c.manage_note ? `\n${esc(c.manage_note)}` : ''}</div>` : ''}
