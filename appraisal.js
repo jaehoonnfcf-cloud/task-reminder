@@ -713,7 +713,7 @@ document.addEventListener('click', async (e) => {
 
 
 // ---------- 보고서 인쇄 ----------
-function apReportHtml(c){
+function apReportHtml(c, mapHtml){
   const props = apProps(c), reqs = apReqs(c), n = (v) => Number(v).toLocaleString('ko-KR');
   const sums = reqs.map(r => apReqSum(r, props));
   const chosenIdx = reqs.findIndex(r => r.firm_id === c.chosen_firm_id);
@@ -749,6 +749,7 @@ function apReportHtml(c){
   h2{font-size:14px;margin:18px 0 6px;padding-left:8px;border-left:4px solid #333}.h2u{display:flex;justify-content:space-between;align-items:baseline}.h2u .unit{font-size:12px;font-weight:400;color:#444}
   table.t{width:100%;border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:5px 8px;vertical-align:middle;word-break:keep-all}
   table.t th{background:#eee;font-weight:700;text-align:center}table.t td.k{background:#f3f3f3;font-weight:700;text-align:center;white-space:nowrap;width:1%}
+  .mapwrap{margin-top:10px;page-break-inside:avoid}.mapwrap img.map{width:100%;display:block;border:1px solid #444}.mapwrap .mapbox{margin:0 !important}
   .nw{white-space:nowrap}.r{text-align:right}.c{text-align:center}.b{font-weight:700}.m{color:#666;font-size:11px;font-weight:400}.sel{background:#fff6d6 !important}
   .box{border:2px solid #333;padding:9px 12px;margin-top:14px;font-size:13px}tr{page-break-inside:avoid}
   .note{margin-top:5px;color:#555;font-size:11px}.foot{margin-top:18px;color:#666;font-size:10.5px;text-align:right}
@@ -761,14 +762,32 @@ function apReportHtml(c){
   <tr><td class="k">의뢰자</td><td>${esc(nameOf(c.requester_email))}</td><td class="k">의뢰일</td><td>${esc(c.request_date)}</td></tr>
   ${c.memo ? `<tr><td class="k">메모</td><td colspan="3" style="white-space:pre-wrap">${esc(c.memo)}</td></tr>` : ''}</table>
   <h2>1. 물건 내역 (${props.length}건)</h2>
-  <table class="t"><thead><tr><th class="nw">번호</th><th class="nw">구분</th><th>소재지</th><th class="nw">지목</th><th class="nw">대지·토지(㎡)</th><th class="nw">건물·전용(㎡)</th></tr></thead><tbody>${propRows}</tbody></table>
+  <table class="t"><thead><tr><th class="nw">번호</th><th class="nw">구분</th><th>소재지</th><th class="nw">지목</th><th class="nw">대지·토지(㎡)</th><th class="nw">건물·전용(㎡)</th></tr></thead><tbody>${propRows}</tbody></table>${mapHtml ? `<div class="mapwrap">${mapHtml}<div class="note">▲ 물건 위치도 — 지도의 번호는 위 물건 번호와 같습니다.</div></div>` : ''}
   <h2 class="h2u"><span>2. 평가기관별 평가금액</span><span class="unit">(단위: 원)</span></h2>
   ${reqs.length ? `<table class="t price"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td class="b">합계</td>${total}</tr><tr><td class="b nw">가격 수령일</td>${recv}</tr>${hasNote ? `<tr><td class="b nw">특이사항</td>${notes}</tr>` : ''}</tbody></table>${foot ? `<div class="note">${foot}</div>` : ''}` : '<div>의뢰한 평가기관이 없습니다.</div>'}
   ${cmts.length ? `<h2>3. 담당자 의견</h2><table class="t cmt"><thead><tr><th style="width:13%">작성자</th><th style="width:15%">작성일</th><th>의견</th></tr></thead><tbody>${cmts.map(m => `<tr><td class="c nw">${esc(nameOf(m.author_email))}</td><td class="c nw">${esc(new Date(new Date(m.created_at).getTime() + 9 * 3600e3).toISOString().slice(0, 10))}</td><td style="white-space:pre-wrap;word-break:break-word">${esc(m.body)}</td></tr>`).join('')}</tbody></table>` : ''}
   <div class="box">${summary}</div>
   </body></html>`;
 }
-function apPrint(c){ apPreview(apReportHtml(c), '결과 보고서', `보고서_${apCaseNo(c)}`); }
+let apMapType = (() => { try { return localStorage.getItem('apMapType') === 'sat' ? 'sat' : 'base'; } catch (e) { return 'base'; } })();
+// 보고서에 넣을 물건 위치도 (좌표가 있는 물건만, 번호 = 물건 번호). 일반지도/항공지도 선택
+async function apReportMap(c, type){
+  const items = apProps(c).map((p, i) => ({ ...p, no: i + 1 })).filter(p => p.lat != null && p.lng != null);
+  if (!items.length || typeof svMapImage !== 'function') return '';
+  return (await svMapImage([{ items, color: '#d9453d', line: false, label: (k, it) => it.no }], 1400, 640, type).catch(() => null)) || '';
+}
+async function apPrint(c){
+  const go = async (type) => {
+    apMapType = type; try { localStorage.setItem('apMapType', type); } catch (e) {}
+    const map = await apReportMap(c, type);
+    apPreview(apReportHtml(c, map), '결과 보고서', `보고서_${apCaseNo(c)}`, false, go);
+    $('apPvMapSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === type));
+    const miss = apProps(c).filter(p => p.lat == null || p.lng == null).length;
+    const msg = !map && apProps(c).length ? (miss ? '좌표가 등록된 물건이 없어 지도를 넣지 못했어요. 물건을 주소 검색으로 다시 등록하면 지도가 들어가요.' : '지도를 불러오지 못했어요. 잠시 후 다시 시도해주세요.') : miss ? `좌표가 없는 물건 ${miss}건은 지도에 표시되지 않았어요.` : '';
+    if (msg){ $('apPvMsg').textContent = msg; $('apPvMsg').style.display = 'block'; }
+  };
+  toast('🗺 지도를 불러오는 중...'); await go(apMapType);
+}
 
 
 // ---------- 감정평가 의뢰서 (팩스용) ----------
@@ -850,18 +869,20 @@ $('apFaxPanel').addEventListener('click', (e) => {
   apCloseFax();
 });
 // ---------- 미리보기 / 인쇄 / 이미지 공유 (PC·휴대폰 공통) ----------
-let apPvHtml = '', apPvName = '', apPvTitle = '';
+let apPvRegen = null, apPvHtml = '', apPvName = '', apPvTitle = '';
 (function(){
   const d = document.createElement('div');
   d.innerHTML = `<div class="ov" id="apPvOv" style="z-index:40;background:#6b7280;padding:0 0 30px">
     <div id="apPvBar" style="position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;padding-top:max(10px, env(safe-area-inset-top));background:#1f2937;color:#fff">
       <b id="apPvT" style="margin-right:auto;font-size:15px"></b>
+      <style>#apPvMapSeg button{color:#e5e7eb}#apPvMapSeg button.on{color:#111}</style><span class="seg" id="apPvMapSeg" style="display:none;background:#374151"><button data-t="base">🗺 일반지도</button><button data-t="sat">🛰 항공지도</button></span>
       <button class="btn primary small" id="apPvPrint">🖨 인쇄</button>
       <button class="btn glass small" id="apPvShare">📤 이미지로 공유 (카톡 등)</button>
       <button class="btn glass small" id="apPvClose">✕ 닫기</button></div>
     <div id="apPvMsg" style="display:none;padding:8px 14px;background:#fff7d6;color:#7a4b00;font-size:13px"></div>
     <div id="apPvBox" style="overflow:hidden;margin:12px auto 0"><iframe id="apPvFrame" style="width:794px;border:0;background:#fff;transform-origin:0 0;display:block"></iframe></div></div>`;
   document.body.appendChild(d);
+  $('apPvMapSeg').onclick = async (e) => { const b = e.target.closest('[data-t]'); if (!b || !apPvRegen) return; toast('🗺 지도를 불러오는 중...'); await apPvRegen(b.dataset.t); };
   $('apPvClose').onclick = apClosePv;
   $('apPvPrint').onclick = apPvPrint;
   $('apPvShare').onclick = apPvShare;
@@ -871,8 +892,9 @@ let apPvHtml = '', apPvName = '', apPvTitle = '';
 const apIos = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
 const apStandalone = () => apIos() && (navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
 let apPvW = 794;   // 미리보기 폭: 세로 A4 794px, 가로 A4 1123px
-function apPreview(html, title, name, landscape){
+function apPreview(html, title, name, landscape, mapRegen){
   apPvW = landscape ? 1123 : 794; $('apPvFrame').style.width = apPvW + 'px';
+  $('apPvMapSeg').style.display = mapRegen ? '' : 'none'; apPvRegen = mapRegen || null;
   apPvHtml = html; apPvTitle = title; apPvName = name; $('apPvT').textContent = `📄 ${title} 미리보기`;
   const inject = '<style>@media screen{html{background:#fff}body{width:' + apPvW + 'px;margin:0;padding:22px 42px;box-sizing:border-box}.page{padding-bottom:18px;margin-bottom:22px;border-bottom:1px dashed #aaa}.page:last-child{border-bottom:0}}</style>';
   const fr = $('apPvFrame'), sa = apStandalone();

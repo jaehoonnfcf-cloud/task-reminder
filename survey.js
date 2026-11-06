@@ -510,7 +510,7 @@ async function svMapImage(sets, W = 1400, H = 560, type = 'base'){   // sets: [{
     if (!tiles.some(t => t.im)){ g.strokeStyle = '#dde2ea'; g.lineWidth = 1; for (let x = 0; x < W; x += 100){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y = 0; y < H; y += 100){ g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } }
     sets.forEach(set => {
       const p = set.items.filter(r => r.lat != null && r.lng != null).map(px);
-      if (p.length > 1){ g.strokeStyle = set.color; g.lineWidth = 5; g.globalAlpha = .8; g.setLineDash([16, 12]); g.beginPath(); p.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
+      if (set.line !== false && p.length > 1){ g.strokeStyle = set.color; g.lineWidth = 5; g.globalAlpha = .8; g.setLineDash([16, 12]); g.beginPath(); p.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
     });
     sets.forEach(set => set.items.filter(r => r.lat != null && r.lng != null).forEach((r, k) => {
       const [x, y] = px(r); g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, 25, 0, 7); g.fill(); g.fillStyle = set.color; g.beginPath(); g.arc(x, y, 21, 0, 7); g.fill();
@@ -536,7 +536,7 @@ async function svMapImage(sets, W = 1400, H = 560, type = 'base'){   // sets: [{
   const pct = (v, t) => `${(v / t * 100).toFixed(4)}%`, tileImg = (u, x, y) => `<img src="${u}" alt="" style="position:absolute;left:${pct(x * 256 * S - ox, W)};top:${pct(y * 256 * S - oy, H)};width:${pct(256 * S, W)};height:${pct(256 * S, H)}" />`;
   const imgs = tl.map(p => tileImg(vw(sat ? 'Satellite' : 'Base', p.x, p.y, sat ? 'jpeg' : 'png'), p.x, p.y)).join('') + (sat ? tl.map(p => tileImg(vw('Hybrid', p.x, p.y, 'png'), p.x, p.y)).join('') : '');
   const shapes = sets.map(set => { const p = set.items.filter(r => r.lat != null && r.lng != null).map(px);
-    return (p.length > 1 ? `<polyline points="${p.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ')}" fill="none" stroke="${set.color}" stroke-width="5" stroke-dasharray="16 12" opacity=".8" />` : '') +
+    return (set.line !== false && p.length > 1 ? `<polyline points="${p.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ')}" fill="none" stroke="${set.color}" stroke-width="5" stroke-dasharray="16 12" opacity=".8" />` : '') +
       set.items.filter(r => r.lat != null && r.lng != null).map((r, k) => { const [x, y] = px(r); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="25" fill="#fff" /><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="21" fill="${set.color}" /><text x="${x.toFixed(1)}" y="${(y + 9).toFixed(1)}" text-anchor="middle" font-size="26" font-weight="700" fill="#fff" font-family="sans-serif">${esc(String(set.label(k, r)))}</text>`; }).join(''); }).join('');
   return `<div class="mapbox" style="position:relative;width:100%;height:0;padding-bottom:${(H / W * 100).toFixed(3)}%;overflow:hidden;border:1px solid #444;margin:0 0 6px;background:#e9edf3">${imgs}<svg viewBox="0 0 ${W} ${H}" style="position:absolute;left:0;top:0;width:100%;height:100%">${shapes}</svg><div style="position:absolute;right:3px;bottom:2px;font-size:9px;background:rgba(255,255,255,.85);padding:1px 5px;color:#556">© 브이월드(국토교통부)${sat ? ' · 항공영상' : ''}</div></div>`;
 }
