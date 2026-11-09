@@ -665,3 +665,46 @@ alter publication supabase_realtime add table public.perf_liq;
 alter table public.debt_cases add column if not exists caution_date date;  -- 요주의 분류일(예정일)
 alter table public.debt_cases add column if not exists other_bank_since date;  -- 타행연체일자
 alter table public.debt_cases add column if not exists bond_type text not null default '일반', add column if not exists special_date date;  -- 일반/특수채권, 특수채권편입일자
+
+-- 채권관리 기록 보호: 삭제는 '보관 처리'(soft delete)만, 수정 이력 자동 보존, 앱에서 영구 삭제 불가
+alter table public.debt_logs add column if not exists deleted_at timestamptz, add column if not exists deleted_by text, add column if not exists delete_reason text;
+alter table public.debt_cases add column if not exists deleted_at timestamptz, add column if not exists deleted_by text, add column if not exists delete_reason text;
+create table if not exists public.debt_log_history (
+  id bigint generated always as identity primary key,
+  log_id bigint not null,
+  old_log_date date, old_kind text, old_body text,
+  changed_by text, changed_at timestamptz not null default now()
+);
+create index if not exists debt_log_history_idx on public.debt_log_history (log_id, changed_at desc);
+alter table public.debt_log_history enable row level security;
+drop policy if exists dlh_sel on public.debt_log_history;
+create policy dlh_sel on public.debt_log_history for select to authenticated using (is_member());
+grant select on public.debt_log_history to authenticated;
+create or replace function public.debt_log_guard() returns trigger language plpgsql security definer set search_path = public as $f$
+begin
+  if old.log_date is distinct from new.log_date or old.kind is distinct from new.kind or old.body is distinct from new.body then
+    insert into public.debt_log_history (log_id, old_log_date, old_kind, old_body, changed_by) values (old.id, old.log_date, old.kind, old.body, auth.email());
+  end if;
+  if new.deleted_at is distinct from old.deleted_at then
+    new.deleted_by := case when new.deleted_at is null then null else auth.email() end;
+    if new.deleted_at is null then new.delete_reason := null; end if;
+  end if;
+  return new;
+end $f$;
+drop trigger if exists debt_log_guard_t on public.debt_logs;
+create trigger debt_log_guard_t before update on public.debt_logs for each row execute function public.debt_log_guard();
+create or replace function public.debt_case_guard() returns trigger language plpgsql security definer set search_path = public as $f$
+begin
+  if new.deleted_at is distinct from old.deleted_at then
+    if not is_admin() then raise exception '채권 삭제·복원은 관리자만 할 수 있어요'; end if;
+    new.deleted_by := case when new.deleted_at is null then null else auth.email() end;
+    if new.deleted_at is null then new.delete_reason := null; end if;
+  end if;
+  return new;
+end $f$;
+drop trigger if exists debt_case_guard_t on public.debt_cases;
+create trigger debt_case_guard_t before update on public.debt_cases for each row execute function public.debt_case_guard();
+drop policy if exists dc_del on public.debt_cases;
+drop policy if exists dl_del on public.debt_logs;
+revoke delete on public.debt_cases, public.debt_logs from authenticated;
+grant update (log_date, kind, body, deleted_at, delete_reason) on public.debt_logs to authenticated;
