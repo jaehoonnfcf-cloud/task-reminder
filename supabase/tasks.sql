@@ -708,3 +708,15 @@ drop policy if exists dc_del on public.debt_cases;
 drop policy if exists dl_del on public.debt_logs;
 revoke delete on public.debt_cases, public.debt_logs from authenticated;
 grant update (log_date, kind, body, deleted_at, delete_reason) on public.debt_logs to authenticated;
+
+-- (위 보호 SQL의 최종 적용본에는 아래가 추가됨) 영구 삭제는 관리자만, 먼저 보관 처리한 건만, 감사 기록(debt_purge_audit) 남김
+create table if not exists public.debt_purge_audit (
+  id bigint generated always as identity primary key,
+  kind text not null, target_id bigint not null, label text, detail text,
+  purged_by text, purged_at timestamptz not null default now()
+);
+alter table public.debt_purge_audit enable row level security;
+drop policy if exists dpa_sel on public.debt_purge_audit;
+create policy dpa_sel on public.debt_purge_audit for select to authenticated using (is_admin());
+grant select on public.debt_purge_audit to authenticated;
+-- debt_purge_log(p_id) / debt_purge_case(p_id): security definer 함수 (Supabase 에 적용된 마이그레이션 debt_records_protection 참고)

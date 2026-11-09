@@ -4,7 +4,7 @@
 const DEBT_KINDS = ['전화', '문자', '방문', '면담', '우편', '기타'];
 const DEBT_ICON = { '전화': '📞', '문자': '💬', '방문': '🚪', '면담': '🤝', '우편': '✉️', '기타': '📝' };
 let dbLogEdit = null, dbLogEditShown = null;
-let debtCases = [], debtOpenId = null, debtFormId = null, debtTimer = null;
+let debtArchived = [], dbHist = {}, dbTrashLogs = false, dbHistOpen = new Set(), debtCases = [], debtOpenId = null, debtFormId = null, debtTimer = null;
 let dbType = 'all', dbClassF = 'all', dbView = 'active', dbScope = 'all', dbMine = false, dbQ = '', dbSort = 'next';
 const debtCan = () => !!(meRow && (meRow.is_admin || meRow.perm_debt));   // 등록·수정 권한 (없어도 팀원 누구나 보기만 가능)
 const debtView = () => !!meRow;
@@ -89,7 +89,9 @@ function dbNextMsg(c){
   const nx = m.find(x => x.nx);
   return nx ? `<span class="dbnm">예정 · <b>${nx.label}</b> ${esc(dbShortDate(nx.date))} <b class="${nx.st.cls}">${nx.st.d === 0 ? '오늘' : 'D-' + nx.st.d}</b></span>` : '<span class="dbnm mu">건전성 변경 일정이 아직 없어요</span>';
 }
-const dbLogs = (c) => [...(c.debt_logs || [])].sort((a, b) => String(b.log_date).localeCompare(String(a.log_date)) || b.id - a.id);
+const dbFind = (id) => debtCases.find(x => x.id === id) || debtArchived.find(x => x.id === id);
+const dbDelLogs = (c) => (c.debt_logs || []).filter(l => l.deleted_at).sort((a, b) => String(b.deleted_at).localeCompare(String(a.deleted_at)));
+const dbLogs = (c) => [...(c.debt_logs || []).filter(l => !l.deleted_at)].sort((a, b) => String(b.log_date).localeCompare(String(a.log_date)) || b.id - a.id);
 const dbMd = (iso) => iso ? iso.slice(5).replace('-', '/') : '';
 function dbDaysTag(c){
   const d = dbDays(c);
@@ -168,6 +170,8 @@ function dbNext(c){
   .dblog .ic{ flex:none; width:34px; height:34px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; }
   .dblog .bd{ flex:1; min-width:0; } .dblog .hd{ font-size:12.5px; color:var(--muted); font-weight:600; }
   .dblog .tx{ font-size:14.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; margin-top:2px; }
+  .dbarch{ margin-top:12px; background:#fff0ee; border:1.5px solid #f4b9b0; color:#b42318; border-radius:14px; padding:10px 14px; font-size:13.5px; } .dbarch div{ margin-top:2px; color:#44546f; }
+  .dblk{ border:0; background:transparent; color:var(--muted); font-size:12.5px; font-weight:700; cursor:pointer; padding:4px 0; text-decoration:underline; } .dbhist{ margin-top:4px; padding:8px 10px; background:#f6f7fb; border-radius:10px; font-size:13px; display:grid; gap:6px; } .dbtrash{ margin-top:8px; display:grid; gap:10px; } .dbtl{ border:1px dashed var(--line); border-radius:14px; padding:2px 12px 10px; }
   .dblog .del{ border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:14px; align-self:flex-start; }
   @media (max-width:1000px){
     .dbhead{ display:none; }
@@ -185,12 +189,31 @@ function dbNext(c){
   $('dbFormOv').addEventListener('click', (e) => { if (e.target === $('dbFormOv')) dbCloseForm(); });
 })();
 
+// 2단계 확인 팝업: 사유 입력 / 확인 문구 입력을 마쳐야 실행 버튼이 켜진다
+function dbAsk({ title, html, reason, confirmText, okLabel, danger }){
+  return new Promise((res) => {
+    const ov = document.createElement('div'); ov.className = 'ov'; ov.style.cssText = 'display:block;z-index:80';
+    ov.innerHTML = `<div class="panel" style="max-width:460px"><div class="ph"><h2>${title}</h2><button class="x" data-q="no">✕</button></div><div style="font-size:14.5px;line-height:1.55">${html}</div>
+      ${reason ? `<label style="margin-top:12px">${reason}</label><input id="dqR" maxlength="200" autocomplete="off" />` : ''}
+      ${confirmText ? `<label style="margin-top:12px">확인을 위해 <b>${esc(confirmText)}</b> 을(를) 그대로 입력하세요</label><input id="dqC" autocomplete="off" />` : ''}
+      <div class="acts" style="margin-top:18px"><button class="btn" data-q="no">취소</button><button class="btn ${danger ? 'danger' : 'primary'}" data-q="ok" disabled>${okLabel}</button></div></div>`;
+    document.body.appendChild(ov);
+    const ok = ov.querySelector('[data-q=ok]'), r = ov.querySelector('#dqR'), cf = ov.querySelector('#dqC');
+    const chk = () => { ok.disabled = !((!r || r.value.trim().length >= 2) && (!cf || cf.value.trim() === confirmText)); };
+    ov.addEventListener('input', chk);
+    const done = (v) => { ov.remove(); res(v); };
+    ov.addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; if (b.dataset.q === 'no') return done(null); if (!ok.disabled) done({ reason: r ? r.value.trim() : '' }); });
+    setTimeout(() => { const f = r || cf; if (f) f.focus(); }, 50);
+  });
+}
+const dbLogBox = (l) => `<div style="background:var(--field);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:14px"><div class="muted" style="font-size:12.5px">${esc(l.log_date)} · ${esc(l.kind)} · ${esc(nameOf(l.created_by))}</div><div style="white-space:pre-wrap;margin-top:3px">${esc(l.body)}</div></div>`;
 // ---------- 불러오기 ----------
 async function loadDebt(){
   if (!debtView()){ debtCases = []; dbBadge(); return; }
   const { data, error } = await sb.from('debt_cases').select('*, debt_logs(*)').order('id', { ascending: false });
   if (error){ console.warn('채권관리 불러오기 실패', error.message); return; }
-  debtCases = data || [];
+  debtCases = (data || []).filter(c => !c.deleted_at); debtArchived = (data || []).filter(c => c.deleted_at);
+  { const h = await sb.from('debt_log_history').select('*').order('changed_at', { ascending: false }); dbHist = {}; if (!h.error) (h.data || []).forEach(x => (dbHist[x.log_id] = dbHist[x.log_id] || []).push(x)); }
   dbBadge();
   if (typeof loadSurvey === 'function') await loadSurvey();
   if (typeof loadFund === 'function') await loadFund();
@@ -227,7 +250,7 @@ function renderDebtMain(){
     el.dataset.ready = '1';
     el.innerHTML = `<div class="dbsecT">📞 연체채권관리</div><div class="list-panel">
       <div class="toolbar">
-        <div class="seg" id="dbViewSeg"><button data-v="active">진행중 <span id="dbNA"></span></button><button data-v="closed">종결 <span id="dbNB"></span></button></div>
+        <div class="seg" id="dbViewSeg"><button data-v="active">진행중 <span id="dbNA"></span></button><button data-v="closed">종결 <span id="dbNB"></span></button><button data-v="trash">🗑 보관함 <span id="dbNT"></span></button></div>
         <select id="dbScope"><option value="all">본점·지점</option><option value="본점">본점</option><option value="지점">지점</option></select>
         <select id="dbType"><option value="all">일반·특수채권</option><option value="일반">일반채권</option><option value="특수">특수채권</option></select>
         <select id="dbClass"><option value="all">건전성 전체</option>${DB_CLASSES.map(k => `<option>${k}</option>`).join('')}<option value="none">미분류</option></select>
@@ -250,9 +273,9 @@ function renderDebtMain(){
     $('dbList').addEventListener('click', (e) => { const r = e.target.closest('[data-db]'); if (r) dbOpenDetail(+r.dataset.db); });
   }
   const nEnd = debtCases.filter(c => c.status === '종결').length;
-  $('dbNA').textContent = debtCases.length - nEnd; $('dbNB').textContent = nEnd;
+  $('dbNA').textContent = debtCases.length - nEnd; $('dbNB').textContent = nEnd; $('dbNT').textContent = debtArchived.length || '';
   document.querySelectorAll('#dbViewSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === dbView));
-  const shown = debtCases.filter(c => (dbView === 'closed' ? c.status === '종결' : c.status !== '종결') && (dbScope === 'all' || c.scope === dbScope) && (dbType === 'all' || (dbType === '특수') === dbSpecial(c)) && (dbClassF === 'all' || (!dbSpecial(c) && (dbClassF === 'none' ? !c.asset_class : c.asset_class === dbClassF)))
+  const shown = (dbView === 'trash' ? debtArchived : debtCases).filter(c => (dbView === 'trash' || (dbView === 'closed' ? c.status === '종결' : c.status !== '종결')) && (dbScope === 'all' || c.scope === dbScope) && (dbType === 'all' || (dbType === '특수') === dbSpecial(c)) && (dbClassF === 'all' || (!dbSpecial(c) && (dbClassF === 'none' ? !c.asset_class : c.asset_class === dbClassF)))
     && (!dbMine || c.assignee_email === me) && (!dbQ || (c.debtor_name || '').toLowerCase().includes(dbQ)));
   const nx = (c) => c.next_action_date || '9999-12-31';
   shown.sort(dbSort === 'days' ? (a, b) => dbDays(b) - dbDays(a) : dbSort === 'accel' ? (a, b) => dbAccelKey(a) - dbAccelKey(b) || dbDays(b) - dbDays(a) : dbSort === 'cls' ? (a, b) => dbClsKey(a) - dbClsKey(b) || dbDays(b) - dbDays(a) : dbSort === 'new' ? (a, b) => b.id - a.id : (a, b) => nx(a).localeCompare(nx(b)) || dbDays(b) - dbDays(a));
@@ -260,7 +283,7 @@ function renderDebtMain(){
   const late = act.filter(c => c.next_action_date && dbDiff(c.next_action_date) < 0).length, tod = act.filter(c => c.next_action_date && dbDiff(c.next_action_date) === 0).length;
   const sum = act.reduce((s, c) => s + Number(c.principal || 0), 0), accSoon = act.filter(c => { const a = dbAccel(c); return a && a.d >= 0 && a.d <= 30; }).length, fixSoon = act.filter(c => { const a = dbFixed(c); return a && a.d >= 0 && a.d <= 30; }).length, cauSoon = act.filter(c => { const a = dbCaution(c); return a && a.d >= 0 && a.d <= 30; }).length, lowN = act.filter(c => !dbSpecial(c) && ['고정', '회수의문', '추정손실'].includes(c.asset_class)).length;
   $('dbSum').innerHTML = `<span><b>${shown.length}건</b></span>${act.length && sum ? `<span>연체 원금 합계 <b>${dbWon(sum)}</b></span>` : ''}${late ? `<span class="r">조치 지연 ${late}건</span>` : ''}${tod ? `<span class="o">오늘 조치 ${tod}건</span>` : ''}${accSoon ? `<span class="o">기한이익상실 예정 ${accSoon}건 (30일 내)</span>` : ''}${cauSoon ? `<span class="o">요주의 분류 예정 ${cauSoon}건 (30일 내)</span>` : ''}${fixSoon ? `<span class="o">고정이하 분류 예정 ${fixSoon}건 (30일 내)</span>` : ''}${lowN ? `<span>고정이하 ${lowN}건</span>` : ''}`;
-  $('dbList').innerHTML = shown.map(dbRowHtml).join('') || `<div class="blk-empty">${dbView === 'closed' ? '종결된 채권이 없어요.' : debtCases.length ? '조건에 맞는 채권이 없어요.' : '등록된 채권이 없어요. 오른쪽 위 “＋ 채권 등록”으로 시작해요.'}</div>`;
+  $('dbList').innerHTML = shown.map(dbRowHtml).join('') || `<div class="blk-empty">${dbView === 'trash' ? '보관함이 비어 있어요.' : dbView === 'closed' ? '종결된 채권이 없어요.' : debtCases.length ? '조건에 맞는 채권이 없어요.' : '등록된 채권이 없어요. 오른쪽 위 “＋ 채권 등록”으로 시작해요.'}</div>`;
 }
 function dbRowHtml(c){
   const lg = dbLogs(c)[0], nx = dbNext(c);
@@ -269,22 +292,23 @@ function dbRowHtml(c){
     <div>${dbOverdueHtml(c)}</div>
     <div>${dbMileHtml(c)}</div>
     <div><div class="dblast">${lg ? `<span class="m">${DEBT_ICON[lg.kind] || ''} ${esc(dbMd(lg.log_date))}</span>${esc(lg.body)}` : '<span class="muted">연락·방문 이력 없음</span>'}</div>${c.manage_date || c.manage_note ? `<div class="dbmg"><span class="m">🗂 ${esc(dbMd(c.manage_date))}</span>${esc(c.manage_note || '')}</div>` : ''}</div>
-    <div class="dbnx ${c.status === '종결' ? 'none' : nx.cls}">${c.status === '종결' ? '-' : `${nx.txt}${c.next_action_date ? `<small>${esc(dbMd(c.next_action_date))}${c.next_action_note ? ' · ' + esc(c.next_action_note) : ''}</small>` : ''}`}</div></div>`;
+    ${c.deleted_at ? `<div class="dbnx none">🗑 보관 ${esc(String(c.deleted_at).slice(0, 10))}<small>${esc(c.delete_reason || '')}</small></div></div>` : `<div class="dbnx ${c.status === '종결' ? 'none' : nx.cls}">${c.status === '종결' ? '-' : `${nx.txt}${c.next_action_date ? `<small>${esc(dbMd(c.next_action_date))}${c.next_action_note ? ' · ' + esc(c.next_action_note) : ''}</small>` : ''}`}</div>`}</div>`;
 }
 
 // ---------- 상세 ----------
 function dbOpenDetail(id){ debtOpenId = id; dbLogEdit = null; renderDbDetail(); $('dbDetailOv').style.display = 'block'; document.body.style.overflow = 'hidden'; }
 function dbCloseDetail(){ debtOpenId = null; dbLogEdit = null; $('dbDetailOv').style.display = 'none'; document.body.style.overflow = $('dbFormOv').style.display === 'block' ? 'hidden' : ''; }
 function renderDbDetail(){
-  const c = debtCases.find(x => x.id === debtOpenId);
+  const c = dbFind(debtOpenId);
   if (!c){ if (debtOpenId) dbCloseDetail(); return; }
-  const logs = dbLogs(c), closed = c.status === '종결', ro = !debtCan();
+  const logs = dbLogs(c), closed = c.status === '종결', arch = !!c.deleted_at, ro = !debtCan() || arch, adm = isAdmin();
   const editing = dbLogEdit ? logs.find(l => l.id === dbLogEdit) : null; if (dbLogEdit && !editing) dbLogEdit = null;
   const fresh = !!editing && dbLogEditShown !== dbLogEdit; dbLogEditShown = dbLogEdit;
   const cur = document.querySelector('input[name=dbLogKindR]:checked');
   // 작성 중인 이력은 다시 그려도 유지 (수정을 막 시작한 때만 기존 값으로 채움)
   const keep = fresh ? { d: editing.body, date: editing.log_date, kind: editing.kind } : { d: ($('dbLogBody') || {}).value || '', date: ($('dbLogDate') || {}).value || kstToday(), kind: cur ? cur.value : '전화' };
   $('dbDetailPanel').innerHTML = `<div class="ph"><h2><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)} ${dbDaysTag(c)}</h2><button class="x" data-d="close">✕</button></div>
+    ${arch ? `<div class="dbarch">🗑 <b>보관된 채권</b>이에요 — ${esc(String(c.deleted_at).slice(0, 10))} · ${esc(nameOf(c.deleted_by))}<div>사유: ${esc(c.delete_reason || '-')}</div></div>` : ''}
     ${dbSpecial(c) ? `<div class="dbcur"><span class="k">채권구분</span>${dbClassChip(c)}</div><div style="margin-top:10px">${dbMileHtml(c, true)}</div>` : `
     <div class="dbgrp"><div class="gt">⏱ 연체 · 기한이익상실</div><div class="dbov2">
       <div><div class="k">내부연체기준일</div><div class="v">${c.overdue_since ? esc(c.overdue_since) : '<span class="muted">미입력</span>'}</div></div>
@@ -310,23 +334,40 @@ function renderDbDetail(){
       ${editing ? `<div class="muted" style="font-size:13px;margin-top:8px">✏️ ${esc(editing.log_date)} 이력을 수정하는 중이에요</div>` : ''}
       <div class="dbline" style="margin-top:8px">${editing ? '' : '<span class="muted" style="font-size:13px">다음 조치일도 같이 정하기</span><input type="date" id="dbLogNext" />'}<span style="flex:1"></span>${editing ? '<button class="btn" data-d="canceledit">취소</button>' : ''}<button class="btn primary" data-d="addlog">${editing ? '수정 저장' : '이력 추가'}</button></div>
 `}
-      <div style="margin-top:10px">${logs.map(l => `<div class="dblog"><div class="ic">${DEBT_ICON[l.kind] || '📝'}</div><div class="bd"><div class="hd">${esc(l.log_date)} · ${esc(l.kind)} · ${esc(nameOf(l.created_by))}</div><div class="tx">${esc(l.body)}</div></div>${!ro && (l.created_by === me || isAdmin()) ? `<button class="del" data-ledit="${l.id}" title="이 이력 수정">✏️</button><button class="del" data-ldel="${l.id}" title="이 이력 삭제">✕</button>` : ''}</div>`).join('') || '<div class="muted" style="padding:6px 2px">아직 이력이 없어요.</div>'}</div></div>
-    <div class="acts" style="margin-top:20px;justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap">${ro ? '' : '<button class="btn" data-d="edit">수정</button>'}<button class="btn" data-d="print">🖨 기록 출력</button>${ro ? '' : `<button class="btn" data-d="${closed ? 'reopen' : 'close2'}">${closed ? '↩ 진행중으로 되돌리기' : '✅ 종결 처리'}</button>`}</div>${!ro && (c.created_by === me || isAdmin()) ? '<button class="btn danger" data-d="del">삭제</button>' : ''}</div>`;
+      <div style="margin-top:10px">${logs.map(l => `<div class="dblog"><div class="ic">${DEBT_ICON[l.kind] || '📝'}</div><div class="bd"><div class="hd">${esc(l.log_date)} · ${esc(l.kind)} · ${esc(nameOf(l.created_by))}</div><div class="tx">${esc(l.body)}</div>${(dbHist[l.id] || []).length ? `<button class="dblk" data-lhist="${l.id}">✏️ 수정됨 ${(dbHist[l.id] || []).length}회 · 이전 내용 ${dbHistOpen.has(l.id) ? '접기' : '보기'}</button>${dbHistOpen.has(l.id) ? `<div class="dbhist">${(dbHist[l.id] || []).map(h => `<div><span class="muted">${esc(String(h.changed_at).slice(0, 16).replace('T', ' '))} · ${esc(nameOf(h.changed_by))} 수정 전</span><div>${esc(h.old_log_date)} · ${esc(h.old_kind)} · ${esc(h.old_body)}</div></div>`).join('')}</div>` : ''}` : ''}</div>${!ro && (l.created_by === me || adm) ? `<button class="del" data-ledit="${l.id}" title="이 이력 수정">✏️</button><button class="del" data-ldel="${l.id}" title="이 이력 삭제(보관)">🗑</button>` : ''}</div>`).join('') || '<div class="muted" style="padding:6px 2px">아직 이력이 없어요.</div>'}</div>
+      ${dbDelLogs(c).length ? `<div style="margin-top:12px"><button class="dblk" data-d="trashlogs">🗑 삭제(보관)된 이력 ${dbDelLogs(c).length}건 ${dbTrashLogs ? '접기' : '보기'}</button>${dbTrashLogs ? `<div class="dbtrash">${dbDelLogs(c).map(l => `<div class="dbtl">${dbLogBox(l)}<div class="muted" style="font-size:12.5px">🗑 ${esc(String(l.deleted_at).slice(0, 16).replace('T', ' '))} · ${esc(nameOf(l.deleted_by))} · 사유: ${esc(l.delete_reason || '-')}</div><div class="dbline" style="margin-top:6px">${!arch && debtCan() && (l.created_by === me || adm) ? `<button class="btn small" data-lrestore="${l.id}">↩ 복원</button>` : ''}${adm ? `<button class="btn danger small" data-lpurge="${l.id}">영구 삭제</button>` : ''}</div></div>`).join('')}</div>` : ''}</div>` : ''}</div>
+    <div class="acts" style="margin-top:20px;justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap">${ro ? '' : '<button class="btn" data-d="edit">수정</button>'}${arch ? '' : '<button class="btn" data-d="print">🖨 기록 출력</button>'}${ro ? '' : `<button class="btn" data-d="${closed ? 'reopen' : 'close2'}">${closed ? '↩ 진행중으로 되돌리기' : '✅ 종결 처리'}</button>`}</div>${arch ? (adm ? '<div style="display:flex;gap:8px"><button class="btn" data-d="restore">↩ 복원</button><button class="btn danger" data-d="purge">영구 삭제</button></div>' : '') : !ro && adm ? '<button class="btn danger" data-d="del">🗑 삭제</button>' : ''}</div>`;
 }
 $('dbDetailPanel').addEventListener('click', async (ev) => {
-  const c = debtCases.find(x => x.id === debtOpenId); if (!c) return;
+  const c = dbFind(debtOpenId); if (!c) return;
   const le = ev.target.closest('[data-ledit]');
   if (le){ dbLogEdit = +le.dataset.ledit; renderDbDetail(); const t = $('dbLogBody'); if (t){ t.scrollIntoView({ block: 'center' }); t.focus(); } return; }
   const ld = ev.target.closest('[data-ldel]');
   if (ld){
-    if (!confirm('이 이력을 삭제할까요?')) return;
-    const { error } = await sb.from('debt_logs').delete().eq('id', +ld.dataset.ldel);
+    const l = (c.debt_logs || []).find(x => x.id === +ld.dataset.ldel); if (!l) return;
+    const r = await dbAsk({ title: '🗑 이력 삭제', html: `이 이력을 삭제할까요?${dbLogBox(l)}<span class="muted">완전히 지워지지 않고 <b>보관</b>돼요. 필요하면 “삭제된 이력”에서 복원할 수 있어요.</span>`, reason: '삭제 사유 (필수)', okLabel: '삭제(보관)', danger: true });
+    if (!r) return;
+    const { error } = await sb.from('debt_logs').update({ deleted_at: new Date().toISOString(), delete_reason: r.reason }).eq('id', l.id);
     if (error) return alert(error.message);
-    return loadDebt();
+    toast('🗑 이력을 보관했어요'); return loadDebt();
+  }
+  const lh = ev.target.closest('[data-lhist]');
+  if (lh){ const id = +lh.dataset.lhist; dbHistOpen.has(id) ? dbHistOpen.delete(id) : dbHistOpen.add(id); return renderDbDetail(); }
+  const lr = ev.target.closest('[data-lrestore]');
+  if (lr){ const { error } = await sb.from('debt_logs').update({ deleted_at: null }).eq('id', +lr.dataset.lrestore); if (error) return alert(error.message); toast('↩ 이력을 복원했어요'); return loadDebt(); }
+  const lp = ev.target.closest('[data-lpurge]');
+  if (lp){
+    const l = (c.debt_logs || []).find(x => x.id === +lp.dataset.lpurge); if (!l) return;
+    const r = await dbAsk({ title: '⚠ 이력 영구 삭제', html: `<b style="color:var(--danger)">되돌릴 수 없어요.</b> 이 이력과 수정 이력이 완전히 지워지고, 누가 지웠는지만 감사 기록에 남아요.${dbLogBox(l)}`, confirmText: '영구삭제', okLabel: '영구 삭제', danger: true });
+    if (!r) return;
+    const { error } = await sb.rpc('debt_purge_log', { p_id: l.id });
+    if (error) return alert(error.message);
+    toast('영구 삭제했어요'); return loadDebt();
   }
   const b = ev.target.closest('[data-d]'); if (!b) return;
   const act = b.dataset.d;
   if (act === 'close') return dbCloseDetail();
+  if (act === 'trashlogs'){ dbTrashLogs = !dbTrashLogs; return renderDbDetail(); }
   if (act === 'edit') return dbOpenForm(c.id);
   if (act === 'print') return dbrPrint({ status: 'all', scope: 'all', summary: false, detail: true, from: '', to: '', ids: [c.id] });
   const upd = async (patch, msg) => { const { error } = await sb.from('debt_cases').update(patch).eq('id', c.id); if (error) return alert(error.message); if (msg) toast(msg); await loadDebt(); };
@@ -335,10 +376,20 @@ $('dbDetailPanel').addEventListener('click', async (ev) => {
   if (act === 'close2'){ if (!confirm('종결 처리할까요? (종결 탭으로 이동해요)')) return; return upd({ status: '종결', closed_at: new Date().toISOString(), next_action_date: null, next_action_note: null }, '✅ 종결 처리했어요'); }
   if (act === 'reopen') return upd({ status: '진행중', closed_at: null }, '진행중으로 되돌렸어요');
   if (act === 'del'){
-    if (!confirm(`"${c.debtor_name}" 건과 모든 이력을 삭제할까요? 되돌릴 수 없어요.`)) return;
-    const { error } = await sb.from('debt_cases').delete().eq('id', c.id);
+    const n = dbLogs(c).length;
+    const r = await dbAsk({ title: '🗑 채권 삭제', html: `<b>${esc(c.debtor_name)}</b> 채권을 삭제할까요?<br><span class="muted">이력 ${n}건을 포함해 <b>보관함</b>으로 옮겨지고, 목록·보고서에서는 보이지 않아요. 보관함에서 복원할 수 있어요.</span>`, reason: '삭제 사유 (필수)', confirmText: c.debtor_name, okLabel: '삭제(보관)', danger: true });
+    if (!r) return;
+    const { error } = await sb.from('debt_cases').update({ deleted_at: new Date().toISOString(), delete_reason: r.reason }).eq('id', c.id);
     if (error) return alert(error.message);
-    dbCloseDetail(); return loadDebt();
+    dbCloseDetail(); toast('🗑 보관함으로 옮겼어요'); return loadDebt();
+  }
+  if (act === 'restore'){ const { error } = await sb.from('debt_cases').update({ deleted_at: null }).eq('id', c.id); if (error) return alert(error.message); dbCloseDetail(); toast('↩ 복원했어요'); return loadDebt(); }
+  if (act === 'purge'){
+    const r = await dbAsk({ title: '⚠ 채권 영구 삭제', html: `<b style="color:var(--danger)">되돌릴 수 없어요.</b><br><b>${esc(c.debtor_name)}</b> 채권과 이력 ${(c.debt_logs || []).length}건(보관된 이력 포함)이 완전히 지워지고, 누가 지웠는지만 감사 기록에 남아요.`, confirmText: c.debtor_name, okLabel: '영구 삭제', danger: true });
+    if (!r) return;
+    const { error } = await sb.rpc('debt_purge_case', { p_id: c.id });
+    if (error) return alert(error.message);
+    dbCloseDetail(); toast('영구 삭제했어요'); return loadDebt();
   }
   if (act === 'canceledit'){ dbLogEdit = null; $('dbLogBody').value = ''; return renderDbDetail(); }
   if (act === 'addlog'){
