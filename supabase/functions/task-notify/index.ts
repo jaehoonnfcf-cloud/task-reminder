@@ -75,6 +75,18 @@ async function notify(emails: string[], text: string) {
   const { data } = await db.from("telegram_links").select("chat_id").in("email", uniq).not("chat_id", "is", null);
   await Promise.all((data ?? []).map((r) => tg(r.chat_id, text)));
 }
+// 업데이트(새 기능) 안내: app_updates 한 건을 텔레그램에 연결된 모든 팀원에게 발송 (관리자가 요청할 때만 — DB 함수 send_app_update 가 호출)
+async function announce(id: number) {
+  const { data: u } = await db.from("app_updates").select("*").eq("id", id).maybeSingle();
+  if (!u) return { error: "not found" };
+  if (u.sent_at) return { error: "already sent", sent_at: u.sent_at };
+  const { data: lk } = await db.from("telegram_links").select("chat_id").not("chat_id", "is", null);
+  const ids = [...new Set((lk ?? []).map((r) => r.chat_id))];
+  const text = `🆕 할일요정 업데이트\n\n${u.title}\n${u.body}`;
+  await Promise.all(ids.map((c) => tg(c, text)));
+  await db.from("app_updates").update({ sent_at: new Date().toISOString(), sent_count: ids.length }).eq("id", id);
+  return { sent: ids.length };
+}
 async function nameMap() {
   const { data } = await db.from("team_members").select("email, name");
   return new Map((data ?? []).map((r) => [r.email, r.name || r.email]));
@@ -129,7 +141,9 @@ async function handle(req: Request): Promise<Response> {
   if (req.headers.get("x-cron-secret")) {
     if (req.headers.get("x-cron-secret") !== Deno.env.get("CRON_SECRET")) return new Response("forbidden", { status: 403 });
     const today = kstToday();
-    const mode = (await req.json().catch(() => ({})))?.mode;
+    const cronBody = await req.json().catch(() => ({}));
+    const mode = cronBody?.mode;
+    if (mode === "announce") return ok(await announce(Number(cronBody.id)));
     if (mode === "perf") return ok({ perfMissing: await perfCheck(today) });
     const dueTag = (d: string | null) => !d ? "" : d < today ? ` 🔴기한초과(${d})` : d === today ? " 🟠오늘마감" : ` (~${d})`;
     const SECTIONS = ["수신/기타", "여신", "개인"];   // 메뉴 순서(수신/기타 → 여신 → 감정평가 → 채권관리 → 개인업무)와 같게. 일정은 맨 위

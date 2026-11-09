@@ -738,3 +738,18 @@ create policy dpc_upd on public.deposit_calcs for update to authenticated using 
 create policy dpc_del on public.deposit_calcs for delete to authenticated using (has_appraisal() and (created_by = auth.email() or is_admin()));
 grant select, insert, update, delete on public.deposit_calcs to authenticated;
 alter publication supabase_realtime add table public.deposit_calcs;
+
+-- 업데이트(새 기능) 안내 텔레그램: app_updates 에 제목·설명을 쌓아 두고, 관리자가 요청할 때 select send_app_update(<id>) 로 발송 (task-notify 의 announce 모드).
+-- send_app_update 는 로그인 사용자에게는 실행 권한이 없고 DB 관리 권한(SQL 편집기·MCP)으로만 실행된다.
+create table if not exists public.app_updates (
+  id bigint generated always as identity primary key,
+  title text not null check (char_length(title) between 1 and 100),
+  body text not null check (char_length(body) between 1 and 1500),
+  created_at timestamptz not null default now(),
+  sent_at timestamptz, sent_count int
+);
+alter table public.app_updates enable row level security;
+create policy au_sel on public.app_updates for select to authenticated using (is_member());
+grant select on public.app_updates to authenticated;
+grant select, insert, update on public.app_updates to service_role;
+-- function public.send_app_update(p_id bigint): Supabase 에 적용된 마이그레이션 app_updates_announce 참고
