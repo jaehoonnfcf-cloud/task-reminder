@@ -539,7 +539,7 @@ create table if not exists public.rti_settings (
   id smallint primary key default 1 check (id = 1),
   base_rate numeric(5,2) not null default 2.93, base_month text not null default '2026년 3월',
   ref_loan_rate numeric(5,2) not null default 4.79, ref_loan_month text not null default '2024년 12월',
-  stress_existing numeric(4,2) not null default 1.00, stress_new numeric(4,2) not null default 1.50,
+  stress_existing numeric(4,2) not null default 1.00, stress_new numeric(4,2) not null default 1.70,
   est_ratio numeric(5,2) not null default 70, small_limit bigint not null default 100000000,
   th_non_house numeric(4,2) not null default 1.50, th_non_house_ok numeric(4,2) not null default 1.20,
   th_house numeric(4,2) not null default 1.25, th_house_ok numeric(4,2) not null default 1.00,
@@ -720,3 +720,4 @@ drop policy if exists dpa_sel on public.debt_purge_audit;
 create policy dpa_sel on public.debt_purge_audit for select to authenticated using (is_admin());
 grant select on public.debt_purge_audit to authenticated;
 -- debt_purge_log(p_id) / debt_purge_case(p_id): security definer 함수 (Supabase 에 적용된 마이그레이션 debt_records_protection 참고)
+update public.rti_settings set stress_new = 1.7 where id = 1;  -- 신규대출 Stress 1.5 → 1.7

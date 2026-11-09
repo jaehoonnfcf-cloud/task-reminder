@@ -3,7 +3,7 @@
 // 전역(sb, $, esc, me, meRow, nameOf, kstToday, toast, canWrite, isAdmin)과 appraisal.js 의 apPreview / apSettings / AP_FONT 를 함께 쓴다.
 
 let rtiCalcs = [], rtiSet = null, rtiMode = 'list', rtiDraft = null, rtiQ = '', rtiKind = 'all';
-const RTI_DEF = { base_rate: 2.93, base_month: '2026년 3월', ref_loan_rate: 4.79, ref_loan_month: '2024년 12월', stress_existing: 1, stress_new: 1.5, est_ratio: 70, small_limit: 100000000, th_non_house: 1.5, th_non_house_ok: 1.2, th_house: 1.25, th_house_ok: 1.0 };
+const RTI_DEF = { base_rate: 2.93, base_month: '2026년 3월', ref_loan_rate: 4.79, ref_loan_month: '2024년 12월', stress_existing: 1, stress_new: 1.7, est_ratio: 70, small_limit: 100000000, th_non_house: 1.5, th_non_house_ok: 1.2, th_house: 1.25, th_house_ok: 1.0 };
 const rtiS = () => ({ ...RTI_DEF, ...(rtiSet || {}) });
 const rtiCan = () => typeof canWrite === 'function' && canWrite('appraisal');
 const rtiNum = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); return d ? Number(d) : 0; };
