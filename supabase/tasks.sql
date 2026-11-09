@@ -753,3 +753,4 @@ create policy au_sel on public.app_updates for select to authenticated using (is
 grant select on public.app_updates to authenticated;
 grant select, insert, update on public.app_updates to service_role;
 -- function public.send_app_update(p_id bigint): Supabase 에 적용된 마이그레이션 app_updates_announce 참고
+-- (DB) 연락·방문 이력에 발신/수신(direction), 조치 예정(action_note·action_date·action_done_at) 추가 — Supabase 마이그레이션 debt_logs_direction_action

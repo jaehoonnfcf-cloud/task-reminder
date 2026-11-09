@@ -46,7 +46,7 @@ function dbrReportHtml(opt){
     const rows = cases.map((c, i) => {
       const lg = dbLogs(c)[0], nx = c.status === '종결' ? null : c.next_action_date;
       return `<tr class="${c.status === '종결' ? 'end' : ''}"><td class="c">${i + 1}</td><td class="c">${esc(c.scope)}</td><td class="nm">${esc(c.debtor_name)}</td><td class="nw">${dbrSince(c)}</td><td class="r nw">${esc(dbrDays(c))}</td><td class="r">${esc(dbrNum(c.principal))}</td><td class="c nw">${dbrCls(c)}</td><td class="nw sch">${dbrSch(c)}</td><td class="c">${esc(c.assignee_email ? nameOf(c.assignee_email) : '-')}</td>
-        <td>${lg ? `<b>${esc(lg.log_date.slice(5).replace('-', '/'))}</b> ${esc(lg.kind)}<div class="sm">${esc(lg.body)}</div>` : '<span class="mu">-</span>'}</td>
+        <td>${lg ? `<b>${esc(lg.log_date.slice(5).replace('-', '/'))}</b> ${esc(dbKindTxt(lg))}<div class="sm">${esc(lg.body)}</div>${dbHasAct(lg) ? `<div class="sm">📌 ${lg.action_date ? esc(lg.action_date.slice(5).replace('-', '/')) + ' ' : ''}${esc(lg.action_note || '')}</div>` : ''}` : '<span class="mu">-</span>'}</td>
         <td>${c.manage_note ? esc(c.manage_note) : '<span class="mu">-</span>'}</td>
         <td>${c.status === '종결' ? `<span class="mu">종결${c.closed_at ? ' ' + esc(String(c.closed_at).slice(0, 10)) : ''}</span>` : nx ? `<b${nx < today ? ' class="lt"' : ''}>${esc(nx.slice(5).replace('-', '/'))}</b>${nx < today ? ' (지연)' : ''}${c.next_action_note ? `<div class="sm">${esc(c.next_action_note)}</div>` : ''}` : '<span class="mu">미정</span>'}</td></tr>`;
     }).join('');
@@ -62,7 +62,7 @@ function dbrReportHtml(opt){
   if (opt.detail){
     detail = cases.map(c => {
       const logs = logsOf(c), closed = c.status === '종결', nx = closed ? null : dbNext(c);
-      const lrows = logs.map((l, i) => `<tr><td class="c">${i + 1}</td><td class="c" style="white-space:nowrap">${esc(l.log_date)} (${dbrDow(l.log_date)})</td><td class="c">${esc(l.kind)}</td><td class="bd">${esc(l.body)}</td><td class="c">${esc(nameOf(l.created_by))}</td></tr>`).join('');
+      const lrows = logs.map((l, i) => `<tr><td class="c">${i + 1}</td><td class="c" style="white-space:nowrap">${esc(l.log_date)} (${dbrDow(l.log_date)})</td><td class="c">${esc(dbKindTxt(l))}</td><td class="bd">${esc(l.body)}</td><td class="act">${dbHasAct(l) ? `${l.action_date ? `<b>${esc(l.action_date.slice(2).replace(/-/g, '.'))}</b> ` : ''}${esc(l.action_note || '')}${l.action_done_at ? ` <span class="dn">(완료 ${esc(String(l.action_done_at).slice(2, 10).replace(/-/g, '.'))})</span>` : ''}` : '<span class="mu">-</span>'}</td><td class="c">${esc(nameOf(l.created_by))}</td></tr>`).join('');
       return `<div class="page brk">${head('연체채권사후관리기록부', `관리번호 <b>${esc(dbrNo(c))}</b> · 기준일 ${esc(today)} (${dbrDow(today)})`)}
         <div class="cust"><div><div class="l">채무자</div><div class="n">${esc(c.debtor_name)}</div></div><div class="tag">${esc(c.scope)} · ${closed ? '종결' : '진행중'}</div></div>
         <h2>기본 사항</h2>
@@ -75,8 +75,8 @@ function dbrReportHtml(opt){
         ${c.manage_note ? `<h2>관리내역</h2><div class="memo">${esc(c.manage_note)}</div>` : ''}
         ${c.memo ? `<h2>메모</h2><div class="memo">${esc(c.memo)}</div>` : ''}
         <h2>연락·방문 이력 <span class="cnt">(${logs.length}건${periodTxt ? ' · ' + (opt.from || '처음') + ' ~ ' + (opt.to || '현재') : ''})</span></h2>
-        <table class="t log"><thead><tr><th style="width:6%">번호</th><th style="width:17%">일자</th><th style="width:9%">구분</th><th>내용</th><th style="width:11%">작성자</th></tr></thead>
-        <tbody>${lrows || '<tr><td colspan="5" class="c" style="padding:14px">기록된 이력이 없습니다.</td></tr>'}</tbody></table>
+        <table class="t log"><thead><tr><th style="width:6%">번호</th><th style="width:15%">일자</th><th style="width:11%">구분</th><th>내용</th><th style="width:24%">조치 예정</th><th style="width:9%">작성자</th></tr></thead>
+        <tbody>${lrows || '<tr><td colspan="6" class="c" style="padding:14px">기록된 이력이 없습니다.</td></tr>'}</tbody></table>
         <div class="foot">출력일 ${esc(today)} · 출력자 ${esc(nameOf(me))}</div></div>`;
     }).join('');
   }
@@ -97,7 +97,7 @@ function dbrReportHtml(opt){
   .cust .tag{border:1.5px solid #111;border-radius:99px;padding:3px 14px;font-weight:700;font-size:13px;white-space:nowrap}
   h2{font-size:13.5px;margin:13px 0 5px;padding-left:9px;border-left:5px solid #111}h2 .cnt{font-size:11.5px;font-weight:500;color:#555}
   .memo{border:1px solid #444;padding:6px 10px;white-space:pre-wrap;min-height:26px}
-  table.log td.bd{white-space:pre-wrap;word-break:break-all}
+  table.log td.bd,table.log td.act{white-space:pre-wrap;word-break:break-all}table.log td.act{font-size:11.5px}table.log .dn{color:#2f6f3e;font-size:10.5px}
   .foot{margin-top:10px;font-size:11px;color:#666;text-align:center}`;
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>연체채권사후관리기록부</title>${link}<style>${css}</style></head><body>${summary}${detail}</body></html>`;
 }
