@@ -497,6 +497,7 @@
     </div>
     <div id="appraisal"></div>
     <div id="rti"></div>
+    <div id="dep"></div>
     <div id="event"></div>
     <div id="debt"><div class="seg" id="dbTabs"><button data-t="debt">📞 <span class="svlf">연체채권관리</span><span class="svls">연체채권</span></button><button data-t="survey">🏭 <span class="svlf">정책자금실태조사</span><span class="svls">실태조사</span></button><button data-t="fund" id="dbTabFund" style="display:none">💰 <span class="svlf">자금운영관리</span><span class="svls">자금</span></button></div><div id="debtMain"></div><div id="survey"></div><div id="fund"></div></div>
     <div id="personal" style="display:none">
@@ -737,7 +738,7 @@
     if (!started) setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
     if (!started) divn = hashDiv() || 'home';   // 열 때마다 현황판이 기본화면 (주소 끝 #credit 등으로 바로 열 수도 있음)
     started = true;
-    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadEvent === 'function') await loadEvent(); if (typeof loadRti === 'function') await loadRti(); if (typeof loadDebt === 'function') await loadDebt(); if (typeof loadCal === 'function') await loadCal(); if (typeof loadPcal === 'function') await loadPcal(); if (typeof loadPerf === 'function') await loadPerf(); ensureSide(); startRealtime();
+    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadEvent === 'function') await loadEvent(); if (typeof loadRti === 'function') await loadRti(); if (typeof loadDep === 'function') await loadDep(); if (typeof loadDebt === 'function') await loadDebt(); if (typeof loadCal === 'function') await loadCal(); if (typeof loadPcal === 'function') await loadPcal(); if (typeof loadPerf === 'function') await loadPerf(); ensureSide(); startRealtime();
   }
 
   async function reloadMembers(){
@@ -844,7 +845,7 @@
     $('app').dataset.div = divn;
     const nm = (nameOf(me) || '').trim() || '담당자';
     $('helloT').innerHTML = ev ? '이벤트 일정이에요 🎉<br><span>검진·연차·반차를 겹치지 않게 골라요</span>' : home ? `안녕하세요, ${esc(nm)}님 👋<br><span>오늘의 조합 현황이에요</span>` : debt ? '사후관리 현황이에요 🛠<br><span>오늘 챙길 조치부터 확인해요</span>' : appr ? '새 의뢰 전에,<br><span>기존 기록부터 찾아볼까요? 🔍</span>' : personal ? '나만 보는 업무예요 🔒<br><span>오늘 할 일부터 확인해요</span>' : `안녕하세요, ${esc(nm)}님 👋<br><span>오늘 챙겨야 할 업무예요</span>`;
-    $('home').style.display = home ? 'flex' : 'none'; $('shared').style.display = personal || appr || debt || home || ev ? 'none' : 'flex'; $('event').style.display = ev ? 'flex' : 'none'; $('debt').style.display = debt ? 'flex' : 'none'; $('debtBtn').style.display = ''; $('personal').style.display = personal ? 'flex' : 'none'; $('appraisal').style.display = appr ? 'flex' : 'none'; $('rti').style.display = appr && typeof apTab !== 'undefined' && apTab === 'rti' ? 'flex' : 'none';
+    $('home').style.display = home ? 'flex' : 'none'; $('shared').style.display = personal || appr || debt || home || ev ? 'none' : 'flex'; $('event').style.display = ev ? 'flex' : 'none'; $('debt').style.display = debt ? 'flex' : 'none'; $('debtBtn').style.display = ''; $('personal').style.display = personal ? 'flex' : 'none'; $('appraisal').style.display = appr ? 'flex' : 'none'; $('rti').style.display = appr && typeof apTab !== 'undefined' && apTab === 'rti' ? 'flex' : 'none'; $('dep').style.display = appr && typeof apTab !== 'undefined' && apTab === 'dep' ? 'flex' : 'none';
     document.querySelectorAll('#divBtns button').forEach(b => b.classList.toggle('on', b.dataset.div === divn));
     const pToday = kstToday(), pDue = ptasks.filter(t => !t.done_at && t.due_date && t.due_date <= pToday).length;
     $('nPersonal').textContent = pDue || ''; $('nPersonal').style.display = pDue ? '' : 'none';
@@ -854,7 +855,7 @@
     const fundTab = debt && typeof dbTab !== 'undefined' && dbTab === 'fund';
     const w = !home && !ev && !fundTab && (personal || canWrite(divn));   // debt 도 canWrite('debt'), 현황판에는 새 업무 버튼 없음
     $('newBtn').style.display = w ? '' : 'none';
-    $('newBtn').textContent = debt ? (typeof dbTab !== 'undefined' && dbTab === 'survey' ? '＋ 조사 대상 등록' : '＋ 연체채권 등록') : personal ? '＋ 개인 할 일' : appr ? (typeof apTab !== 'undefined' && apTab === 'rti' ? '＋ 새 RTI 계산' : '＋ 새 감정평가 의뢰') : '＋ 새 업무';
+    $('newBtn').textContent = debt ? (typeof dbTab !== 'undefined' && dbTab === 'survey' ? '＋ 조사 대상 등록' : '＋ 연체채권 등록') : personal ? '＋ 개인 할 일' : appr ? (typeof apTab !== 'undefined' && apTab === 'rti' ? '＋ 새 RTI 계산' : typeof apTab !== 'undefined' && apTab === 'dep' ? '＋ 새 차감계산' : '＋ 새 감정평가 의뢰') : '＋ 새 업무';
     $('roPill').style.display = w || home || ev || fundTab ? 'none' : '';
     $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
     renderRecentComments();
@@ -1054,6 +1055,7 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'fund_days' }, () => { if (typeof loadFund === 'function' && typeof divn !== 'undefined' && divn === 'debt') loadFund(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'event_bookings' }, () => { if (typeof scheduleEvent === 'function') scheduleEvent(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_calcs' }, () => { if (typeof scheduleDep === 'function') scheduleDep(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rti_calcs' }, () => { if (typeof scheduleRti === 'function') scheduleRti(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rti_settings' }, () => { if (typeof scheduleRti === 'function') scheduleRti(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'survey_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
@@ -1288,7 +1290,7 @@
   function closeForm(){ $('formOv').style.display = 'none'; editId = null; document.body.style.overflow = $('detailOv').style.display === 'block' ? 'hidden' : ''; }
   $('fClose').onclick = closeForm; $('fCancel').onclick = closeForm;
   $('formOv').addEventListener('click', (e) => { if (e.target === $('formOv')) closeForm(); });
-  $('newBtn').onclick = () => divn === 'personal' ? openPf(null) : divn === 'debt' ? (dbTab === 'survey' ? svOpenForm(null) : dbOpenForm(null)) : divn === 'appraisal' ? (apTab === 'rti' ? rtiNew() : apOpenForm(null)) : openForm('new', null);
+  $('newBtn').onclick = () => divn === 'personal' ? openPf(null) : divn === 'debt' ? (dbTab === 'survey' ? svOpenForm(null) : dbOpenForm(null)) : divn === 'appraisal' ? (apTab === 'rti' ? rtiNew() : apTab === 'dep' ? depNew() : apOpenForm(null)) : openForm('new', null);
 
   $('fSave').onclick = async () => {
     const title = $('fTitle').value.trim();
@@ -1695,13 +1697,14 @@
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if ($('calOv') && $('calOv').style.display === 'block') calClose(); else if ($('apPvOv').style.display === 'block') apClosePv(); else if ($('apFaxOv').style.display === 'block') apCloseFax(); else if ($('apFormOv').style.display === 'block') apCloseForm(); else if ($('apDetailOv').style.display === 'block') apCloseDetail(); else if ($('dropOv').style.display === 'block') closeDrop(); else if ($('prOv').style.display === 'block') closePr(); else if ($('pfOv').style.display === 'block') closePf(); else if ($('formOv').style.display === 'block') closeForm(); else if ($('profOv').style.display === 'block') closeProfile(); else if ($('adminOv').style.display === 'block') closeAdmin(); else if ($('detailOv').style.display === 'block') closeDetail(); } });
 </script>
-<script src="appraisal.js?v=49"></script>
+<script src="appraisal.js?v=50"></script>
 <script src="calendar.js?v=6"></script>
 <script src="debt.js?v=24"></script>
 <script src="debtreport.js?v=16"></script>
 <script src="survey.js?v=11"></script>
 <script src="fund.js?v=3"></script>
 <script src="rti.js?v=6"></script>
+<script src="deposit.js?v=2"></script>
 <script src="event.js?v=4"></script>
 <script src="perf.js?v=29"></script>
 <script src="cover.js?v=1"></script>

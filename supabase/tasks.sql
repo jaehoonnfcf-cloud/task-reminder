@@ -721,3 +721,20 @@ create policy dpa_sel on public.debt_purge_audit for select to authenticated usi
 grant select on public.debt_purge_audit to authenticated;
 -- debt_purge_log(p_id) / debt_purge_case(p_id): security definer 함수 (Supabase 에 적용된 마이그레이션 debt_records_protection 참고)
 update public.rti_settings set stress_new = 1.7 where id = 1;  -- 신규대출 Stress 1.5 → 1.7
+
+-- 감정평가 > 임차보증금 차감계산(대출가능금액): deposit_calcs. 조회는 팀원 전체, 저장·수정은 has_appraisal(), 삭제는 작성자·관리자.
+create table if not exists public.deposit_calcs (
+  id bigint generated always as identity primary key,
+  title text not null check (char_length(title) between 1 and 100),
+  data jsonb not null default '{}'::jsonb,
+  appraisal bigint not null default 0, deduct bigint not null default 0, loanable bigint not null default 0,
+  memo text check (memo is null or char_length(memo) <= 500),
+  created_by text not null default auth.email(), created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+alter table public.deposit_calcs enable row level security;
+create policy dpc_sel on public.deposit_calcs for select to authenticated using (is_member());
+create policy dpc_ins on public.deposit_calcs for insert to authenticated with check (has_appraisal() and created_by = auth.email());
+create policy dpc_upd on public.deposit_calcs for update to authenticated using (has_appraisal()) with check (has_appraisal());
+create policy dpc_del on public.deposit_calcs for delete to authenticated using (has_appraisal() and (created_by = auth.email() or is_admin()));
+grant select, insert, update, delete on public.deposit_calcs to authenticated;
+alter publication supabase_realtime add table public.deposit_calcs;
