@@ -331,5 +331,5 @@ function depPrint(){
   <h2>임차보증금·소액임차보증금 산출 근거</h2><div class="why">${esc(why)}</div>
   <div class="note">${mode === 'com' ? '비주거용: 대출가능금액 = 총감정평가액(토지 포함) × 담보인정비율 − 선순위 설정금액 − 임차보증금 − (미임대점포 × 점포별배당가능소액임차보증금) − 기타 우선채권' : '대출가능금액 = 총감정평가액(토지 포함) × 담보인정비율 − 선순위 설정금액 − 임차보증금 − 소액임차보증금 − 기타 우선채권'} · 임차보증금과 소액임차보증금은 근저당권 등 담보물권 취득 시점 기준으로 산정 · 소액임차보증금은 감정가액의 1/2을 최고 금액으로 함</div>
   ${D.memo ? `<h2>메모</h2><div class="note" style="white-space:pre-wrap;font-size:12px;color:#111">${esc(D.memo)}</div>` : ''}</body></html>`;
-  apPreview(html, '임차보증금 차감계산', `차감계산_${D.title || ''}`);
+  apPreview(html, '임차보증금 차감계산', `임차보증금차감계산_${D.title || ''}`);
 }

@@ -781,7 +781,7 @@ async function apPrint(c){
   const go = async (type) => {
     apMapType = type; try { localStorage.setItem('apMapType', type); } catch (e) {}
     const map = await apReportMap(c, type);
-    apPreview(apReportHtml(c, map), '결과 보고서', `보고서_${apCaseNo(c)}`, false, go);
+    apPreview(apReportHtml(c, map), '결과 보고서', `감정평가결과_${c.debtor_name}_${apCaseNo(c)}`, false, go);
     $('apPvMapSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === type));
     const miss = apProps(c).filter(p => p.lat == null || p.lng == null).length;
     const msg = !map && apProps(c).length ? (miss ? '좌표가 등록된 물건이 없어 지도를 넣지 못했어요. 물건을 주소 검색으로 다시 등록하면 지도가 들어가요.' : '지도를 불러오지 못했어요. 잠시 후 다시 시도해주세요.') : miss ? `좌표가 없는 물건 ${miss}건은 지도에 표시되지 않았어요.` : '';
@@ -866,7 +866,7 @@ $('apFaxPanel').addEventListener('click', (e) => {
   table.items{width:100%;border-collapse:collapse}table.items th,table.items td{border:1px solid #000;padding:4px 8px;white-space:nowrap}table.items td:nth-child(2){white-space:normal}
   table.items th{background:#fff;font-weight:700;text-align:center;border-bottom:2px solid #000}.c{text-align:center}.r{text-align:right}tr{page-break-inside:avoid}
   table.items tr.sum td{font-weight:700;border-top:2px solid #000}.to .fx{font-size:13px;color:#333}.pg{text-align:center;color:#444;font-size:12px;margin-top:16px}.cont{margin-top:8px;color:#444;font-size:12px;text-align:right}.purpose{margin-top:22px;font-size:15px;font-weight:700;white-space:pre-wrap}
-  </style></head><body>${pages.join('')}</body></html>`, '탁상감정의뢰서', `의뢰서_${apCaseNo(c)}`);
+  </style></head><body>${pages.join('')}</body></html>`, '탁상감정의뢰서', `탁상감정의뢰서_${c.debtor_name}_${apCaseNo(c)}`);
   apCloseFax();
 });
 // ---------- 미리보기 / 인쇄 / 이미지 공유 (PC·휴대폰 공통) ----------
@@ -918,11 +918,22 @@ function apPvFit(){
 function apClosePv(){ $('apPvOv').style.display = 'none'; $('apPvFrame').srcdoc = ''; document.body.style.overflow = ($('apDetailOv').style.display === 'block' || $('apFormOv').style.display === 'block') ? 'hidden' : ''; }
 async function apPvPrint(){
   const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
-  if (!mobile){ try { await $('apPvFrame').contentDocument.fonts.ready; $('apPvFrame').contentWindow.focus(); $('apPvFrame').contentWindow.print(); return; } catch (e) {} }
+  // PDF 로 저장할 때 파일 이름은 '인쇄하는 페이지의 제목'이 된다 → 인쇄하는 동안만 제목을 보고서 이름으로 바꿨다가 되돌린다
+  const fname = String(apPvName || apPvTitle || '보고서').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || '보고서';
+  if (!mobile){
+    const fr = $('apPvFrame'), t0 = document.title; let restored = false;
+    const restore = () => { if (restored) return; restored = true; document.title = t0; };
+    try {
+      await fr.contentDocument.fonts.ready; document.title = fname; try { fr.contentDocument.title = fname; } catch (e) {}
+      window.addEventListener('afterprint', restore, { once: true }); try { fr.contentWindow.addEventListener('afterprint', restore, { once: true }); } catch (e) {}
+      setTimeout(restore, 120000);
+      fr.contentWindow.focus(); fr.contentWindow.print(); return;
+    } catch (e) { restore(); }
+  }
   // 휴대폰: 화면 안의 iframe 은 인쇄가 안 되는 경우가 많아, 새 창에 열어서 인쇄한다
   const w = window.open('', '_blank');
   if (!w){ $('apPvMsg').textContent = '팝업이 차단돼서 인쇄 창을 열 수 없어요. 팝업을 허용하거나, "이미지로 공유"를 이용해주세요.'; $('apPvMsg').style.display = 'block'; return; }
-  w.document.open(); w.document.write(apPvHtml); w.document.close();
+  w.document.open(); w.document.write(apPvHtml.replace(/<title>[\s\S]*?<\/title>/, `<title>${esc(fname)}</title>`)); w.document.close();
   const go = () => { try { w.focus(); w.print(); } catch (e) {} };
   setTimeout(() => { try { w.document.fonts.ready.then(go); } catch (e) { go(); } }, 400);
 }
