@@ -362,6 +362,11 @@
   .rrow .rnext{ color:var(--muted); }
   /* 오른쪽 시세·뉴스 */
   .side-card{ border-radius:24px; box-shadow:var(--sh); }
+  #meCard{ display:none; padding:14px 16px 14px; flex-direction:column; gap:10px; }
+  @media (min-width:1500px){ #meCard{ display:flex; } }
+  #meCard .whoBtn{ padding-left:0; } #meCard #clock{ min-width:0; width:100%; box-shadow:none; background:var(--field); border-radius:18px; margin:0; padding:10px 16px; }
+  .ol-h{ font-size:12.5px; font-weight:800; color:#44546f; display:flex; align-items:center; gap:7px; } .ol-dot{ width:8px; height:8px; border-radius:50%; background:#2fb344; box-shadow:0 0 0 3px rgba(47,179,68,.2); flex:none; }
+  .ol-list{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; } .ol-c{ display:inline-flex; align-items:center; gap:6px; background:var(--field); border-radius:99px; padding:3px 11px 3px 3px; font-size:12.5px; font-weight:600; white-space:nowrap; } .ol-c.me{ background:var(--accent-soft); color:var(--accent); }
   .side-h{ border-bottom-color:var(--line); }
   .q-row,.ni{ border-bottom-color:#f1f3f7; } .ni:hover{ background:#f7f8fc; }
   .ni .src{ background:var(--accent-soft); color:var(--accent); }
@@ -472,11 +477,11 @@
     <span class="spacer"></span>
     <span class="pill ro" id="roPill" style="display:none" title="이 업무구분에 대한 등록·수정 권한이 없습니다">👀 보기 전용</span>
     <button class="btn glass small" id="newBtn">＋ 새 업무</button>
-    <button class="whoBtn" id="who" title="내 프로필 (사진·이름 변경)"></button>
+    <span id="whoPh" style="display:none"></span><button class="whoBtn" id="who" title="내 프로필 (사진·이름 변경)"></button>
   </div>
   <div id="wrap">
     <div id="main">
-    <div id="hello"><div id="helloT"></div><div id="clock"><div class="cdd"></div><div class="cdt"></div><div class="cd2"></div></div></div>
+    <div id="hello"><div id="helloT"></div><span id="clockPh" style="display:none"></span><div id="clock"><div class="cdd"></div><div class="cdt"></div><div class="cd2"></div></div></div>
     <div id="home"><div id="cal"></div><div id="perf"></div></div>
     <div id="shared">
     <div id="tiles"></div>
@@ -513,6 +518,7 @@
     </div>
     </div>
     <aside id="side">
+      <div class="side-card" id="meCard"><div class="mc-who"></div><div class="mc-clock"></div><div id="onlineBox"></div></div>
       <div class="side-card"><div class="side-h"><span>📈 시세정보 <button class="q-mg" id="qManage" type="button">관리</button></span><span class="muted" id="qTime"></span></div><div id="quotes"><div class="side-empty">불러오는 중...</div></div></div>
       <div class="side-card" id="rcCard" style="display:none"><div class="side-h"><span>💬 최근 댓글</span><span class="muted">눌러서 업무 열기</span></div><div id="rcList"></div></div>
       <div class="side-card"><div class="side-h"><span>📰 경제뉴스</span><span class="muted" id="nTime"></span></div><div id="news"><div class="side-empty">불러오는 중...</div></div></div>
@@ -750,7 +756,32 @@
 
   function renderWho(){
     $('who').innerHTML = avHtml(me, '', 'margin:0') + `<span class="wn">${esc(nameOf(me))}</span>`;
+    renderOnline();
   }
+  // 넓은 화면(사이드 영역이 보일 때)에서는 내 프로필·시계를 시세정보 위 카드로 옮기고, 좁은 화면에서는 원래 자리로 돌려놓는다
+  const mqSide = window.matchMedia('(min-width:1500px)');
+  function placeMe(){
+    const who = $('who'), clock = $('clock'); if (!who || !clock) return;
+    if (mqSide.matches){ document.querySelector('#meCard .mc-who').appendChild(who); document.querySelector('#meCard .mc-clock').appendChild(clock); }
+    else { $('whoPh').after(who); $('clockPh').after(clock); }
+  }
+  mqSide.addEventListener ? mqSide.addEventListener('change', placeMe) : mqSide.addListener(placeMe); placeMe();
+  // 지금 접속 중인 사람 (Supabase Realtime Presence — 저장되지 않고 접속이 끊기면 자동으로 사라짐)
+  let presChan = null, onlineKeys = [];
+  function renderOnline(){
+    const el = $('onlineBox'); if (!el) return;
+    const list = [...new Set(onlineKeys)].filter(e => e && nameOf(e)).sort((a, b) => (a === me ? -1 : b === me ? 1 : String(nameOf(a)).localeCompare(String(nameOf(b)), 'ko')));
+    el.innerHTML = list.length ? `<div class="ol-h"><i class="ol-dot"></i>지금 접속 중 <b>${list.length}명</b></div><div class="ol-list">${list.map(e => `<span class="ol-c ${e === me ? 'me' : ''}">${avHtml(e, '', 'margin:0;width:24px;height:24px;font-size:11px;border-width:0')}${esc(nameOf(e))}${e === me ? ' (나)' : ''}</span>`).join('')}</div>` : '';
+  }
+  function startPresence(){
+    if (presChan || !me) return;
+    try {
+      presChan = sb.channel('online-users', { config: { presence: { key: me } } });
+      presChan.on('presence', { event: 'sync' }, () => { try { onlineKeys = Object.keys(presChan.presenceState()); } catch (e) {} renderOnline(); })
+        .subscribe(async (s) => { if (s === 'SUBSCRIBED'){ try { await presChan.track({ email: me, at: new Date().toISOString() }); } catch (e) {} } });
+    } catch (e) { presChan = null; }
+  }
+  function stopPresence(){ try { if (presChan) sb.removeChannel(presChan); } catch (e) {} presChan = null; onlineKeys = []; renderOnline(); }
 
   // ---------- 텔레그램 (프로필 창 안에서 연결) ----------
   let tgLinked = false, tgPending = false, tgChat = false, tgWait = false;
@@ -1068,8 +1099,9 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'appraisal_comments' }, scheduleAp)
         .subscribe();
     } catch (e) { rtChan = null; }
+    startPresence();
   }
-  function stopRealtime(){ try { if (rtChan) sb.removeChannel(rtChan); } catch (e) {} rtChan = null; }
+  function stopRealtime(){ try { if (rtChan) sb.removeChannel(rtChan); } catch (e) {} rtChan = null; stopPresence(); }
   // 실시간 연결이 끊겨도 놓치지 않도록: 화면에 다시 돌아오면 갱신 + 1분마다 갱신
   document.addEventListener('visibilitychange', () => { if (!document.hidden && me){ loadTasks(); loadPersonal(); loadAppraisal(); if (typeof loadDebt === 'function') loadDebt(); if (typeof loadCal === 'function'){ loadCal(); loadPcal(); } if (typeof loadPerf === 'function') loadPerf(); } });
   setInterval(() => { if (!document.hidden && me){ loadTasks(); loadAppraisal(); if (typeof loadDebt === 'function') loadDebt(); if (typeof loadCal === 'function'){ loadCal(); loadPcal(); } if (typeof loadPerf === 'function') loadPerf(); } }, 60000);
