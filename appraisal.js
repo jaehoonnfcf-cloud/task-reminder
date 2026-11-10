@@ -230,7 +230,7 @@ function renderAppraisal(){
   document.querySelectorAll('#apView button').forEach(b => b.classList.toggle('on', b.dataset.v === apView));
   const shown = apCases.filter(c => (apView === 'archive' ? !!c.archived_at : !c.archived_at) && (apScope === 'all' || c.scope === apScope) && (apType === 'all' || c.handling_type === apType)
     && (!apMine || c.requester_email === me)
-    && (!apQ || [c.debtor_name, c.memo, ...apProps(c).map(p => p.address)].some(v => (v || '').toLowerCase().includes(apQ))));
+    && (!apQ || [c.debtor_name, c.memo, ...apProps(c).map(p => p.address), ...apProps(c).map(p => p.owner)].some(v => (v || '').toLowerCase().includes(apQ))));
   if (apView === 'archive') shown.sort((a, b) => String(b.archived_at).localeCompare(String(a.archived_at)));
   $('apList').innerHTML = shown.map(apRowHtml).join('') || `<div class="blk-empty">${apView === 'archive' ? '보관함이 비어 있어요. 가격이 모두 도착한 의뢰는 상세 창에서 📦 보관함으로 옮길 수 있어요.' : apCases.length ? '조건에 맞는 의뢰가 없어요.' : '등록된 감정평가 의뢰가 없어요.'}</div>`;
 }
@@ -276,7 +276,7 @@ function renderApDetail(){
   const cdraft = ($('apCmtInput') || {}).value || '';   // 작성 중인 의견은 다시 그려도 유지
   const draft = [...$('apDetailPanel').querySelectorAll('[data-k]')].filter(i => i.value !== i.dataset.orig).map(i => [i.dataset.k, i.value]);
   const unit = (p) => p.kind === '토지' ? '토지' : p.kind === '건물' ? '연면적' : '전용';
-  const propRows = props.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? `<div class="muted">${esc(p.detail)}</div>` : ''}</td><td>${esc(p.jimok || '-')}</td><td style="text-align:right">${p.kind === '건물' ? `대지 ${p.land_area !== null && p.land_area !== undefined ? apM2Py(p.land_area) : '-'}<div>건물 ${p.area !== null ? apM2Py(p.area) : '-'}</div>` : `${p.area !== null ? apM2Py(p.area) : '-'}<div class="muted">${unit(p)}</div>`}</td></tr>`).join('');
+  const propRows = props.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.kind)}</td><td>${esc(p.address)}${p.owner ? `<div class="muted">소유자 ${esc(p.owner)}</div>` : ''}${p.detail ? `<div class="muted">${esc(p.detail)}</div>` : ''}</td><td>${esc(p.jimok || '-')}</td><td style="text-align:right">${p.kind === '건물' ? `대지 ${p.land_area !== null && p.land_area !== undefined ? apM2Py(p.land_area) : '-'}<div>건물 ${p.area !== null ? apM2Py(p.area) : '-'}</div>` : `${p.area !== null ? apM2Py(p.area) : '-'}<div class="muted">${unit(p)}</div>`}</td></tr>`).join('');
   const head = reqs.map(r => {
     const sel = c.chosen_firm_id === r.firm_id;
     return `<th class="f ${sel ? 'chosen' : ''}"><div class="fh"><b>${esc(apFirmName(r.firm_id))}</b>${can ? `<label><input type="radio" name="apChosen" value="${r.firm_id}" ${sel ? 'checked' : ''} data-act="choose"/> 채택</label>` : sel ? '<label>✔ 채택</label>' : ''}</div>
@@ -535,13 +535,13 @@ function apAddPropBlock(p){
         <div class="apres"></div></div></div>
     <input class="pa apaddr" placeholder="↑ 검색해서 주소를 선택하세요" readonly style="margin-top:8px" />
     <div class="apst"></div>
-    <div class="grid3"><div><label>지목</label><input class="pj" list="apJimokDl" /></div><div class="lwc"><label>대지면적 (㎡)</label><input class="pl" inputmode="decimal" /><div class="pyh pyl"></div></div><div><label class="la">면적</label><input class="pr" inputmode="decimal" /><div class="pyh pyr"></div></div><div><label class="ld">비고</label><input class="pd" maxlength="80" /></div></div>`;
+    <div class="grid3"><div><label>소유자</label><input class="po" maxlength="60" placeholder="예: 홍길동" /></div><div><label>지목</label><input class="pj" list="apJimokDl" /></div><div class="lwc"><label>대지면적 (㎡)</label><input class="pl" inputmode="decimal" /><div class="pyh pyl"></div></div><div><label class="la">면적</label><input class="pr" inputmode="decimal" /><div class="pyh pyr"></div></div><div><label class="ld">비고</label><input class="pd" maxlength="80" /></div></div>`;
   $('apfProps').appendChild(blk);
   blk.addEventListener('input', (e) => { if (e.target.matches('.pl, .pr')) apPySync(blk); });
   if (!$('apJimokDl')){ const dl = document.createElement('datalist'); dl.id = 'apJimokDl'; dl.innerHTML = AP_JIMOK.map(j => `<option value="${j}">`).join(''); document.body.appendChild(dl); }
   if (p){
     blk.querySelector('.pk').value = p.kind; blk.querySelector('.pa').value = p.address; blk.dataset.verified = '1'; blk.dataset.pnu = p.pnu || ''; blk.dataset.lat = p.lat ?? ''; blk.dataset.lng = p.lng ?? '';
-    blk.querySelector('.pj').value = p.jimok || ''; blk.querySelector('.pl').value = p.land_area === null || p.land_area === undefined ? '' : p.land_area; blk.querySelector('.pr').value = p.area === null ? '' : p.area; blk.querySelector('.pd').value = p.detail || '';
+    blk.querySelector('.pj').value = p.jimok || ''; blk.querySelector('.pl').value = p.land_area === null || p.land_area === undefined ? '' : p.land_area; blk.querySelector('.pr').value = p.area === null ? '' : p.area; blk.querySelector('.pd').value = p.detail || ''; blk.querySelector('.po').value = p.owner || '';
   }
   apKindSync(blk); apRenumber();
 }
@@ -634,7 +634,7 @@ async function apSaveForm(){
       landArea = laS === '' ? null : Number(laS.replace(/,/g, ''));
       if (landArea !== null && (isNaN(landArea) || landArea <= 0)) return alert(`물건 ${i + 1}: 대지면적(㎡)은 0보다 큰 숫자로 입력하거나, 모르면 비워두세요.`);
     }
-    props.push({ id: b.dataset.id ? +b.dataset.id : null, seq: i + 1, kind, address: addr, pnu: b.dataset.pnu || null, lat: b.dataset.lat ? Number(b.dataset.lat) : null, lng: b.dataset.lng ? Number(b.dataset.lng) : null, jimok: jimok || null, area, land_area: landArea, detail: b.querySelector('.pd').value.trim() || null });
+    props.push({ id: b.dataset.id ? +b.dataset.id : null, seq: i + 1, kind, address: addr, pnu: b.dataset.pnu || null, lat: b.dataset.lat ? Number(b.dataset.lat) : null, lng: b.dataset.lng ? Number(b.dataset.lng) : null, jimok: jimok || null, area, land_area: landArea, detail: b.querySelector('.pd').value.trim() || null, owner: b.querySelector('.po').value.trim() || null });
   }
   const firms = [...document.querySelectorAll('#apFirmList input:checked')].map(i => +i.value);
   const notify = [...document.querySelectorAll('#apNotifyList input:checked')].map(i => i.value);
@@ -722,7 +722,7 @@ function apReportHtml(c, mapHtml){
   const numPy = (v) => (v === null || v === undefined || v === '') ? '-' : `${n(v)}${apPy(v) ? `<br><span class="m">(${apPy(v)})</span>` : ''}`;   // ㎡ 아래에 평 병기
   const nameOfFirm = (r) => apFirmName(r.firm_id);
   const cmts = apCmts(c);   // 담당자 의견(대출가능액 등)도 보고서에 기재
-  const propRows = props.map((p, i) => `<tr><td class="c nw">${i + 1}</td><td class="c nw">${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? ` <span class="m">(${esc(p.detail)})</span>` : ''}</td><td class="c nw">${esc(p.jimok || '-')}</td>
+  const propRows = props.map((p, i) => `<tr><td class="c nw">${i + 1}</td><td class="c nw">${esc(p.kind)}</td><td>${esc(p.address)}${p.detail ? ` <span class="m">(${esc(p.detail)})</span>` : ''}</td><td class="c nw">${esc(p.owner || '-')}</td><td class="c nw">${esc(p.jimok || '-')}</td>
     <td class="r nw">${p.kind === '건물' ? numPy(p.land_area) : (p.kind === '토지' ? numPy(p.area) : '-')}</td><td class="r nw">${p.kind === '토지' ? '-' : numPy(p.area)}</td></tr>`).join('');
   const many = reqs.length > 4;
   const head = reqs.map((r, i) => `<th class="nw ${i === chosenIdx ? 'sel' : ''}">${esc(nameOfFirm(r))}${i === chosenIdx ? ' ★' : ''}</th>`).join('');
@@ -763,7 +763,7 @@ function apReportHtml(c, mapHtml){
   <tr><td class="k">의뢰자</td><td>${esc(nameOf(c.requester_email))}</td><td class="k">의뢰일</td><td>${esc(c.request_date)}</td></tr>
   ${c.memo ? `<tr><td class="k">메모</td><td colspan="3" style="white-space:pre-wrap">${esc(c.memo)}</td></tr>` : ''}</table>
   <h2>1. 물건 내역 (${props.length}건)</h2>
-  <table class="t"><thead><tr><th class="nw">번호</th><th class="nw">구분</th><th>소재지</th><th class="nw">지목</th><th class="nw">대지·토지(㎡)</th><th class="nw">건물·전용(㎡)</th></tr></thead><tbody>${propRows}</tbody></table>${mapHtml ? `<div class="mapwrap">${mapHtml}<div class="note">▲ 물건 위치도 — 지도의 번호는 위 물건 번호와 같습니다.</div></div>` : ''}
+  <table class="t"><thead><tr><th class="nw">번호</th><th class="nw">구분</th><th>소재지</th><th class="nw">소유자</th><th class="nw">지목</th><th class="nw">대지·토지(㎡)</th><th class="nw">건물·전용(㎡)</th></tr></thead><tbody>${propRows}</tbody></table>${mapHtml ? `<div class="mapwrap">${mapHtml}<div class="note">▲ 물건 위치도 — 지도의 번호는 위 물건 번호와 같습니다.</div></div>` : ''}
   <h2 class="h2u"><span>2. 평가기관별 평가금액</span><span class="unit">(단위: 원)</span></h2>
   ${reqs.length ? `<table class="t price"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td class="b">합계</td>${total}</tr><tr><td class="b nw">가격 수령일</td>${recv}</tr>${hasNote ? `<tr><td class="b nw">특이사항</td>${notes}</tr>` : ''}</tbody></table>${foot ? `<div class="note">${foot}</div>` : ''}` : '<div>의뢰한 평가기관이 없습니다.</div>'}
   ${cmts.length ? `<h2>3. 담당자 의견</h2><table class="t cmt"><thead><tr><th style="width:13%">작성자</th><th style="width:15%">작성일</th><th>의견</th></tr></thead><tbody>${cmts.map(m => `<tr><td class="c nw">${esc(nameOf(m.author_email))}</td><td class="c nw">${esc(new Date(new Date(m.created_at).getTime() + 9 * 3600e3).toISOString().slice(0, 10))}</td><td style="white-space:pre-wrap;word-break:break-word">${esc(m.body)}</td></tr>`).join('')}</tbody></table>` : ''}
@@ -1073,7 +1073,7 @@ function apMapRefresh(){
 }
 function apPopupHtml(c, p, i, n, st){
   return `<b>${esc(c.debtor_name)}</b> <span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span><br>${esc(p.address)}${n > 1 ? ` <span class="muted">(물건 ${n}개 중 ${i + 1}번)</span>` : ''}
-    <br><span class="muted">${esc(p.kind)}${p.jimok ? ` · ${esc(p.jimok)}` : ''}${p.area ? ` · ${apM2Py(p.area)}` : ''}</span>
+    <br><span class="muted">${esc(p.kind)}${p.jimok ? ` · ${esc(p.jimok)}` : ''}${p.area ? ` · ${apM2Py(p.area)}` : ''}${p.owner ? ` · 소유자 ${esc(p.owner)}` : ''}</span>
     <br>${esc(apTypeText(c))} · ${esc(c.request_date)}<br><b>${esc(apCaseMoney(c))}</b> <span class="muted">· ${AP_STATE[st]}</span>
     <br><button class="btn small primary" data-apopen="${c.id}">상세 보기</button>`;
 }

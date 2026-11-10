@@ -772,3 +772,4 @@ create policy po_del on public.perf_orig for delete to authenticated using (is_a
 grant select, insert, update, delete on public.perf_orig to authenticated;
 grant select on public.perf_orig to service_role;
 alter publication supabase_realtime add table public.perf_orig;
+alter table public.appraisal_properties add column if not exists owner text check (owner is null or char_length(owner) <= 60);  -- 감정평가 물건 소유자
