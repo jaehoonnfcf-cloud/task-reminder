@@ -754,3 +754,21 @@ grant select on public.app_updates to authenticated;
 grant select, insert, update on public.app_updates to service_role;
 -- function public.send_app_update(p_id bigint): Supabase 에 적용된 마이그레이션 app_updates_announce 참고
 -- (DB) 연락·방문 이력에 발신/수신(direction), 조치 예정(action_note·action_date·action_done_at) 추가 — Supabase 마이그레이션 debt_logs_direction_action
+
+-- 현황판 신규대출 취급액: perf_orig(주 시작일=월요일, 본점·지점 취급액 백만원) + perf_year 의 연 취급 목표(orig_hq_t, orig_br_t). 조회는 팀원 전체, 입력·수정·삭제는 관리자.
+create table if not exists public.perf_orig (
+  week_start date primary key check (extract(isodow from week_start) = 1),
+  hq bigint not null default 0 check (hq >= 0),
+  br bigint not null default 0 check (br >= 0),
+  memo text check (memo is null or char_length(memo) <= 200),
+  updated_by text, updated_at timestamptz not null default now()
+);
+alter table public.perf_year add column if not exists orig_hq_t bigint check (orig_hq_t is null or orig_hq_t >= 0), add column if not exists orig_br_t bigint check (orig_br_t is null or orig_br_t >= 0);
+alter table public.perf_orig enable row level security;
+create policy po_sel on public.perf_orig for select to authenticated using (is_member());
+create policy po_ins on public.perf_orig for insert to authenticated with check (is_admin());
+create policy po_upd on public.perf_orig for update to authenticated using (is_admin()) with check (is_admin());
+create policy po_del on public.perf_orig for delete to authenticated using (is_admin());
+grant select, insert, update, delete on public.perf_orig to authenticated;
+grant select on public.perf_orig to service_role;
+alter publication supabase_realtime add table public.perf_orig;

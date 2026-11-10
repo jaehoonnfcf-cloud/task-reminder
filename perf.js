@@ -135,6 +135,7 @@ async function loadPerf(){
   ]);
   if (d.error || y.error){ console.warn('실적 불러오기 실패', (d.error || y.error).message); return; }
   if (!lq.error) perfLiq = lq.data || [];
+  if (typeof loadOrig === 'function') await loadOrig();
   perfRows = (d.data || []).sort((a, b) => a.base_date.localeCompare(b.base_date));
   perfYears = Object.fromEntries((y.data || []).map(r => [r.year, r]));
   if (!perfSel || !perfRows.some(r => r.base_date === perfSel)) perfSel = perfRows.length ? perfRows[perfRows.length - 1].base_date : null;
@@ -335,7 +336,8 @@ function renderPerf(){
   const btns = `${adm ? '<button class="btn small primary" data-pf="input">＋ 실적 입력</button><button class="btn small" data-pf="goal">⚙ 목표·전년말</button>' : ''}`;
   if (!c){
     el.innerHTML = `<div class="pfcard"><div class="pfh"><b>📊 여수신 현황</b><span class="sp"></span>${btns}</div>
-      <div class="pfempty">아직 입력된 실적이 없어요.${adm ? '<br>오른쪽 위 “＋ 실적 입력”으로 전 영업일 실적부터 입력해주세요.' : '<br>관리자가 입력하면 여기에 표시돼요.'}</div></div>`;
+      <div class="pfempty">아직 입력된 실적이 없어요.${adm ? '<br>오른쪽 위 “＋ 실적 입력”으로 전 영업일 실적부터 입력해주세요.' : '<br>관리자가 입력하면 여기에 표시돼요.'}</div></div>${typeof pfOrigHtml === 'function' ? pfOrigHtml() : ''}`;
+    if (typeof pfOrigDraw === 'function') pfOrigDraw();
     return;
   }
   const { r, Y, prev } = c, yr = +r.base_date.slice(0, 4);
@@ -361,8 +363,9 @@ function renderPerf(){
       <span class="pfnav"><button data-pf="prev" title="이전 영업일" ${c.i > 0 ? '' : 'disabled'}>◀</button><button data-pf="next" title="다음 영업일" ${c.i < perfRows.length - 1 ? '' : 'disabled'}>▶</button></span>${btns}</div>
     ${pfDashHtml(c, adm)}
     <div class="pfh" style="margin-top:18px"><b style="font-size:15px">상세표</b><span class="m" style="color:var(--muted);font-size:13px">보고용 양식</span><span class="sp"></span><button class="btn small" data-pf="table">${perfTable ? '접기 ▴' : '펼치기 ▾'}</button></div>
-    ${perfTable ? tbl : ''}${note ? `<div class="pfnote">${esc(note)}</div>` : ''}${noGoal}</div>`;
+    ${perfTable ? tbl : ''}${note ? `<div class="pfnote">${esc(note)}</div>` : ''}${noGoal}</div>${typeof pfOrigHtml === 'function' ? pfOrigHtml() : ''}`;
   pfFocusDraw();
+  if (typeof pfOrigDraw === 'function') pfOrigDraw();
 }
 
 // ---------- 실적 입력 (관리자) ----------
@@ -433,6 +436,8 @@ function pfOpenTg(year){
     <div class="pfsub" style="margin-top:14px;font-weight:800;color:#44546f">연 목표 (A)</div>
     <div class="pfform"><div><label>수신 · 본점 (억원)</label><input id="pgDepHq" inputmode="numeric" placeholder="0" /></div><div><label>수신 · 지점 (억원)</label><input id="pgDepBr" inputmode="numeric" placeholder="0" /></div>
       <div><label>여신 · 본점 (억원)</label><input id="pgLoanHq" inputmode="numeric" placeholder="0" /></div><div><label>여신 · 지점 (억원)</label><input id="pgLoanBr" inputmode="numeric" placeholder="0" /></div></div>
+    <div class="pfsub" style="margin-top:12px;font-weight:800;color:#44546f">신규대출 취급 연 목표 (선택)</div>
+    <div class="pfform"><div><label>취급 · 본점 (억원)</label><input id="pgOrigHq" inputmode="numeric" placeholder="0" /></div><div><label>취급 · 지점 (억원)</label><input id="pgOrigBr" inputmode="numeric" placeholder="0" /></div></div>
     <label>연체율 목표 (%)</label><input id="pgDq" inputmode="decimal" placeholder="예: 1.50" style="max-width:200px;text-align:right;font-weight:700" />
     <div class="pfsub" style="margin-top:16px;font-weight:800;color:#44546f">전년말 기준값 (각주·전년말 대비에 사용)</div>
     <div class="pfform"><div><label>전년말 수신 합계 (억원)</label><input id="pgPDep" inputmode="numeric" placeholder="0" /></div><div><label>전년말 여신 합계 (억원)</label><input id="pgPLoan" inputmode="numeric" placeholder="0" /></div></div>
@@ -441,12 +446,12 @@ function pfOpenTg(year){
   $('pgYear').value = y;
   const fill = () => {
     const Y = perfYears[+$('pgYear').value] || {}, c = (n) => pfEn(n);
-    $('pgDepHq').value = c(Y.dep_hq_t); $('pgDepBr').value = c(Y.dep_br_t); $('pgLoanHq').value = c(Y.loan_hq_t); $('pgLoanBr').value = c(Y.loan_br_t);
+    $('pgDepHq').value = c(Y.dep_hq_t); $('pgDepBr').value = c(Y.dep_br_t); $('pgLoanHq').value = c(Y.loan_hq_t); $('pgLoanBr').value = c(Y.loan_br_t); $('pgOrigHq').value = c(Y.orig_hq_t); $('pgOrigBr').value = c(Y.orig_br_t);
     $('pgDq').value = Y.delinq_t === null || Y.delinq_t === undefined ? '' : Number(Y.delinq_t).toFixed(2);
     $('pgPDep').value = c(Y.prev_dep); $('pgPLoan').value = c(Y.prev_loan); $('pgPDq').value = Y.prev_delinq === null || Y.prev_delinq === undefined ? '' : Number(Y.prev_delinq).toFixed(2);
   };
   fill(); $('pgYear').onchange = fill;
-  ['pgDepHq', 'pgDepBr', 'pgLoanHq', 'pgLoanBr', 'pgPDep', 'pgPLoan'].forEach(id => { $(id).oninput = () => { $(id).value = pfEfmt($(id).value); }; });
+  ['pgDepHq', 'pgDepBr', 'pgLoanHq', 'pgLoanBr', 'pgOrigHq', 'pgOrigBr', 'pgPDep', 'pgPLoan'].forEach(id => { $(id).oninput = () => { $(id).value = pfEfmt($(id).value); }; });
   $('pfOvTg').style.display = 'block'; document.body.style.overflow = 'hidden';
 }
 function pfCloseTg(){ $('pfOvTg').style.display = 'none'; document.body.style.overflow = ''; }
@@ -455,7 +460,7 @@ $('pfTgPanel').addEventListener('click', async (ev) => {
   if (b.dataset.g === 'close') return pfCloseTg();
   const year = +$('pgYear').value;
   if (!year || year < 2000 || year > 2100) return alert('연도를 확인해주세요.');
-  const row = { year, dep_hq_t: pfEin($('pgDepHq').value), dep_br_t: pfEin($('pgDepBr').value), loan_hq_t: pfEin($('pgLoanHq').value), loan_br_t: pfEin($('pgLoanBr').value), delinq_t: pfDec($('pgDq').value),
+  const row = { year, dep_hq_t: pfEin($('pgDepHq').value), dep_br_t: pfEin($('pgDepBr').value), loan_hq_t: pfEin($('pgLoanHq').value), loan_br_t: pfEin($('pgLoanBr').value), orig_hq_t: pfEin($('pgOrigHq').value), orig_br_t: pfEin($('pgOrigBr').value), delinq_t: pfDec($('pgDq').value),
     prev_dep: pfEin($('pgPDep').value), prev_loan: pfEin($('pgPLoan').value), prev_delinq: pfDec($('pgPDq').value), updated_by: me, updated_at: new Date().toISOString() };
   b.disabled = true;
   const { error } = await sb.from('perf_year').upsert(row, { onConflict: 'year' });
@@ -512,4 +517,4 @@ $('pfLqPanel').addEventListener('click', async (ev) => {
 });
 
 let pfRsT = null;
-window.addEventListener('resize', () => { clearTimeout(pfRsT); pfRsT = setTimeout(() => { if (typeof divn !== 'undefined' && divn === 'home' && document.getElementById('pfFocus')) pfFocusDraw(); }, 150); });
+window.addEventListener('resize', () => { clearTimeout(pfRsT); pfRsT = setTimeout(() => { if (typeof divn !== 'undefined' && divn === 'home' && document.getElementById('pfFocus')) pfFocusDraw(); if (typeof pfOrigDraw === 'function' && document.getElementById('pfoChart')) pfOrigDraw(); }, 150); });
