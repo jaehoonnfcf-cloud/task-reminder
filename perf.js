@@ -89,7 +89,7 @@ function pfPrevBizDay(from = kstToday()){
   .pfs-sep{ height:10px; } .pfem{ font-style:normal; color:var(--muted); font-size:12px; margin-left:4px; font-weight:600; }
   .pfbr2{ margin-top:12px; } .pfbt2{ display:flex; justify-content:space-between; gap:8px; font-size:13px; } .pfbt2 em{ font-style:normal; color:var(--muted); font-size:12px; } .pfbar2{ height:6px; border-radius:99px; margin-top:6px; overflow:hidden; } .pfbar2 i{ display:block; height:100%; border-radius:99px; }
   @media (max-width:1100px){ .pfd-tiles{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
-  @media (max-width:760px){ .pft-h{ flex-wrap:wrap; row-gap:6px; } .pft-s{ margin-left:0; } .pft{ padding:14px 14px 10px; } .pft-v{ font-size:27px; } .pft-s{ font-size:11px; padding:2px 7px; } .pfd-main{ padding:14px 12px 12px; } }
+  @media (max-width:760px){ .pft-h{ display:grid; grid-template-columns:auto 1fr; align-items:center; gap:6px 8px; } .pft-s{ margin-left:0; grid-column:1 / -1; justify-self:start; } .pft-d{ flex-direction:column; gap:2px; } .pft-d > span{ white-space:nowrap; } .pft{ padding:14px 14px 10px; } .pft-v{ font-size:27px; } .pft-s{ font-size:11px; padding:2px 7px; } .pfd-main{ padding:14px 12px 12px; } }
   .pfbar{ height:10px; background:#fff; border-radius:99px; margin-top:10px; overflow:hidden; } .pfbar i{ display:block; height:100%; border-radius:99px; }
   .pfrow{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:#5a6172; margin-top:6px; font-weight:600; } .pfrow b{ color:var(--ink); }
   .pfrow .gd{ color:var(--green); font-weight:800; } .pfrow .bd{ color:#e5484d; font-weight:800; } .pfrow .tg{ color:var(--accent); font-weight:800; } .pfrow .fl{ color:var(--muted); font-weight:700; }
