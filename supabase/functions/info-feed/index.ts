@@ -22,7 +22,7 @@ const QUOTES = [
   { sym: "^IXIC", name: "나스닥", dec: 2 },
   { sym: "^TNX", name: "미국채 10년", dec: 3, suffix: "%" },
   { sym: "CL=F", name: "WTI 유가", dec: 2, prefix: "$" },
-  { sym: "GC=F", name: "금", dec: 1, prefix: "$" },
+  { sym: "GC=F", name: "금 (1돈)", dec: 0, prefix: "₩", don: true },   // 국제 금 시세($/트로이온스) × 달러/원 환율 → 원화 1돈(3.75g) 환산
   { sym: "BTC-KRW", name: "BTC", dec: 0, prefix: "₩", alt: "BTC-USD" },   // 원화 시세, 안 되면 달러 시세 × 달러/원 환율로 계산
   { sym: "ETH-KRW", name: "ETH", dec: 0, prefix: "₩", alt: "ETH-USD" },
 ];
@@ -85,7 +85,10 @@ async function yahoo(sym: string) {
 async function getQuotes() {
   const res = await Promise.allSettled(QUOTES.map(async (q) => {
     const k = q.mult ?? 1;
-    let { price, prev } = await yahoo(q.sym).catch(async (e) => {
+    let { price, prev } = q.don ? await (async () => {   // 금: 달러/트로이온스 → 원/1돈 (1트로이온스 = 31.1035g, 1돈 = 3.75g)
+      const [u, w] = await Promise.all([yahoo(q.sym), yahoo("KRW=X")]); const f = 3.75 / 31.1035;
+      return { price: u.price * w.price * f, prev: u.prev * w.prev * f };
+    })() : await yahoo(q.sym).catch(async (e) => {
       if (!q.alt) throw e;
       const [u, w] = await Promise.all([yahoo(q.alt), yahoo("KRW=X")]);   // 달러 시세 × 환율
       return { price: u.price * w.price, prev: u.prev * w.prev };
