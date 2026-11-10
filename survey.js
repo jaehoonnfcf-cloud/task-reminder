@@ -333,6 +333,18 @@ function svRoute(items){   // 중심에서 가장 먼 곳에서 출발해 가까
   return out.concat(items.filter(r => r.lat == null));
 }
 function svDiam(items){ let m = 0; for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) m = Math.max(m, svKm(items[i], items[j])); return m; }
+// 군집 간 거리 = 두 군집에서 가장 먼 쌍의 거리(완전연결). D = n×n 거리표(km)
+function svClusterMatrix(n, D, maxKm, maxN){
+  const cl = Array.from({ length: n }, (_, i) => ({ m: [i], alive: true })), CD = D.map(r => Float32Array.from(r));
+  for (;;){
+    let bi = -1, bj = -1, bd = Infinity;
+    for (let i = 0; i < n; i++){ if (!cl[i].alive) continue; for (let j = i + 1; j < n; j++){ if (!cl[j].alive || cl[i].m.length + cl[j].m.length > maxN) continue; const d = CD[i][j]; if (d < bd && d <= maxKm){ bd = d; bi = i; bj = j; } } }
+    if (bi < 0) break;
+    cl[bi].m = cl[bi].m.concat(cl[bj].m); cl[bj].alive = false;
+    for (let k = 0; k < n; k++) if (k !== bi && cl[k].alive){ const d = Math.max(CD[bi][k], CD[bj][k]); CD[bi][k] = CD[k][bi] = d; }
+  }
+  return cl.filter(c => c.alive).map(c => c.m);
+}
 function svCluster(pts, maxKm, maxN){
   const n = pts.length; if (!n) return [];
   if (n > 700){   // 매우 많을 땐 격자 방식으로 단순 분할
@@ -341,21 +353,59 @@ function svCluster(pts, maxKm, maxN){
     return [...g.values()].flatMap(a => { const o = []; for (let i = 0; i < a.length; i += maxN) o.push(a.slice(i, i + maxN)); return o; });
   }
   const D = Array.from({ length: n }, () => new Float32Array(n)); for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) D[i][j] = D[j][i] = svKm(pts[i], pts[j]);
-  const cl = pts.map((_, i) => ({ m: [i], alive: true })), CD = D;   // 군집 간 거리 = 두 군집에서 가장 먼 쌍의 거리
-  for (;;){
-    let bi = -1, bj = -1, bd = Infinity;
-    for (let i = 0; i < n; i++){ if (!cl[i].alive) continue; for (let j = i + 1; j < n; j++){ if (!cl[j].alive || cl[i].m.length + cl[j].m.length > maxN) continue; const d = CD[i][j]; if (d < bd && d <= maxKm){ bd = d; bi = i; bj = j; } } }
-    if (bi < 0) break;
-    cl[bi].m = cl[bi].m.concat(cl[bj].m); cl[bj].alive = false;
-    for (let k = 0; k < n; k++) if (k !== bi && cl[k].alive){ const d = Math.max(CD[bi][k], CD[bj][k]); CD[bi][k] = CD[k][bi] = d; }
+  return svClusterMatrix(n, D, maxKm, maxN).map(m => m.map(i => pts[i]));
+}
+// ── 도로(차량 이동) 기준 ─────────────────────────────────────────────
+// 도로 거리는 직선거리보다 항상 길거나 같다 → 직선으로 maxKm 보다 멀면 같은 묶음이 될 수 없다. 그래서 먼저 직선거리로 '연결 덩어리'를 나눈 뒤, 덩어리마다 도로 이동거리표를 받아서 묶는다.
+// 도로 정보: OSRM 공개 서버(OpenStreetMap 도로망, 사업장 좌표만 전송). 불러오지 못하면 직선거리 기준으로 대신한다.
+const SV_OSRM = 'https://router.project-osrm.org', svMatrixCache = new Map();
+async function svFetchJson(url, ms = 12000){
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
+  try { const r = await fetch(url, { signal: ctl.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); } finally { clearTimeout(t); }
+}
+const svCoords = (pts) => pts.map(p => `${Number(p.lng).toFixed(5)},${Number(p.lat).toFixed(5)}`).join(';');
+async function svRoadMatrix(pts){   // → { dist: 미터 n×n, dur: 초 n×n }
+  const key = svCoords(pts); if (svMatrixCache.has(key)) return svMatrixCache.get(key);
+  const j = await svFetchJson(`${SV_OSRM}/table/v1/driving/${key}?annotations=duration,distance`);
+  if (j.code !== 'Ok' || !j.durations || !j.distances) throw new Error('도로 정보 없음');
+  const m = { dist: j.distances, dur: j.durations }; svMatrixCache.set(key, m); return m;
+}
+async function svRoadRoute(items){   // 방문 순서대로 실제 도로를 따라가는 선과 총 이동거리·시간
+  const j = await svFetchJson(`${SV_OSRM}/route/v1/driving/${svCoords(items)}?overview=full&geometries=geojson&steps=false`);
+  const r = j.code === 'Ok' && j.routes && j.routes[0]; if (!r) throw new Error('경로 없음');
+  return { path: r.geometry.coordinates.map(([x, y]) => [y, x]), km: r.distance / 1000, min: r.duration / 60 };
+}
+function svComponents(pts, maxKm){   // 직선거리 maxKm 이내로 이어지는 점들의 덩어리
+  const n = pts.length, par = Array.from({ length: n }, (_, i) => i), find = (x) => { while (par[x] !== x){ par[x] = par[par[x]]; x = par[x]; } return x; };
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (svKm(pts[i], pts[j]) <= maxKm) par[find(i)] = find(j);
+  const g = new Map(); pts.forEach((p, i) => { const r = find(i); (g.get(r) || g.set(r, []).get(r)).push(p); });
+  return [...g.values()];
+}
+// 방문 순서: 도로 이동시간 합이 가장 짧은 열린 경로 (모든 시작점에서 가까운 곳 잇기 + 2-opt 개선)
+function svRoadOrder(idx, T){
+  const n = idx.length; if (n <= 2) return idx.slice();
+  const cost = (a, b) => T[a][b], len = (p) => { let s = 0; for (let i = 0; i < p.length - 1; i++) s += cost(p[i], p[i + 1]); return s; };
+  let best = null, bl = Infinity;
+  for (const st of idx){
+    const left = new Set(idx); left.delete(st); const p = [st];
+    while (left.size){ const c = p[p.length - 1]; let nb = null, nd = Infinity; for (const x of left){ const d = cost(c, x); if (d < nd){ nd = d; nb = x; } } p.push(nb); left.delete(nb); }
+    for (let imp = true, it = 0; imp && it < 50; it++){
+      imp = false;
+      for (let i = 0; i < n - 1; i++) for (let j = i + 1; j < n; j++){
+        const a = i > 0 ? p[i - 1] : null, b = p[i], c = p[j], d = j < n - 1 ? p[j + 1] : null;
+        const before = (a !== null ? cost(a, b) : 0) + (d !== null ? cost(c, d) : 0), after = (a !== null ? cost(a, c) : 0) + (d !== null ? cost(b, d) : 0);
+        if (after < before - 1e-9){ const seg = p.slice(i, j + 1).reverse(); p.splice(i, j - i + 1, ...seg); imp = true; }
+      }
+    }
+    const l = len(p); if (l < bl){ bl = l; best = p; }
   }
-  return cl.filter(c => c.alive).map(c => c.m.map(i => pts[i]));
+  return best;
 }
 // 묶음의 점 = 현장 하나. 대출 정보는 대출건 것을 그대로 쓰고(잔액은 묶음 안에서 한 번만 합산), k/n = 그 대출건의 몇 번째 현장인지
 const svPoints = (cases) => cases.flatMap(c => svSites(c).map((s, k) => ({ ...c, address: s.address, lat: s.lat, lng: s.lng, geo_status: s.geo_status, siteId: s.id, k: k + 1, n: svSites(c).length })));
 const svFirstOf = (items) => { const seen = new Set(); return items.map(r => { const f = !seen.has(r.id); seen.add(r.id); return f; }); };   // 같은 대출건의 첫 현장만 true
 const svSiteTag = (r) => r.n > 1 ? `현장 ${r.k}/${r.n}` : '';
-function svBuildGroups(targets, maxKm, maxN, byAsg){
+function svBuildGroupsLine(targets, maxKm, maxN, byAsg){
   const parts = byAsg ? [...new Set(targets.map(r => svAsgName(r) || '(담당자 없음)'))].map(a => ({ a, rows: targets.filter(r => (svAsgName(r) || '(담당자 없음)') === a) })) : [{ a: '', rows: targets }];
   const groups = [];
   parts.forEach(p => {
@@ -364,9 +414,53 @@ function svBuildGroups(targets, maxKm, maxN, byAsg){
     const byArea = new Map(); nog.forEach(r => { const a = svArea(r.address), k = `${a.sgg}|${a.emd}`; (byArea.get(k) || byArea.set(k, []).get(k)).push(r); });
     [...byArea.values()].forEach(a => { for (let i = 0; i < a.length; i += maxN) groups.push({ unk: true, asg: p.a, items: a.slice(i, i + maxN) }); });
   });
-  groups.forEach(g => { g.name = svName(g.items); g.loans = new Set(g.items.map(r => r.id)).size; g.sum = g.items.reduce((s, r, i, a) => s + (a.findIndex(x => x.id === r.id) === i ? Number(r.balance || 0) : 0), 0); g.diam = g.unk ? null : svDiam(g.items); });
+  return svDecorate(groups);
+}
+const svDecorate = (groups) => {
+  groups.forEach(g => { g.name = svName(g.items); g.loans = new Set(g.items.map(r => r.id)).size; g.sum = g.items.reduce((s, r, i, a) => s + (a.findIndex(x => x.id === r.id) === i ? Number(r.balance || 0) : 0), 0); if (g.diam === undefined || g.diam === null) g.diam = g.unk ? null : svDiam(g.items); });
   groups.sort((a, b) => a.unk - b.unk || b.items.length - a.items.length || b.sum - a.sum);
   return groups;
+};
+// 차량 이동(도로) 기준 묶음. 반환 { list, road: 도로 기준으로 만들어졌는지, failed: 도로 정보를 못 받은 덩어리 수 }
+async function svBuildGroups(targets, maxKm, maxN, byAsg, useRoad, onProg){
+  if (!useRoad) return { list: svBuildGroupsLine(targets, maxKm, maxN, byAsg), road: false, failed: 0 };
+  const parts = byAsg ? [...new Set(targets.map(r => svAsgName(r) || '(담당자 없음)'))].map(a => ({ a, rows: targets.filter(r => (svAsgName(r) || '(담당자 없음)') === a) })) : [{ a: '', rows: targets }];
+  const groups = []; let roadOk = true, failed = 0, calls = 0;
+  for (const p of parts){
+    const geo = p.rows.filter(r => r.lat != null && r.lng != null), nog = p.rows.filter(r => r.lat == null || r.lng == null);
+    for (const comp of svComponents(geo, maxKm)){
+      const pieces = comp.length > 90 ? svCluster(comp, maxKm, 90) : [comp];
+      for (const piece of pieces){
+        if (piece.length === 1){ groups.push({ unk: false, asg: p.a, items: piece, road: true }); continue; }
+        let M = null;
+        if (roadOk){ try { if (calls++) await new Promise(r => setTimeout(r, 200)); if (onProg) onProg(`도로 정보를 불러오는 중… (${calls})`); M = await svRoadMatrix(piece); } catch (e) { roadOk = false; } }
+        if (!M){ failed++; svCluster(piece, maxKm, maxN).forEach(m => groups.push({ unk: false, asg: p.a, items: svRoute(m), road: false })); continue; }
+        const n = piece.length, val = (v) => (v === null || v === undefined || !isFinite(v)) ? 1e9 : v;
+        const Dk = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => i === j ? 0 : (val(M.dist[i][j]) + val(M.dist[j][i])) / 2000));   // 오가는 길 평균, km
+        const Ts = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => i === j ? 0 : (val(M.dur[i][j]) + val(M.dur[j][i])) / 2));   // 초
+        svClusterMatrix(n, Dk, maxKm, maxN).forEach(ids => {
+          const ord = svRoadOrder(ids, Ts); let km = 0, min = 0, diam = 0;
+          for (let i = 0; i < ord.length - 1; i++){ km += val(M.dist[ord[i]][ord[i + 1]]) / 1000; min += val(M.dur[ord[i]][ord[i + 1]]) / 60; }
+          for (const a of ids) for (const b of ids) if (a < b) diam = Math.max(diam, Dk[a][b]);
+          groups.push({ unk: false, asg: p.a, items: ord.map(i => piece[i]), road: true, km, min, diam });
+        });
+      }
+    }
+    const byArea = new Map(); nog.forEach(r => { const a = svArea(r.address), k = `${a.sgg}|${a.emd}`; (byArea.get(k) || byArea.set(k, []).get(k)).push(r); });
+    [...byArea.values()].forEach(a => { for (let i = 0; i < a.length; i += maxN) groups.push({ unk: true, asg: p.a, items: a.slice(i, i + maxN) }); });
+  }
+  svDecorate(groups);
+  // 방문 순서대로 실제 도로를 따라가는 선 (지도·인쇄물에 그림). 실패하면 직선 점선으로 대신
+  const need = groups.filter(g => g.road && g.items.length > 1 && !g.unk);
+  let done = 0; const q = need.slice();
+  await Promise.all(Array.from({ length: Math.min(3, q.length) }, async () => {
+    while (q.length){
+      const g = q.shift();
+      try { const r = await svRoadRoute(g.items); g.path = r.path; g.km = r.km; g.min = r.min; } catch (e) { /* 직선으로 표시 */ }
+      if (onProg) onProg(`동선(도로)을 그리는 중… ${++done}/${need.length}`);
+    }
+  }));
+  return { list: groups, road: groups.some(g => g.road), failed };
 }
 async function svGeocode(addr){
   const q = String(addr || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim(); if (!q) return null;
@@ -382,13 +476,14 @@ async function svGeocode(addr){
 }
 function svOpenGroup(){
   if (!svTargets().length) return alert(svCondText() === '전체' ? '미완료 조사 대상이 없어요.' : `선택한 조건(${svCondText()})에 맞는 미완료 조사 대상이 없어요.`);
-  let p = { km: 5, n: 8, asg: false }; try { p = { ...p, ...JSON.parse(localStorage.getItem('svGp') || '{}') }; } catch (e) {}
+  let p = { km: 5, n: 8, asg: false, road: true }; try { p = { ...p, ...JSON.parse(localStorage.getItem('svGp') || '{}') }; } catch (e) {}
   $('svGpPanel').innerHTML = `<div class="ph"><h2>📍 현장 조사 묶음 추천</h2><button class="x" data-g="close">✕</button></div>
-    <div class="muted" style="font-size:13.5px;line-height:1.6;margin-top:6px">미완료 조사 대상의 사업장 주소를 지도 좌표로 바꿔서, <b>가까운 곳끼리</b> 한 묶음으로 만들어요. 묶음마다 방문 순서(가까운 곳으로 이어가는 길)도 같이 보여줘요.</div>
+    <div class="muted" style="font-size:13.5px;line-height:1.6;margin-top:6px">미완료 조사 대상의 사업장 주소를 지도 좌표로 바꿔서, <b>가까운 곳끼리</b> 한 묶음으로 만들어요. <b>🚗 차량 이동(도로) 기준</b>으로 묶으면 지도상 가까워도 길이 돌아가는 곳(강·산 건너편 등)은 갈라지고, 묶음마다 <b>도로를 따라가는 방문 순서</b>와 이동거리·시간도 같이 보여줘요.</div>
     <div class="dbsum" style="margin-top:10px;border-radius:12px;background:var(--field);border:0"><span>대상 <b>${esc(svCondText())}</b> · 미완료 대출 <b>${svTargets().length}건</b> (현장 ${svTargets().reduce((s, r) => s + svSites(r).length, 0)}곳)</span><span class="muted">목록 화면에서 사업구분·담당자를 고르면 그 대상만 묶어요</span></div>
     <div class="dbline" style="margin-top:12px"><label style="margin:0">묶음 크기(가장 먼 두 곳 사이)</label><select id="svgKm">${[2, 3, 5, 8, 12, 20].map(k => `<option value="${k}" ${k === p.km ? 'selected' : ''}>${k}km 이내</option>`).join('')}</select>
       <label style="margin:0">최대</label><select id="svgN">${[4, 6, 8, 10, 15, 20].map(k => `<option value="${k}" ${k === p.n ? 'selected' : ''}>${k}곳</option>`).join('')}</select>
-      <label class="chk" style="margin:0"><input type="checkbox" id="svgAsg" ${p.asg ? 'checked' : ''} /> 담당자별로 따로</label></div>
+      <label class="chk" style="margin:0"><input type="checkbox" id="svgAsg" ${p.asg ? 'checked' : ''} /> 담당자별로 따로</label>
+      <label class="chk" style="margin:0" title="OpenStreetMap 도로망(공개 서버)으로 차량 이동거리·시간을 계산해요. 사업장 좌표만 전송돼요."><input type="checkbox" id="svgRoad" ${p.road !== false ? 'checked' : ''} /> 🚗 도로(차량 이동) 기준으로 묶기</label></div>
     <div class="dbline" style="margin-top:10px">${debtCan() ? '<button class="btn" data-g="geo" id="svgGeoBtn"></button>' : ''}<button class="btn primary" data-g="make">🧭 묶음 만들기</button><span class="muted" id="svgMsg" style="font-size:13px"></span></div>
     <div id="svgOut"></div>`;
   svGeoLabel(); svGroups = null; svShowOv('svGpOv');
@@ -405,8 +500,13 @@ $('svGpPanel').addEventListener('click', async (ev) => {
   if (a === 'close') return svCloseOv('svGpOv');
   if (a === 'geo') return svRunGeo(b.dataset.retry === '1');
   if (a === 'make'){
-    const km = +$('svgKm').value, n = +$('svgN').value, asg = $('svgAsg').checked; try { localStorage.setItem('svGp', JSON.stringify({ km, n, asg })); } catch (e) {}
-    const targets = svPoints(svTargets()); svGroups = { list: svBuildGroups(targets, km, n, asg), km, n, cond: svCondText() };
+    if (svBusy) return;
+    const km = +$('svgKm').value, n = +$('svgN').value, asg = $('svgAsg').checked, road = $('svgRoad').checked; try { localStorage.setItem('svGp', JSON.stringify({ km, n, asg, road })); } catch (e) {}
+    const targets = svPoints(svTargets()), msg = $('svgMsg'); svBusy = true; b.disabled = true; if (msg) msg.textContent = road ? '🚗 도로 정보를 불러오는 중…' : '묶는 중…';
+    try {
+      const r = await svBuildGroups(targets, km, n, asg, road, (t) => { if (msg) msg.textContent = '🚗 ' + t; });
+      svGroups = { list: r.list, km, n, cond: svCondText(), road: r.road, wantRoad: road, failed: r.failed };
+    } finally { svBusy = false; b.disabled = false; if (msg) msg.textContent = ''; }
     return svShowGroups();
   }
   if (a === 'mt'){ svMapType = b.dataset.t === 'sat' ? 'sat' : 'base'; try { localStorage.setItem('svMapType', svMapType); } catch (e) {} document.querySelectorAll('#svMapSeg button').forEach(x => x.classList.toggle('on', x.dataset.t === svMapType)); return svMapDraw(); }
@@ -463,12 +563,13 @@ async function svMapDraw(){
   svGroups.list.forEach((g, gi) => {
     const pts = g.items.filter(r => r.lat != null && r.lng != null); if (!pts.length) return;
     const col = svColor(gi), layer = L.layerGroup().addTo(svMap), ll = pts.map(r => [r.lat, r.lng]);
-    if (pts.length > 1) L.polyline(ll, { color: col, weight: 3, opacity: .75, dashArray: '6 6' }).addTo(layer);
+    if (g.path && g.path.length > 1) L.polyline(g.path, { color: col, weight: 4.5, opacity: .85 }).addTo(layer);   // 실제 도로를 따라가는 동선
+    else if (pts.length > 1) L.polyline(ll, { color: col, weight: 3, opacity: .75, dashArray: '6 6' }).addTo(layer);
     pts.forEach((r, k) => {
       const icon = L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: `<div style="width:30px;height:30px;border-radius:50%;background:${col};color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)">${gi + 1}</div>` });
       L.marker([r.lat, r.lng], { icon }).bindPopup(`<b>${gi + 1}번 묶음 · ${k + 1}번째</b>${svSiteTag(r) ? ' · ' + svSiteTag(r) : ''}<br>${esc(r.name)} ${r.balance !== null ? '· ' + svComma(r.balance) + '원' : ''}<br><span style="color:#667">${esc(r.address)}</span>`).addTo(layer);
     });
-    svMapGroups[gi] = L.latLngBounds(ll); all.push(...ll);
+    const bb = g.path && g.path.length > 1 ? ll.concat(g.path) : ll; svMapGroups[gi] = L.latLngBounds(bb); all.push(...bb);
   });
   if (all.length) svMap.fitBounds(L.latLngBounds(all).pad(0.15), { maxZoom: 15 });
   setTimeout(() => svMap && svMap.invalidateSize(), 150);
@@ -481,12 +582,13 @@ function svMapFocus(gi){
 function svShowGroups(){
   const gs = svGroups.list, tot = gs.reduce((s, g) => s + g.items.length, 0), loanN = new Set(gs.flatMap(g => g.items.map(r => r.id))).size, unk = gs.filter(g => g.unk).reduce((s, g) => s + g.items.length, 0), today = kstToday();
   const need = svTargets().flatMap(svSites).filter(r => r.lat == null && r.geo_status !== 'fail').length;
-  $('svgOut').innerHTML = `<div class="dbsum" style="margin-top:12px;border-radius:12px;background:var(--field)"><span><b>${gs.length}개 묶음</b> · 현장 ${tot}곳 (대출 ${loanN}건)</span><span>묶음당 평균 ${(tot / Math.max(1, gs.length)).toFixed(1)}곳</span>${unk ? `<span class="o">위치 미확인 ${unk}곳 (주소 기준으로 묶음)</span>` : ''}${need ? `<span class="r">위치 확인 안 한 건 ${need}곳 — ${debtCan() ? '먼저 “위치 확인”을 눌러주세요' : '권한자가 위치 확인을 하면 지도에 나와요'}</span>` : ''}<span style="flex:1"></span><button class="btn small" data-g="print">🖨 전체 인쇄</button></div>
+  const roadNote = svGroups.wantRoad ? (svGroups.road && !svGroups.failed ? '<div class="dbsum" style="margin-top:12px;border-radius:12px;background:#eaf7ee;color:#256c3a"><span>🚗 차량 이동(도로) 기준으로 묶었어요 · 묶음 크기 = 도로로 가장 먼 두 곳 사이</span></div>' : '<div class="dbsum" style="margin-top:12px;border-radius:12px;background:#fff3c4;color:#7a5200"><span>⚠ 도로 정보를 불러오지 못해 ' + (svGroups.road ? '일부를' : '전부를') + ' <b>지도상 직선거리</b>로 묶었어요. 잠시 후 다시 “묶음 만들기”를 눌러보세요.</span></div>') : '';
+  $('svgOut').innerHTML = `${roadNote}<div class="dbsum" style="margin-top:12px;border-radius:12px;background:var(--field)"><span><b>${gs.length}개 묶음</b> · 현장 ${tot}곳 (대출 ${loanN}건)</span><span>묶음당 평균 ${(tot / Math.max(1, gs.length)).toFixed(1)}곳</span>${unk ? `<span class="o">위치 미확인 ${unk}곳 (주소 기준으로 묶음)</span>` : ''}${need ? `<span class="r">위치 확인 안 한 건 ${need}곳 — ${debtCan() ? '먼저 “위치 확인”을 눌러주세요' : '권한자가 위치 확인을 하면 지도에 나와요'}</span>` : ''}<span style="flex:1"></span><button class="btn small" data-g="print">🖨 전체 인쇄</button></div>
     <div class="seg" id="svMapSeg" style="margin-top:12px"><button data-g="mt" data-t="base" class="${svMapType === 'base' ? 'on' : ''}">🗺 일반지도</button><button data-g="mt" data-t="sat" class="${svMapType === 'sat' ? 'on' : ''}">🛰 항공지도</button><span class="muted" style="align-self:center;margin-left:8px;font-size:12.5px">고른 지도로 보고서도 인쇄돼요</span></div>
     <div id="svMapEl" class="svmap" style="margin-top:8px"><div class="muted" style="padding:14px">지도를 불러오는 중…</div></div>
-    <div class="muted" style="font-size:12.5px;margin-top:6px">원 안의 숫자 = 묶음 번호, 점선 = 추천 방문 순서. 묶음의 “🗺 지도에서 보기”를 누르면 그 묶음으로 확대돼요.${gs.some(g => g.unk) ? ' (위치 미확인 묶음은 지도에 나오지 않아요)' : ''}</div>
+    <div class="muted" style="font-size:12.5px;margin-top:6px">원 안의 숫자 = 묶음 번호, 선 = 추천 방문 순서(도로 기준이면 실제 도로를 따라가요). 묶음의 “🗺 지도에서 보기”를 누르면 그 묶음으로 확대돼요.${gs.some(g => g.unk) ? ' (위치 미확인 묶음은 지도에 나오지 않아요)' : ''}</div>
     ${gs.map((g, i) => `<div class="svgrp ${g.unk ? 'unk' : ''}"><div class="gh"><span class="gn" style="background:${g.unk ? '#9aa3b2' : svColor(i)}">${i + 1}</span><b>${esc(g.name)}</b><span class="muted">${g.items.length}곳${g.loans !== g.items.length ? ` · 대출 ${g.loans}건` : ''}</span><span style="flex:1"></span>${g.unk ? '' : `<button class="btn small" data-g="focus" data-i="${i}">🗺 지도에서 보기</button>`}<button class="btn small" data-g="print" data-i="${i}">🖨 인쇄</button></div>
-      <div class="gm">대출잔액 ${esc(dbWon(g.sum))}${g.diam !== null && g.items.length > 1 ? ` · 가장 먼 두 곳 약 ${g.diam.toFixed(1)}km` : ''}${g.unk ? ' · 좌표 없음(주소 기준)' : ''}${g.asg ? ` · 담당 ${esc(g.asg)}` : ''}</div>
+      <div class="gm">대출잔액 ${esc(dbWon(g.sum))}${g.road && g.items.length > 1 ? ` · <b>🚗 이동 약 ${g.km.toFixed(1)}km · ${Math.max(1, Math.round(g.min))}분</b> <span class="muted">(방문 순서대로, 도로 기준)</span> · 가장 먼 두 곳 도로 약 ${g.diam.toFixed(1)}km` : g.diam !== null && g.items.length > 1 ? ` · 가장 먼 두 곳 직선 약 ${g.diam.toFixed(1)}km` : ''}${g.unk ? ' · 좌표 없음(주소 기준)' : ''}${g.asg ? ` · 담당 ${esc(g.asg)}` : ''}</div>
       <ol>${(() => { const fs = svFirstOf(g.items); return g.items.map((r, ix) => `<li><b>${esc(r.name)}</b> <small>${esc(r.biz_type || '')}${svSiteTag(r) ? ' · ' + svSiteTag(r) : ''}${r.balance !== null ? (fs[ix] ? ' · ' + svComma(r.balance) + '원' : ' · (잔액 위와 같은 대출건)') : ''}${!g.asg && svAsgName(r) ? ' · ' + esc(svAsgName(r)) : ''}</small><br><small>${esc(r.address)}</small></li>`).join(''); })()}</ol>
       <div class="dbline" style="margin:8px 0 0 34px"><span class="muted" style="font-size:13px">이 묶음을 같이 조사했다면</span><input type="date" id="svgDate${i}" value="${today}" /><button class="btn small primary" data-g="finish" data-i="${i}">✅ 조사일 입력·완료</button></div></div>`).join('')}`;
   if (!debtCan()) document.querySelectorAll('#svgOut .dbline').forEach(x => { if (x.querySelector('[data-g=finish]')) x.remove(); });
@@ -498,7 +600,8 @@ const svLoadImg = (src) => new Promise((res) => { const im = new Image(); im.cro
 async function svMapImage(sets, W = 1400, H = 560, type = 'base'){   // sets: [{ items, color, label: (k, item) => text }]
   const pts = sets.flatMap(g => g.items.filter(r => r.lat != null && r.lng != null)); if (!pts.length) return null;
   const mx = (lng, z) => (lng + 180) / 360 * 2 ** z * 256, my = (lat, z) => (1 - Math.log(Math.tan(svRad(lat)) + 1 / Math.cos(svRad(lat))) / Math.PI) / 2 * 2 ** z * 256;
-  const la = pts.map(r => r.lat), lo = pts.map(r => r.lng), pad = 90;
+  const ext = sets.flatMap(g => (g.path || []).map(([la0, ln0]) => ({ lat: la0, lng: ln0 }))), bp = pts.concat(ext);
+  const la = bp.map(r => r.lat), lo = bp.map(r => r.lng), pad = 90;
   let z = 17; for (; z > 8; z--){ const w = mx(Math.max(...lo), z) - mx(Math.min(...lo), z), h = my(Math.min(...la), z) - my(Math.max(...la), z); if (w <= (W - pad * 2) / 2 && h <= (H - pad * 2) / 2) break; }
   const cx = mx((Math.min(...lo) + Math.max(...lo)) / 2, z), cy = my((Math.min(...la) + Math.max(...la)) / 2, z), S = 2;   // 타일 1장 = 512px (선명하게)
   const ox = cx * S - W / 2, oy = cy * S - H / 2, tx0 = Math.floor(ox / (256 * S)), tx1 = Math.floor((ox + W) / (256 * S)), ty0 = Math.floor(oy / (256 * S)), ty1 = Math.floor((oy + H) / (256 * S));
@@ -510,7 +613,8 @@ async function svMapImage(sets, W = 1400, H = 560, type = 'base'){   // sets: [{
     if (!tiles.some(t => t.im)){ g.strokeStyle = '#dde2ea'; g.lineWidth = 1; for (let x = 0; x < W; x += 100){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y = 0; y < H; y += 100){ g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } }
     sets.forEach(set => {
       const p = set.items.filter(r => r.lat != null && r.lng != null).map(px);
-      if (set.line !== false && p.length > 1){ g.strokeStyle = set.color; g.lineWidth = 5; g.globalAlpha = .8; g.setLineDash([16, 12]); g.beginPath(); p.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
+      if (set.path && set.path.length > 1){ g.strokeStyle = set.color; g.lineWidth = 6; g.globalAlpha = .85; g.lineJoin = 'round'; g.beginPath(); set.path.forEach(([a0, b0], i) => { const q = px({ lat: a0, lng: b0 }); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.stroke(); g.globalAlpha = 1; }
+      else if (set.line !== false && p.length > 1){ g.strokeStyle = set.color; g.lineWidth = 5; g.globalAlpha = .8; g.setLineDash([16, 12]); g.beginPath(); p.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
     });
     sets.forEach(set => set.items.filter(r => r.lat != null && r.lng != null).forEach((r, k) => {
       const [x, y] = px(r); g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, 25, 0, 7); g.fill(); g.fillStyle = set.color; g.beginPath(); g.arc(x, y, 21, 0, 7); g.fill();
@@ -536,7 +640,7 @@ async function svMapImage(sets, W = 1400, H = 560, type = 'base'){   // sets: [{
   const pct = (v, t) => `${(v / t * 100).toFixed(4)}%`, tileImg = (u, x, y) => `<img src="${u}" alt="" style="position:absolute;left:${pct(x * 256 * S - ox, W)};top:${pct(y * 256 * S - oy, H)};width:${pct(256 * S, W)};height:${pct(256 * S, H)}" />`;
   const imgs = tl.map(p => tileImg(vw(sat ? 'Satellite' : 'Base', p.x, p.y, sat ? 'jpeg' : 'png'), p.x, p.y)).join('') + (sat ? tl.map(p => tileImg(vw('Hybrid', p.x, p.y, 'png'), p.x, p.y)).join('') : '');
   const shapes = sets.map(set => { const p = set.items.filter(r => r.lat != null && r.lng != null).map(px);
-    return (set.line !== false && p.length > 1 ? `<polyline points="${p.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ')}" fill="none" stroke="${set.color}" stroke-width="5" stroke-dasharray="16 12" opacity=".8" />` : '') +
+    return (set.path && set.path.length > 1 ? `<polyline points="${set.path.map(([a0, b0]) => { const q = px({ lat: a0, lng: b0 }); return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ')}" fill="none" stroke="${set.color}" stroke-width="6" stroke-linejoin="round" opacity=".85" />` : set.line !== false && p.length > 1 ? `<polyline points="${p.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ')}" fill="none" stroke="${set.color}" stroke-width="5" stroke-dasharray="16 12" opacity=".8" />` : '') +
       set.items.filter(r => r.lat != null && r.lng != null).map((r, k) => { const [x, y] = px(r); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="25" fill="#fff" /><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="21" fill="${set.color}" /><text x="${x.toFixed(1)}" y="${(y + 9).toFixed(1)}" text-anchor="middle" font-size="26" font-weight="700" fill="#fff" font-family="sans-serif">${esc(String(set.label(k, r)))}</text>`; }).join(''); }).join('');
   return `<div class="mapbox" style="position:relative;width:100%;height:0;padding-bottom:${(H / W * 100).toFixed(3)}%;overflow:hidden;border:1px solid #444;margin:0 0 6px;background:#e9edf3">${imgs}<svg viewBox="0 0 ${W} ${H}" style="position:absolute;left:0;top:0;width:100%;height:100%">${shapes}</svg><div style="position:absolute;right:3px;bottom:2px;font-size:9px;background:rgba(255,255,255,.85);padding:1px 5px;color:#556">© 브이월드(국토교통부)${sat ? ' · 항공영상' : ''}</div></div>`;
 }
@@ -549,8 +653,8 @@ async function svPrintGroups(only){
   const sel = svGroups.list.map((g, i) => ({ g, i })).filter(x => only === null || x.i === only), imgs = new Map(); let overview = null;
   try {
     await Promise.all([
-      ...sel.map(async ({ g, i }) => { if (!g.unk) imgs.set(i, await svMapImage([{ items: g.items, color: svColor(i), label: (k) => k + 1 }], 1400, 560, svMapType).catch(() => null)); }),
-      (async () => { if (only === null && sel.filter(x => !x.g.unk).length > 1) overview = await svMapImage(sel.filter(x => !x.g.unk).map(({ g, i }) => ({ items: g.items, color: svColor(i), label: () => i + 1 })), 1400, 700, svMapType).catch(() => null); })()]);
+      ...sel.map(async ({ g, i }) => { if (!g.unk) imgs.set(i, await svMapImage([{ items: g.items, color: svColor(i), path: g.path, label: (k) => k + 1 }], 1400, 560, svMapType).catch(() => null)); }),
+      (async () => { if (only === null && sel.filter(x => !x.g.unk).length > 1) overview = await svMapImage(sel.filter(x => !x.g.unk).map(({ g, i }) => ({ items: g.items, color: svColor(i), path: g.path, label: () => i + 1 })), 1400, 700, svMapType).catch(() => null); })()]);
   } catch (e) { console.warn('지도 만들기 실패', e); }
   finally { svPrinting = false; if (msg) msg.textContent = ''; }
   svPrintGroupsHtml(only, imgs, overview);   // 지도가 안 만들어져도 표는 인쇄된다
@@ -565,13 +669,13 @@ function svPrintGroupsHtml(only, imgs, overview){
   h2{font-size:13.5px;margin:14px 0 5px;padding-left:9px;border-left:5px solid #111;page-break-after:avoid}h2 small{font-weight:500;color:#555;font-size:11.5px;margin-left:6px}
   table.t{width:calc(100% - 1px);border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:4px 6px;vertical-align:middle}table.t th{background:#eee;font-size:11.5px}
   tr{page-break-inside:avoid}thead{display:table-header-group}.c{text-align:center}.r{text-align:right}.nw{white-space:nowrap}.g{page-break-inside:avoid}img.map{display:block;width:100%;height:auto;border:1px solid #444;margin:0 0 6px}.foot{margin-top:10px;font-size:11px;color:#666;text-align:center}`;
-  const sum = `<h2>묶음 요약 <small>(${gs.length}개 묶음 · 현장 ${gs.reduce((s, x) => s + x.g.items.length, 0)}곳)</small></h2><table class="t"><thead><tr><th style="width:6%">묶음</th><th>권역</th><th style="width:9%">건수</th><th style="width:20%">대출잔액 합계</th><th style="width:16%">조사 예정일</th></tr></thead><tbody>${gs.map(({ g, i }) => `<tr><td class="c">${i + 1}</td><td>${esc(g.name)}${g.unk ? ' (위치 미확인)' : ''}${g.asg ? ' · ' + esc(g.asg) : ''}</td><td class="c">${g.items.length}${g.loans !== g.items.length ? `<br><small>(대출 ${g.loans})</small>` : ''}</td><td class="r">${esc(svComma(g.sum))}원</td><td></td></tr>`).join('')}</tbody></table>`;
-  const body = gs.map(({ g, i }) => `<div class="g"><h2>${i + 1}번 묶음 — ${esc(g.name)}<small>${g.items.length}곳 · 잔액 ${esc(svComma(g.sum))}원${g.loans !== g.items.length ? ` (대출 ${g.loans}건 기준)` : ''}${g.diam !== null && g.items.length > 1 ? ` · 가장 먼 두 곳 약 ${g.diam.toFixed(1)}km` : ''}${g.unk ? ' · 위치 미확인(주소 기준)' : ''}</small></h2>
+  const sum = `<h2>묶음 요약 <small>(${gs.length}개 묶음 · 현장 ${gs.reduce((s, x) => s + x.g.items.length, 0)}곳)</small></h2><table class="t"><thead><tr><th style="width:6%">묶음</th><th>권역</th><th style="width:9%">건수</th><th style="width:17%">대출잔액 합계</th>${svGroups.road ? '<th style="width:15%">차량 이동(도로)</th>' : ''}<th style="width:14%">조사 예정일</th></tr></thead><tbody>${gs.map(({ g, i }) => `<tr><td class="c">${i + 1}</td><td>${esc(g.name)}${g.unk ? ' (위치 미확인)' : ''}${g.asg ? ' · ' + esc(g.asg) : ''}</td><td class="c">${g.items.length}${g.loans !== g.items.length ? `<br><small>(대출 ${g.loans})</small>` : ''}</td><td class="r">${esc(svComma(g.sum))}원</td>${svGroups.road ? `<td class="c nw">${g.road && g.items.length > 1 ? `약 ${g.km.toFixed(1)}km · ${Math.max(1, Math.round(g.min))}분` : '-'}</td>` : ''}<td></td></tr>`).join('')}</tbody></table>`;
+  const body = gs.map(({ g, i }) => `<div class="g"><h2>${i + 1}번 묶음 — ${esc(g.name)}<small>${g.items.length}곳 · 잔액 ${esc(svComma(g.sum))}원${g.loans !== g.items.length ? ` (대출 ${g.loans}건 기준)` : ''}${g.road && g.items.length > 1 ? ` · 🚗 이동 약 ${g.km.toFixed(1)}km · ${Math.max(1, Math.round(g.min))}분(도로)` : ''}${g.diam !== null && g.items.length > 1 ? ` · 가장 먼 두 곳 ${g.road ? '도로' : '직선'} 약 ${g.diam.toFixed(1)}km` : ''}${g.unk ? ' · 위치 미확인(주소 기준)' : ''}</small></h2>
     ${imgs.get(i) || ''}<table class="t"><thead><tr><th style="width:6.5%;white-space:nowrap">순서</th><th style="width:10%">성명</th><th style="width:10%">고객번호</th><th style="width:17%">계좌번호</th><th style="width:12%">대출잔액(원)</th><th style="width:9%">사업구분</th><th>사업장 소재지</th><th style="width:8%">담당</th><th style="width:11%">조사일</th></tr></thead><tbody>
     ${(() => { const fs = svFirstOf(g.items); return g.items.map((r, k) => `<tr><td class="c">${k + 1}</td><td>${esc(r.name)}</td><td class="c nw">${esc(r.cust_no)}</td><td class="c nw">${esc(r.account_no)}</td><td class="r nw">${r.balance === null ? '-' : fs[k] ? esc(svComma(r.balance)) : '〃'}</td><td class="c">${esc(r.biz_type || '')}</td><td>${esc(r.address)}${svSiteTag(r) ? ` <small>(${svSiteTag(r)})</small>` : ''}</td><td class="c">${esc(svAsgName(r))}</td><td></td></tr>`).join(''); })()}</tbody></table></div>`).join('');
   const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>정책자금 실태조사 현장 묶음</title>${link}<style>${css}</style></head><body>
     <div class="top"><div class="org">${esc(org)}</div></div>
-    <div class="title"><h1>정책자금 실태조사 현장 조사 계획</h1><div class="sub">기준일 ${esc(today)} · 가까운 사업장끼리 묶음 (묶음 ${svGroups.km}km 이내 · 최대 ${svGroups.n}곳 · 대상 ${esc(svGroups.cond || '전체')} · ${svMapType === 'sat' ? '항공지도' : '일반지도'})</div></div>${only === null ? sum : ''}${overview ? `<h2>전체 지도 <small>(원 안의 숫자 = 묶음 번호)</small></h2>${overview}` : ''}${body}
-    <div class="foot">방문 순서는 가까운 곳으로 이어가는 추천 순서이며, 실제 동선에 맞게 조정하세요.</div></body></html>`;
+    <div class="title"><h1>정책자금 실태조사 현장 조사 계획</h1><div class="sub">기준일 ${esc(today)} · ${svGroups.road ? '차량 이동(도로) 기준 묶음 (도로 거리' : '가까운 사업장끼리 묶음 (직선 거리'} ${svGroups.km}km 이내 · 최대 ${svGroups.n}곳 · 대상 ${esc(svGroups.cond || '전체')} · ${svMapType === 'sat' ? '항공지도' : '일반지도'})</div></div>${only === null ? sum : ''}${overview ? `<h2>전체 지도 <small>(원 안의 숫자 = 묶음 번호)</small></h2>${overview}` : ''}${body}
+    <div class="foot">${svGroups.road ? '방문 순서는 도로(차량) 이동시간이 가장 짧도록 계산한 추천 순서이며(OpenStreetMap 도로망 기준), 교통·도로 사정에 따라 실제와 다를 수 있어요. 현장 상황에 맞게 조정하세요.' : '방문 순서는 가까운 곳으로 이어가는 추천 순서이며, 실제 동선에 맞게 조정하세요.'}</div></body></html>`;
   apPreview(html, '정책자금 실태조사 현장 조사 계획', `실태조사_현장묶음_${today}`);
 }
