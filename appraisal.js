@@ -86,7 +86,7 @@ const apM2Py = (m2) => { const p = apPy(m2); return `${Number(m2).toLocaleString
   .apres .it{ padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--line); font-size:14px; } .apres .it:hover{ background:var(--accent-soft); }
   .apres .it small{ display:block; color:var(--muted); font-size:12px; }
   .apst{ font-size:12.5px; margin-top:4px; color:var(--muted); } .apst.ok{ color:var(--green); } .apst.bad{ color:var(--danger); }
-  .apaddr{ background:#f1f2f4 !important; font-weight:600; }
+  .apaddr{ font-weight:600; }
   #apFirmList,#apNotifyList{ display:flex; flex-wrap:wrap; gap:4px 16px; }
   .apmapbox{ display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:16px; height:calc(100vh - 300px); min-height:520px; }
   #apMapEl{ min-height:300px; background:#e8ecf1; z-index:0; border-radius:28px; box-shadow:var(--sh); overflow:hidden; } #apMapPanel{ overflow-y:auto; padding:18px 18px; background:#fff; border-radius:28px; box-shadow:var(--sh); }
@@ -533,7 +533,7 @@ function apAddPropBlock(p){
       <div><label>소재지 (지번) <span style="color:var(--danger)">*</span></label>
         <div style="display:flex;gap:6px"><input class="pq" placeholder="예: 제주시 연동 312, 또는 동 이름 + 번지" style="flex:1" /><button class="btn small" type="button" data-pa="search">검색</button></div>
         <div class="apres"></div></div></div>
-    <input class="pa apaddr" placeholder="↑ 검색해서 주소를 선택하세요" readonly style="margin-top:8px" />
+    <input class="pa apaddr" maxlength="200" placeholder="↑ 검색해서 주소를 선택하면 여기에 채워져요 (직접 고칠 수 있어요)" style="margin-top:8px" />
     <div class="apst"></div>
     <div class="grid3"><div><label>소유자</label><input class="po" maxlength="60" placeholder="예: 홍길동" /></div><div><label>지목</label><input class="pj" list="apJimokDl" /></div><div class="lwc"><label>대지면적 (㎡)</label><input class="pl" inputmode="decimal" /><div class="pyh pyl"></div></div><div><label class="la">면적</label><input class="pr" inputmode="decimal" /><div class="pyh pyr"></div></div><div><label class="ld">비고</label><input class="pd" maxlength="80" /></div></div>`;
   $('apfProps').appendChild(blk);
@@ -793,6 +793,8 @@ async function apPrint(c){
 
 // ---------- 감정평가 의뢰서 (팩스용) ----------
 const apFmt2 = (v) => Number(v).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const AP_HANGUL = ['가', '나', '다', '라', '마', '바', '사', '아', '자', '차', '카', '타', '파', '하', '거', '너', '더', '러', '머', '버', '서', '어', '저', '처', '커', '터', '퍼', '허'];
+const apHangul = (n) => n < AP_HANGUL.length ? AP_HANGUL[n] : `${AP_HANGUL[n % AP_HANGUL.length]}${Math.floor(n / AP_HANGUL.length)}`;   // 28개를 넘으면 가1, 나1 …
 const AP_FAX_ROWS = 20;   // 한 장에 들어가는 물건 줄 수 (넘으면 다음 장으로, 장마다 머리글 반복)
 function apFaxPage(c, firm, purpose){
   const props = apProps(c), st = apSettings[c.scope] || { org_name: '', staff_text: '', contact_text: '' };
@@ -800,9 +802,10 @@ function apFaxPage(c, firm, purpose){
   props.forEach(p => {
     if (p.kind === '건물'){
       rows.push({ addr: p.address, jimok: p.jimok || '', area: p.land_area, land: true, note: '' });
-      rows.push({ addr: p.address, jimok: '건물', area: p.area, land: false, note: p.detail || '' });
+      rows.push({ addr: p.address, jimok: '건물', area: p.area, land: false, bld: true, note: p.detail || '' });
     } else rows.push({ addr: p.address, jimok: p.kind === '집합건물' ? '집합건물' : (p.jimok || ''), area: p.area, land: p.kind === '토지', note: p.detail || '' });
   });
+  { let nn = 0, bb = 0; rows.forEach(r => { r.sym = r.bld ? apHangul(bb++) : String(++nn); }); }   // 건물은 가·나·다…, 토지·집합건물은 1·2·3…
   const landSum = rows.filter(r => r.land && r.area).reduce((s, r) => s + Number(r.area), 0);
   const bldSum = rows.filter(r => !r.land && r.area).reduce((s, r) => s + Number(r.area), 0);
   const chunks = []; for (let k = 0; k < rows.length; k += AP_FAX_ROWS) chunks.push(rows.slice(k, k + AP_FAX_ROWS));
@@ -811,7 +814,7 @@ function apFaxPage(c, firm, purpose){
   const to = firm ? `<div class="to">수 신 : <b>${esc(firm.name)}</b> 귀중${firm.fax ? ` <span class="fx">(팩스 ${esc(firm.fax)})</span>` : ''}</div>` : '';
   return chunks.map((chunk, pi) => {
     const last = pi === total - 1;
-    const body = chunk.map((r, i) => `<tr><td class="c">${pi * AP_FAX_ROWS + i + 1}</td><td>${esc(r.addr)}</td><td class="c">${esc(r.jimok)}</td><td class="r">${r.area === null || r.area === undefined ? '' : apFmt2(r.area)}</td><td class="c">${esc(r.note)}</td></tr>`).join('');
+    const body = chunk.map((r, i) => `<tr><td class="c">${esc(r.sym)}</td><td>${esc(r.addr)}</td><td class="c">${esc(r.jimok)}</td><td class="r">${r.area === null || r.area === undefined ? '' : apFmt2(r.area)}</td><td class="c">${esc(r.note)}</td></tr>`).join('');
     return `<div class="page">
     <div class="hd"><h1>탁상감정의뢰서</h1><img class="logo" src="${logo}" alt="${esc(org)}"></div>
     ${to}
