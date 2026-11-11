@@ -4,7 +4,7 @@
 // index.html 의 전역(sb, $, esc, me, isAdmin, kstToday, toast, divn)을 함께 쓴다.
 
 let lmReports = [], lmLiqRows = [], lmP = null, lmSavedP = null, lmTimer = null, lmLoaded = false, lmMsg = '';
-const LM_DEF = { target: 102, depNet: 0, loanNet: 0, overdue: 0, t3: 0, t6: 20, t10: 30, t12: 40, t13: 10, ext1: 50 };
+const LM_DEF = { target: 100, depNet: 0, loanNet: 0, overdue: 0, t3: 0, t6: 20, t10: 30, t12: 40, t13: 10, ext1: 50 };
 const LM_KIND = { daily_ratio: '일별 규제유동성비율 보고서', daily_cf: '일별 현금흐름분석(규제유동성)', monthly_cf: '현금흐름분석(규제유동성) · 월', monthly_ratio: '규제유동성비율 보고서 · 월' };
 const LM_TERMS = [[3, '3개월 이하', 't3'], [6, '6개월', 't6'], [10, '10개월', 't10'], [12, '12개월', 't12'], [13, '13개월 이상', 't13']];
 const LM_C = { dep: '#2a78d6', loan: '#eb6834', proj: '#8a90a0', bad: '#e5484d' };   // 예금 파랑 · 대출 주황 (validate_palette 통과 조합)
@@ -140,7 +140,7 @@ function renderLiq(live){
   let tiles = cur ? `<div class="lmt"><div class="l">현재 (${+cur.d.slice(5, 7)}/${+cur.d.slice(8, 10)} 기준)</div><div class="v">${lmPct(curR, 2)}</div><div class="n"><span class="lmchip ${cs}">${LM_SL[cs]}</span>GAP ${lmU(cur.A - cur.B)}</div></div>` : '';
   qs.forEach(q => { const s = lmStat(q.r, p); tiles += `<div class="lmt"><div class="l">${lmLab(q.k)}월말 전망</div><div class="v">${lmPct(q.r)}</div><div class="n"><span class="lmchip ${s}">${LM_SL[s]}</span>${q.room >= 0 ? '여유' : '부족'} ${lmU(Math.abs(q.room))}</div></div>`; });
   if (!sim) tiles += `<div class="lmt" style="grid-column:span 2"><div class="l">분기말 전망</div><div class="n" style="margin-top:8px;line-height:1.6">월별 만기표(현금흐름분석(규제유동성) 월 보고서)를 올리면 분기말 전망과 재예치 가이드가 계산돼요.</div></div>`;
-  let body = `<div class="lmsub" style="margin:-6px 2px 0">단위: 백만원 · 기준 100% 이상 · 목표 ${p.target}%${cur ? ` · 최근 일별 자료 ${cur.d}` : ''}${st.base ? ` · 월별 만기표 ${lmY(st.base.ym)}년 ${lmM(st.base.ym)}월말 기준` : ''}</div><div class="lmtiles">${tiles}</div>`;
+  let body = `<div class="lmsub" style="margin:-6px 2px 0">단위: 백만원 · 목표 ${p.target <= 100 ? '100% 초과 유지' : '내부 목표 ' + p.target + '% 이상'}${cur ? ` · 최근 일별 자료 ${cur.d}` : ''}${st.base ? ` · 월별 만기표 ${lmY(st.base.ym)}년 ${lmM(st.base.ym)}월말 기준` : ''}</div><div class="lmtiles">${tiles}</div>`;
   if (sim){
     const nowYm = sim.lpYm > 0 ? sim.lpYm : st.base.ym + 1, curRow = rows.find(r => r.k === nowYm) || rows[0];
     const qeOf = (land) => { let q = land - 1; while (!lmIsQ(q)) q--; return q; };
@@ -154,7 +154,7 @@ function renderLiq(live){
     const remDays = sim.lcf && sim.lcf.dep && lmYmOf(sim.lcf.d) === nowYm ? sim.lcf.dep.slice(0, Math.max(0, lmDim(nowYm) - lmD(sim.lcf.d).getDate())).reduce((a, c) => a + c, 0) : curRow.mat;
     // 할 일
     const t = [], worst = qs.slice().sort((a, c) => a.r - c.r)[0];
-    if (cur) t.push(curR >= 1 ? `현재 비율은 <b>${lmPct(curR, 2)}</b>로 기준을 넘고 여유는 ${lmU(cur.A - cur.B)}입니다. ${curR < p.target / 100 ? `목표 ${p.target}%까지 유동부채를 약 <b>${lmU(cur.B - cur.A / (p.target / 100))}</b> 줄여야 해요.` : '목표 비율도 충족해요.'}`
+    if (cur) t.push(curR >= 1 ? `현재 비율은 <b>${lmPct(curR, 2)}</b>로 기준을 넘고 여유는 ${lmU(cur.A - cur.B)}입니다. ${curR < p.target / 100 ? `내부 목표 ${p.target}%까지 유동부채를 약 <b>${lmU(cur.B - cur.A / (p.target / 100))}</b> 줄여야 해요.` : (p.target > 100 ? '내부 목표도 충족해요.' : (cur.A - cur.B < 1000 ? '여유가 작으니 만기 도래분을 3개월 초과로 재예치해 두세요.' : ''))}`
       : `현재 비율이 <b>${lmPct(curR, 2)}</b>로 기준 미달입니다. 유동부채를 <b>${lmU(cur.B - cur.A)}</b> 줄이거나 유동자산을 그만큼 늘려야 해요.`);
     if (worst) t.push(worst.r < 1 ? `가장 위험한 분기말은 <b>${lmLab(worst.k)}월말(${lmPct(worst.r)})</b>입니다. 그 창(${lmLab(worst.k + 1)}~${lmLab(worst.k + 3)}월 만기)에 예금 만기가 <b>${lmU(-worst.room)}</b> 초과해요. 그 달에 만기가 떨어지는 상품을 줄이세요.`
       : `분기말 전망은 모두 100% 이상입니다. 가장 낮은 분기말은 <b>${lmLab(worst.k)}월말(${lmPct(worst.r)})</b>이고 여유는 ${lmU(worst.room)}입니다.`);
@@ -237,7 +237,7 @@ function lmRec(st, p, live){   // 권장 배분은 순증·만기경과·연장 
 }
 function lmCtrlHtml(p, rec){
   const tsum = (p.t3 + p.t6 + p.t10 + p.t12 + p.t13) || 1;
-  const C = [['depNet', '저축성예수금 순증 (월)', -5000, 5000, 100], ['loanNet', '대출 순증 (월)', -2000, 4000, 50], ['overdue', '만기경과 미해지 잔액', 0, 8000, 100], ['ext1', '만기 대출 중 1년 연장 비율 (나머지는 2년 이상)', 0, 100, 5], ['target', '목표 비율', 100, 120, 1]]
+  const C = [['depNet', '저축성예수금 순증 (월)', -5000, 5000, 100], ['loanNet', '대출 순증 (월)', -2000, 4000, 50], ['overdue', '만기경과 미해지 잔액', 0, 8000, 100], ['ext1', '만기 대출 중 1년 연장 비율 (나머지는 2년 이상)', 0, 100, 5], ['target', '내부 관리 목표 (기준은 100% 초과)', 100, 120, 1]]
     .concat(LM_TERMS.map(([, lab, key]) => [key, '재예치 기간: ' + lab, 0, 100, 1]));
   const isT = (k) => k[0] === 't' && k !== 'target', fmtV = (k, v) => isT(k) ? Math.round(v / tsum * 100) + '%' : (k === 'ext1' || k === 'target') ? v + '%' : lmU(v);
   const hint = (k) => `기본 ${isT(k) ? LM_DEF[k] + '%' : fmtV(k, LM_DEF[k])}` + (isT(k) && rec ? ` · 권장 ${rec.p[k]}%` : '');
