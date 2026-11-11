@@ -119,7 +119,7 @@ const lmStat = (r, p) => !isFinite(r) ? 'plain' : r >= p.target / 100 ? 'good' :
 const LM_SL = { good: '✓ 안전', warn: '▲ 주의', bad: '⚠ 미달', plain: '자료 없음' };
 
 // ---------- 화면 ----------
-function renderLiq(){
+function renderLiq(live){
   const el = $('liq'); if (!el) return;
   if (!el.dataset.ready){ el.dataset.ready = '1'; lmBind(el); }
   if (!lmLoaded){ el.innerHTML = `<div class="lmc"><div class="lmempty">불러오는 중이에요…</div></div>`; return; }
@@ -182,7 +182,7 @@ function renderLiq(){
     <div class="lmc"><h3>비율 추이와 전망</h3><div class="lmleg"><span><i style="background:${LM_C.dep}"></i>실적</span><span><i style="background:${LM_C.proj}"></i>전망(월말, 아래 가정 기준)</span><span><i style="background:${LM_C.bad}"></i>기준 100%</span></div><div class="lmtw">${lmChartRatio(st, rows)}</div></div>
     <div class="lmc"><h3>월별 만기 구조 <small>가정 반영 후 · 예금 만기가 대출 회수보다 크게 몰린 달이 위험</small></h3><div class="lmleg"><span><i style="background:${LM_C.dep}"></i>저축성예수금 만기</span><span><i style="background:${LM_C.loan}"></i>대출 회수(3개월 창 산입분)</span></div><div class="lmtw">${lmChartMat(rows)}</div></div>
     <div class="lmc"><h3>분기말 · 월말 전망표</h3><div class="lmtw"><table class="lmtb">${pt}</table></div></div>
-    <div class="lmc"><h3>가정 조절 <small>바꾸면 위 내용이 바로 다시 계산돼요${adm ? '' : ' · 저장은 관리자만'}</small></h3>
+    <div class="lmc" id="lmCtrlCard"><h3>가정 조절 <small>바꾸면 맨 위 전망 타일과 표·차트가 바로 다시 계산돼요${adm ? '' : ' · 저장은 관리자만'}</small></h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px"><button class="btn small primary" data-lm="opt">권장 재예치 배분 찾기</button>${adm ? `<button class="btn small" data-lm="save" ${dirty ? '' : 'disabled'}>가정 저장</button>` : ''}${dirty ? `<button class="btn small" data-lm="revert">저장된 가정으로</button>` : ''}<span class="lmsub" id="lmOptMsg">월말 비율의 최저값이 가장 높아지는 기간 배분을 찾아요(3개월 이하는 10% 이내).</span></div>
       <div class="lmctrl">${lmCtrlHtml(p)}</div>
       <div class="lmnote"><b>가정으로 채운 부분</b> · 재예치 기간 비율은 합계 100%로 환산해요. · 월별 만기표 이후 재예치·신규된 금액(${past.join(', ') || '없음'})의 만기는 실제 값을 몰라 위 기간 비율로 나눴어요. · 요구불예수금 유동부채(${lmF(sim.demand)})는 그대로 둬요. · 신규 대출과 2년 이상 연장분은 전망 기간 안에 만기가 오지 않는 것으로 봐요.</div></div>
@@ -190,10 +190,26 @@ function renderLiq(){
   } else {
     body += `<div class="lmc"><h3>비율 추이</h3><div class="lmtw">${lmChartRatio(st, [])}</div></div>${upload}`;
   }
-  el.innerHTML = body;
-  el.querySelectorAll('[data-tip]').forEach(n => { n.addEventListener('mousemove', (e) => { const tp = $('lmTip'); tp.innerHTML = n.dataset.tip; tp.style.display = 'block'; tp.style.left = Math.min(window.innerWidth - tp.offsetWidth - 8, e.clientX + 14) + 'px'; tp.style.top = (e.clientY + 14) + 'px'; }); n.addEventListener('mouseleave', () => { $('lmTip').style.display = 'none'; }); });
+  // 가정을 끄는 동안(live)에는 손잡이가 끊기지 않게 '가정 조절' 카드만 그대로 두고 나머지(타일·할 일·차트·표)를 바꿔 끼운다
+  if (live && el.querySelector('#lmCtrlCard')){
+    const tmp = document.createElement('div'); tmp.innerHTML = body; const olds = [...el.children], news = [...tmp.children];
+    if (olds.length === news.length){
+      olds.forEach((o, i) => {
+        if (o.id !== 'lmCtrlCard') return o.replaceWith(news[i]);
+        const no = news[i].querySelectorAll('output'); o.querySelectorAll('output').forEach((x, k) => { if (no[k]) x.textContent = no[k].textContent; });
+        const nn = news[i].querySelector('.lmnote'), on = o.querySelector('.lmnote'); if (nn && on) on.innerHTML = nn.innerHTML;
+      });
+      return lmTips(el);
+    }
+  }
+  el.innerHTML = body; lmTips(el);
 }
 
+function lmTips(el){
+  el.querySelectorAll('[data-tip]').forEach(n => { if (n.dataset.tb) return; n.dataset.tb = '1';
+    n.addEventListener('mousemove', (e) => { const tp = $('lmTip'); tp.innerHTML = n.dataset.tip; tp.style.display = 'block'; tp.style.left = Math.min(window.innerWidth - tp.offsetWidth - 8, e.clientX + 14) + 'px'; tp.style.top = (e.clientY + 14) + 'px'; });
+    n.addEventListener('mouseleave', () => { $('lmTip').style.display = 'none'; }); });
+}
 function lmStatusTable(st, sim, adm){
   const latest = (k) => lmReports.filter(r => r.kind === k).map(r => r.base_date).sort().pop();
   const today = kstToday(), dAgo = (d) => d ? Math.round((Date.parse(today) - Date.parse(d)) / 864e5) : null;
@@ -250,9 +266,9 @@ function lmChartMat(rows){
 
 // ---------- 조작 ----------
 function lmBind(el){
-  // 끄는 동안에는 숫자만 바꾸고, 손을 떼면 전체를 다시 계산해 그린다(끄는 중에 다시 그리면 손잡이가 끊김)
-  el.addEventListener('input', (e) => { const k = e.target.dataset && e.target.dataset.lmp; if (!k) return; lmP[k] = +e.target.value; const o = e.target.parentNode.querySelector('output'); if (o) o.textContent = (k === 'ext1' || k === 'target') ? lmP[k] + '%' : k[0] === 't' ? lmP[k] : lmF(lmP[k]); });
-  el.addEventListener('change', (e) => { const k = e.target.dataset && e.target.dataset.lmp; if (!k) return; const sy = window.scrollY; renderLiq(); window.scrollTo(0, sy); const n = el.querySelector(`[data-lmp="${k}"]`); if (n) n.focus(); });
+  // 끄는 동안에도 위쪽 전망이 바로 따라 바뀐다(가정 카드는 그대로 둠). 손을 떼면 버튼 상태까지 전체를 다시 그린다
+  el.addEventListener('input', (e) => { const k = e.target.dataset && e.target.dataset.lmp; if (!k) return; lmP[k] = +e.target.value; renderLiq(true); });
+  el.addEventListener('change', (e) => { const k = e.target.dataset && e.target.dataset.lmp; if (!k) return; const sy = window.scrollY; renderLiq(); window.scrollTo(0, sy); const n = el.querySelector(`[data-lmp="${k}"]`); if (n) n.focus({ preventScroll: true }); });
   el.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-lm]'), del = e.target.closest('[data-lmdel]');
     if (e.target.closest('#lmDrop')) return $('lmFile').click();
