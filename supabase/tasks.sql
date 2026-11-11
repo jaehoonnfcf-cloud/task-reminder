@@ -773,3 +773,14 @@ grant select, insert, update, delete on public.perf_orig to authenticated;
 grant select on public.perf_orig to service_role;
 alter publication supabase_realtime add table public.perf_orig;
 alter table public.appraisal_properties add column if not exists owner text check (owner is null or char_length(owner) <= 60);  -- 감정평가 물건 소유자
+
+-- 조치 예정 완료 처리: 이력을 쓴 사람·관리자만 이력을 고칠 수 있지만, 완료 표시(action_done_at)는 사후관리 권한자 누구나 할 수 있게 함수로 허용
+create or replace function public.debt_log_action_done(p_id bigint, p_done boolean) returns void language plpgsql security definer set search_path = public as $f$
+begin
+  if not has_debt() then raise exception '사후관리 권한이 없어요'; end if;
+  update public.debt_logs set action_done_at = case when p_done then now() else null end
+   where id = p_id and deleted_at is null and (action_note is not null or action_date is not null);
+  if not found then raise exception '조치 예정을 찾을 수 없어요'; end if;
+end $f$;
+revoke all on function public.debt_log_action_done(bigint, boolean) from public, anon;
+grant execute on function public.debt_log_action_done(bigint, boolean) to authenticated;
