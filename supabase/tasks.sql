@@ -784,3 +784,35 @@ begin
 end $f$;
 revoke all on function public.debt_log_action_done(bigint, boolean) from public, anon;
 grant execute on function public.debt_log_action_done(bigint, boolean) to authenticated;
+
+-- 유동성관리(상황판): 관리자가 올린 ALM 보고서에서 읽은 숫자만 저장한다(파일 자체는 저장하지 않음). 금액은 백만원.
+-- kind: daily_ratio(일별 규제유동성비율 보고서) · daily_cf(일별 현금흐름분석) · monthly_cf(월 현금흐름분석 = 월별 만기표) · monthly_ratio(월 규제유동성비율 보고서)
+-- 조회는 팀원 전체, 올리기·삭제는 관리자. liq_settings 는 전망에 쓰는 가정값(목표 비율·순증·재예치 기간 비율 등) 한 줄(id=1).
+create table if not exists public.liq_reports (
+  kind text not null check (kind in ('daily_ratio','daily_cf','monthly_cf','monthly_ratio')),
+  base_date date not null,
+  data jsonb not null,
+  uploaded_by text not null default auth.email(),
+  updated_at timestamptz not null default now(),
+  primary key (kind, base_date)
+);
+alter table public.liq_reports enable row level security;
+create policy lr_sel on public.liq_reports for select to authenticated using (is_member());
+create policy lr_ins on public.liq_reports for insert to authenticated with check (is_admin() and uploaded_by = auth.email());
+create policy lr_upd on public.liq_reports for update to authenticated using (is_admin()) with check (is_admin());
+create policy lr_del on public.liq_reports for delete to authenticated using (is_admin());
+grant select, insert, update, delete on public.liq_reports to authenticated;
+alter publication supabase_realtime add table public.liq_reports;
+
+create table if not exists public.liq_settings (
+  id int primary key check (id = 1),
+  params jsonb not null default '{}'::jsonb,
+  updated_by text not null default auth.email(),
+  updated_at timestamptz not null default now()
+);
+alter table public.liq_settings enable row level security;
+create policy ls_sel on public.liq_settings for select to authenticated using (is_member());
+create policy ls_ins on public.liq_settings for insert to authenticated with check (is_admin());
+create policy ls_upd on public.liq_settings for update to authenticated using (is_admin()) with check (is_admin());
+grant select, insert, update on public.liq_settings to authenticated;
+alter publication supabase_realtime add table public.liq_settings;
