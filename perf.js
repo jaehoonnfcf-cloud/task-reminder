@@ -236,13 +236,13 @@ function pfTile(m, sel, adm){
     <span class="pft-h"><i class="pft-dot"></i><span class="pft-n">${m.name}</span><span class="pft-s ${st.cls}">${esc(st.txt)}</span></span>
     <span class="pft-v">${big}</span>
     <span class="pft-m"><i style="width:${(frac * 100).toFixed(1)}%"></i>${m.k === 'liq' && !m.empty ? `<u style="left:${LQ_MIN / 120 * 100}%"></u>` : ''}</span>
-    <span class="pft-t">${m.empty ? (adm ? '규제유동성비율 값을 입력해주세요' : '입력 전') : m.tgt !== null ? `${m.tgtLabel} ${pfNm(m.tgt, m.dec)}${m.unit}${m.k === 'liq' ? ' 이상' : ''}` : '&nbsp;'}</span>
+    <span class="pft-t">${m.empty ? (adm ? '유동성관리에 보고서를 올려주세요' : '자료 올리기 전') : m.tgt !== null ? `${m.tgtLabel} ${pfNm(m.tgt, m.dec)}${m.unit}${m.k === 'liq' ? ' 이상' : ''}` : '&nbsp;'}</span>
     <span class="pft-d">${d1}${d2}</span><span class="pft-b">${m.empty ? '' : pfTileBottom(m)}</span></button>`;
 }
 // 오른쪽 상세: 선택한 지표만 (수신·여신은 본점/지점, 유동성비율은 자산·부채와 전월말/전분기말)
 function pfSide(m, adm){   // 차트 위의 값 칩: 선택한 지표의 현재·목표·비교 숫자를 한 줄로
   const chip = (l, v) => `<div class="pfchip"><span>${l}</span><b>${v}</b></div>`, u = m.unit, d = m.dec, sgn = (v, dd) => pfSg(v, u === '억원' ? '억원' : '%p', dd);
-  if (m.empty) return `<div class="pfsub" style="font-size:13px;line-height:1.6">${adm ? '아직 입력된 값이 없어요. “＋ 실적 입력”에서 유동자산합계·유동부채합계를 함께 입력하세요. 전월말·전분기말 값은 아래 버튼으로 과거 날짜를 입력하면 비교에 쓰여요.' : '관리자가 입력하면 표시돼요.'}</div>${adm ? '<button class="btn small" data-pf="liq" style="margin-top:10px">＋ 과거 날짜 입력</button>' : ''}`;
+  if (m.empty) return `<div class="pfsub" style="font-size:13px;line-height:1.6">${adm ? '아직 값이 없어요. <b>유동성관리</b>에 일별 규제유동성비율 보고서를 올리면 자동으로 표시돼요. 보고서를 못 올린 날짜만 아래 “직접 입력”으로 넣어 주세요.' : '관리자가 유동성관리에 보고서를 올리면 표시돼요.'}</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"><button class="btn small" data-pf="goliq">💧 유동성관리 열기</button>${adm ? '<button class="btn small" data-pf="liq">빠진 날짜 직접 입력</button>' : ''}</div>`;
   let h = chip('현재', `${pfNm(m.cur, d)}${u}`);
   if (m.tgt !== null){
     const left = m.better === 'up' ? m.tgt - m.cur : m.cur - m.tgt;
@@ -254,10 +254,11 @@ function pfSide(m, adm){   // 차트 위의 값 칩: 선택한 지표의 현재�
   if (m.dPrev !== null) h += chip(`${m.pLabel} 대비`, `<span class="${pfDeltaCls(m, m.dPrev)}">${sgn(m.dPrev, d)}</span>`);
   if (m.dYear) h += chip(`${m.yLabel} 대비`, `<span class="${pfDeltaCls(m, m.dYear.v)}">${sgn(m.dYear.v, d)}${m.dYear.pct !== null ? ` (${m.dYear.pct >= 0 ? '+' : ''}${pfNm(m.dYear.pct, 1)}%)` : ''}</span>`);
   if (m.k === 'liq'){
-    const cmp = (l, row, end) => !row ? chip(l, `<span class="fl">${adm ? `입력 필요 (${pfMd(end).replace(' ', '')})` : '-'}</span>`) : chip(`${l} <em class="pfem">${pfMd(row.base_date).replace(' ', '')}</em>`, `${pfNm(lqRatio(row), 2)}%`);
+    const cmp = (l, row, end) => !row ? chip(l, `<span class="fl">${adm ? `자료 필요 (${pfMd(end).replace(' ', '')})` : '-'}</span>`) : chip(`${l} <em class="pfem">${pfMd(row.base_date).replace(' ', '')}</em>`, `${pfNm(lqRatio(row), 2)}%`);
     h += cmp('전월말', m.pmRow, lqMonthEnd(perfSel)) + cmp('전분기말', m.pqRow, lqQuarterEnd(perfSel));
     if (m.curRow.base_date !== perfSel) h += chip('기준일', `${pfMd(m.curRow.base_date).replace(' ', '')} <span class="bd">(선택일 입력 없음)</span>`);
-    if (adm) h += `<button class="btn small" data-pf="liq" style="align-self:center">＋ 과거 날짜 입력·수정</button>`;
+    h += `<button class="btn small" data-pf="goliq" style="align-self:center">💧 유동성관리 열기</button>`;
+    if (adm) h += `<button class="btn small" data-pf="liq" style="align-self:center" title="유동성관리에 보고서를 올리지 못한 날짜만 직접 넣어요">빠진 날짜 직접 입력·수정</button>`;
   }
   return h;
 }
@@ -330,6 +331,7 @@ function renderPerf(){
       else if (a === 'input') pfOpenIn();
       else if (a === 'goal') pfOpenTg();
       else if (a === 'liq') pfOpenLq();
+      else if (a === 'goliq'){ const nb = document.querySelector('#divBtns [data-div="liq"]'); if (nb) nb.click(); }
     });
   }
   const adm = isAdmin(), c = pfCalc();
@@ -378,9 +380,7 @@ function pfOpenIn(date){
     <div class="pfform"><div><label>수신 · 본점 (억원)</label><input id="pfDepHq" inputmode="numeric" placeholder="0" /></div><div><label>수신 · 지점 (억원)</label><input id="pfDepBr" inputmode="numeric" placeholder="0" /></div>
       <div><label>여신 · 본점 (억원)</label><input id="pfLoanHq" inputmode="numeric" placeholder="0" /></div><div><label>여신 · 지점 (억원)</label><input id="pfLoanBr" inputmode="numeric" placeholder="0" /></div></div>
     <label>연체율 현황 (%) — 본점·지점 합산</label><input id="pfDq" inputmode="decimal" placeholder="예: 2.88" style="max-width:200px;text-align:right;font-weight:700" />
-    <div class="pfsub" style="margin-top:14px;font-weight:800;color:#44546f">규제유동성비율 <span style="font-weight:500">(단위: 백만원 · 둘 다 입력하면 함께 저장돼요)</span></div>
-    <div class="pfform"><div><label>유동자산합계 (백만원)</label><input id="pfLqA" inputmode="numeric" placeholder="예: 53,435" /></div><div><label>유동부채합계 (백만원)</label><input id="pfLqD" inputmode="numeric" placeholder="예: 56,233" /></div></div>
-    <div id="pfLqR" style="margin-top:6px;font-size:14px;font-weight:800"></div>
+    <div class="pfsub" style="margin-top:14px">💧 규제유동성비율은 여기서 입력하지 않아요. <b>유동성관리</b>에 일별 규제유동성비율 보고서를 올리면 자동으로 반영돼요.</div>
     <div id="pfInfo" class="pfsub" style="margin-top:8px"></div>
     <div class="acts" style="margin-top:20px;justify-content:space-between"><div style="display:flex;gap:8px"><button class="btn primary" data-f="save" style="min-height:44px;padding:8px 26px">저장</button><button class="btn" data-f="close" style="min-height:44px">취소</button></div><button class="btn danger" data-f="del" id="pfDel" style="display:none">이 날짜 삭제</button></div>`;
   $('pfDate').value = d;
@@ -389,13 +389,10 @@ function pfOpenIn(date){
     $('pfDepHq').value = row ? pfEn(row.dep_hq) : ''; $('pfDepBr').value = row ? pfEn(row.dep_br) : '';
     $('pfLoanHq').value = row ? pfEn(row.loan_hq) : ''; $('pfLoanBr').value = row ? pfEn(row.loan_br) : '';
     $('pfDq').value = row ? Number(row.delinq).toFixed(2) : '';
-    const lq = perfLiq.find(r => r.base_date === $('pfDate').value); $('pfLqA').value = lq ? Number(lq.asset).toLocaleString('ko-KR') : ''; $('pfLqD').value = lq ? Number(lq.debt).toLocaleString('ko-KR') : ''; lqPrev();
     $('pfDel').style.display = row ? '' : 'none';
     const v = $('pfDate').value; $('pfInfo').textContent = row ? `✏️ ${v}(${pfDow(v)}) 실적이 이미 있어요. 고쳐서 저장하면 덮어써요.` : (v ? `${v}(${pfDow(v)})${pfIsHoliday(v) ? ' · 휴일' : ''}` : '');
   };
-  const lqPrev = () => { const a = pfNum($('pfLqA').value), b = pfNum($('pfLqD').value); $('pfLqR').innerHTML = a !== null && b ? `비율 <span style="color:${a / b * 100 >= LQ_MIN ? '#12a150' : '#e5484d'}">${pfP(a / b * 100)}%</span> <span class="muted" style="font-weight:500">(기준 ${LQ_MIN}% 이상)</span>` : ''; };
   fill(); $('pfDate').onchange = fill;
-  ['pfLqA', 'pfLqD'].forEach(id => { $(id).oninput = () => { const n = pfNum($(id).value); $(id).value = n === null ? '' : n.toLocaleString('ko-KR'); lqPrev(); }; });
   ['pfDepHq', 'pfDepBr', 'pfLoanHq', 'pfLoanBr'].forEach(id => { $(id).oninput = () => { $(id).value = pfEfmt($(id).value); }; });
   $('pfOvIn').style.display = 'block'; document.body.style.overflow = 'hidden';
   setTimeout(() => { try { $('pfDepHq').focus(); } catch (x) {} }, 50);
@@ -406,23 +403,19 @@ $('pfInPanel').addEventListener('click', async (ev) => {
   if (b.dataset.f === 'close') return pfCloseIn();
   const date = $('pfDate').value;
   if (b.dataset.f === 'del'){
-    if (!confirm(`${date} 실적을 삭제할까요?${perfLiq.some(r => r.base_date === date) ? '\n(같은 날짜의 규제유동성비율 값도 함께 삭제돼요)' : ''}`)) return;
+    if (!confirm(`${date} 실적을 삭제할까요?`)) return;   // 규제유동성비율은 유동성관리에서 올린 보고서가 원본이라 함께 지우지 않는다
     const { error } = await sb.from('perf_daily').delete().eq('base_date', date);
     if (error) return alert(error.message);
-    await sb.from('perf_liq').delete().eq('base_date', date);
     pfCloseIn(); toast('삭제했어요'); return loadPerf();
   }
   const v = { dep_hq: pfEin($('pfDepHq').value), dep_br: pfEin($('pfDepBr').value), loan_hq: pfEin($('pfLoanHq').value), loan_br: pfEin($('pfLoanBr').value), delinq: pfDec($('pfDq').value) };
   if (!date) return alert('기준일을 선택해주세요.');
   if (Object.values(v).some(x => x === null)) return alert('수신·여신 잔액(본점/지점)과 연체율을 모두 입력해주세요.');
   if (date > kstToday()) return alert('오늘 이후 날짜는 입력할 수 없어요.');
-  const lqA = pfNum($('pfLqA').value), lqD = pfNum($('pfLqD').value), lqAny = lqA !== null || lqD !== null;
-  if (lqAny && (lqA === null || !lqD)) return alert('규제유동성비율은 유동자산합계와 유동부채합계(0보다 큰 값)를 둘 다 입력해주세요. (입력하지 않으려면 둘 다 비워두세요)');
   b.disabled = true;
   const { error } = await sb.from('perf_daily').upsert({ base_date: date, ...v, entered_by: me, updated_at: new Date().toISOString() }, { onConflict: 'base_date' });
   b.disabled = false;
   if (error) return alert(error.message);
-  if (lqAny){ const e2 = await sb.from('perf_liq').upsert({ base_date: date, asset: lqA, debt: lqD, entered_by: me, updated_at: new Date().toISOString() }, { onConflict: 'base_date' }); if (e2.error) alert('실적은 저장했지만 규제유동성비율 저장에 실패했어요: ' + e2.error.message); }
   perfSel = date; pfCloseIn(); toast('📊 실적을 저장했어요'); await loadPerf();
 });
 

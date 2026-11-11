@@ -127,7 +127,7 @@ function renderLiq(live){
   if (!lmLoaded){ el.innerHTML = `<div class="lmc"><div class="lmempty">불러오는 중이에요…</div></div>`; return; }
   const st = lmState(), p = lmP || { ...LM_DEF }, adm = isAdmin(), sim = lmSim(st, p);
   const cur = lmLast(st.points), rows = sim ? sim.rows.filter(r => !r.past) : [];
-  const upload = `<div class="lmc"><h3>자료 올리기 <small>${adm ? 'ALM 엑셀을 올리면 숫자만 저장돼요' : '관리자가 올린 자료 기준'}</small></h3>
+  const upload = `<div class="lmc"><h3>자료 올리기 <small>${adm ? 'ALM 엑셀을 올리면 숫자만 저장돼요 · 일별 규제유동성비율 보고서는 현황판에도 자동 반영' : '관리자가 올린 자료 기준'}</small></h3>
     ${adm ? `<div class="lmdrop" id="lmDrop">ALM 엑셀 파일을 끌어다 놓거나 <b>여기를 눌러 선택</b><br><span class="lmsub">일별 규제유동성비율 보고서 · 일별 현금흐름분석(규제유동성) · 현금흐름분석(규제유동성) 월 · 규제유동성비율 보고서 월</span></div><input type="file" id="lmFile" multiple accept=".xlsx" hidden />` : ''}
     <div class="lmtw" style="margin-top:10px">${lmStatusTable(st, sim, adm)}</div>
     ${lmMsg ? `<div class="lmnote">${esc(lmMsg)}</div>` : ''}</div>`;
@@ -290,8 +290,11 @@ function lmBind(el){
   el.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-lm]'), del = e.target.closest('[data-lmdel]');
     if (e.target.closest('#lmDrop')) return $('lmFile').click();
-    if (del){ if (!isAdmin()) return; const [kind, d] = del.dataset.lmdel.split('|'); if (!confirm(`${LM_KIND[kind]} ${d} 자료를 삭제할까요?`)) return;
-      const { error } = await sb.from('liq_reports').delete().eq('kind', kind).eq('base_date', d); if (error) return alert('삭제하지 못했어요: ' + error.message); toast('삭제했어요'); return loadLiq(); }
+    if (del){ if (!isAdmin()) return; const [kind, d] = del.dataset.lmdel.split('|'); const ratio = kind === 'daily_ratio' || kind === 'monthly_ratio';
+      if (!confirm(`${LM_KIND[kind]} ${d} 자료를 삭제할까요?${ratio ? '\n(현황판의 같은 날짜 규제유동성비율 값도 함께 지워져요)' : ''}`)) return;
+      const { error } = await sb.from('liq_reports').delete().eq('kind', kind).eq('base_date', d); if (error) return alert('삭제하지 못했어요: ' + error.message);
+      if (ratio && !lmReports.some(r => r.base_date === d && r.kind !== kind && (r.kind === 'daily_ratio' || r.kind === 'monthly_ratio'))) await sb.from('perf_liq').delete().eq('base_date', d);   // 현황판 값의 원본이 이 보고서
+      toast('삭제했어요'); return loadLiq(); }
     if (!b) return;
     if (b.dataset.lm === 'revert'){ lmP = { ...lmSavedP }; return renderLiq(); }
     if (b.dataset.lm === 'save'){ if (!isAdmin()) return; const { error } = await sb.from('liq_settings').upsert({ id: 1, params: lmP, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: 'id' });
@@ -359,5 +362,6 @@ async function lmUpload(files){
   }
   await loadLiq();
   if (ok.length) toast(`올렸어요: ${ok.join(', ')}`);
+  if (typeof loadPerf === 'function') loadPerf();   // 현황판 규제유동성비율 카드도 바로 새 값으로
   if (bad.length) alert('일부 파일은 반영하지 못했어요.\n\n' + bad.join('\n'));
 }
