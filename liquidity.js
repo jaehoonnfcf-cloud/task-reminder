@@ -5,7 +5,7 @@
 
 let lmReports = [], lmLiqRows = [], lmP = null, lmSavedP = null, lmTimer = null, lmLoaded = false, lmMsg = '';
 const LM_DEF = { target: 100, depNet: 0, loanNet: 0, overdue: 0, t3: 0, t6: 20, t10: 30, t12: 40, t13: 10, ext1: 50 };
-const LM_KIND = { daily_ratio: '일별 규제유동성비율 보고서', daily_cf: '일별 현금흐름분석(규제유동성)', monthly_cf: '현금흐름분석(규제유동성) · 월', monthly_ratio: '규제유동성비율 보고서 · 월' };
+const LM_KIND = { daily_ratio: '일별 규제유동성비율 보고서', daily_cf: '일별 현금흐름분석(규제유동성)', monthly_cf: '현금흐름분석(규제유동성) · 월', monthly_ratio: '규제유동성비율 보고서 · 월', book_dep: '수신 계좌 목록(저축성예수금 전체)', book_loan: '대출 계좌 목록(대출잔액장)' };
 const LM_TERMS = [[3, '3개월 이하', 't3'], [6, '6개월', 't6'], [10, '10개월', 't10'], [12, '12개월', 't12'], [13, '13개월 이상', 't13']];
 const LM_C = { dep: '#2a78d6', loan: '#eb6834', proj: '#8a90a0', bad: '#e5484d' };   // 예금 파랑 · 대출 주황 (validate_palette 통과 조합)
 
@@ -85,37 +85,54 @@ function lmState(){
   const cf = of('daily_cf').map(r => ({ d: r.base_date, ...r.data }));
   const mb = lmLast(of('monthly_cf').map(r => ({ d: r.base_date, ...r.data })));
   const base = mb ? { ...mb, ym: lmYmOf(mb.d) } : null;
-  return { points, cf, base };
+  const bd = lmLast(of('book_dep').map(r => ({ d: r.base_date, ...r.data }))), bl = lmLast(of('book_loan').map(r => ({ d: r.base_date, ...r.data })));
+  const book = bd ? { dep: bd, loan: bl } : null;   // 계좌 목록이 있으면 월별 만기표를 이것으로 쓴다(ALM 월 보고서는 보조)
+  return { points, cf, base, book };
 }
 
 // ---------- 계산: 월별 만기표를 굴려 월말 비율을 전망 ----------
 function lmSim(st, p){
-  const b = st.base; if (!b) return null;
-  const H = 28, dep = new Array(H + 40).fill(0), loan = new Array(H + 40).fill(0);
-  (b.dep || []).forEach((v, i) => dep[i + 1] = v); (b.loan || []).forEach((v, i) => loan[i + 1] = v);
-  for (let i = 13; i <= 18; i++){ dep[i] += (b.dep18 || 0) / 6; loan[i] += (b.loan18 || 0) / 6; }
-  for (let i = 19; i <= 24; i++){ dep[i] += (b.dep24 || 0) / 6; loan[i] += (b.loan24 || 0) / 6; }
-  for (let i = 25; i <= 36; i++){ dep[i] += (b.dep36 || 0) / 12; loan[i] += (b.loan36 || 0) / 12; }
+  const bk = st.book, H = 28;
+  let b = st.base;
+  if (bk){   // 계좌 목록 기준: 0번 칸 = 기준일이 속한 달(그 달의 남은 만기), 1번 칸 = 다음 달 …
+    const a = bk.dep, lo = bk.loan;
+    b = { ym: lmYmOf(a.asof) - 1, liquid: st.base ? st.base.liquid : 0, demand: st.base ? st.base.demand : 0, savTotal: a.total, dep: a.m || [], loanL: lo ? lo.lump : [], loanA: lo ? lo.amort : [] };
+  }
+  if (!b) return null;
+  const dep = new Array(H + 40).fill(0), loan = new Array(H + 40).fill(0), amo = new Array(H + 40).fill(0);
+  (b.dep || []).forEach((v, i) => dep[i + 1] = v);
+  if (bk){ (b.loanL || []).forEach((v, i) => loan[i + 1] = v); (b.loanA || []).forEach((v, i) => amo[i + 1] = v); }
+  else {
+    (b.loan || []).forEach((v, i) => loan[i + 1] = v);
+    for (let i = 13; i <= 18; i++){ dep[i] += (b.dep18 || 0) / 6; loan[i] += (b.loan18 || 0) / 6; }
+    for (let i = 19; i <= 24; i++){ dep[i] += (b.dep24 || 0) / 6; loan[i] += (b.loan24 || 0) / 6; }
+    for (let i = 25; i <= 36; i++){ dep[i] += (b.dep36 || 0) / 12; loan[i] += (b.loan36 || 0) / 12; }
+  }
+  const ov = bk ? (bk.dep.overdue || 0) : p.overdue;   // 만기경과 미해지: 계좌 목록이 있으면 그 값
   const tsum = (p.t3 + p.t6 + p.t10 + p.t12 + p.t13) || 1;
   const lp = lmLast(st.points.filter(x => x.liquid != null)), lcf = lmLast(st.cf), lpYm = lp ? lmYmOf(lp.d) : -1;
   const savEnd = (k) => { const c = st.cf.filter(x => lmYmOf(x.d) === k && lmD(x.d).getDate() >= lmDim(k) - 3).sort((x, y) => x.d < y.d ? -1 : 1).pop(); return c ? c.sav : null; };
   let L = b.liquid, sav = b.savTotal; const demand = (lp && lp.demand) || b.demand || 0, rows = [];
   for (let i = 1; i <= H; i++){
-    const k = b.ym + i; let net = p.depNet, actual = false; const se = savEnd(k);
-    if (se != null){ net = se - sav; actual = true; }
-    else if (lcf && lmYmOf(lcf.d) === k){ const rem = (lmDim(k) - lmD(lcf.d).getDate()) / lmDim(k); net = (lcf.sav - sav) + p.depNet * rem; actual = true; }
+    const k = b.ym + i; let net = p.depNet, actual = false;
+    if (bk){ if (i === 1){ const rem = (lmDim(k) - lmD(bk.dep.asof).getDate()) / lmDim(k); net = p.depNet * rem; } }
+    else {
+      const se = savEnd(k);
+      if (se != null){ net = se - sav; actual = true; }
+      else if (lcf && lmYmOf(lcf.d) === k){ const rem = (lmDim(k) - lmD(lcf.d).getDate()) / lmDim(k); net = (lcf.sav - sav) + p.depNet * rem; actual = true; }
+    }
     const mat = dep[i], renew = Math.max(0, mat + net);
     LM_TERMS.forEach(([t, , key]) => dep[i + t] += renew * p[key] / tsum);
-    loan[i + 12] += loan[i] * p.ext1 / 100;
+    loan[i + 12] += loan[i] * p.ext1 / 100;   // 만기 도래 대출 중 일부는 1년 연장(분할상환 회수분은 제외)
     sav += net;
     if (k < lpYm) L = null;
     else if (k === lpYm){ const rem = (lmDim(k) - lmD(lp.d).getDate()) / lmDim(k); L = lp.liquid + (p.depNet - p.loanNet) * rem; }
     else L = (L == null ? b.liquid : L) + net - p.loanNet;
-    const wl = loan[i + 1] + loan[i + 2] + loan[i + 3], wd = dep[i + 1] + dep[i + 2] + dep[i + 3];
-    const A = L == null ? NaN : L + wl, B = demand + p.overdue + wd;
-    rows.push({ k, mat, loanMat: loan[i], A, B, r: A / B, room: A - B, wd, wl, past: k < lpYm, actualNet: actual ? net : null });
+    const wl = loan[i + 1] + loan[i + 2] + loan[i + 3] + amo[i + 1] + amo[i + 2] + amo[i + 3], wd = dep[i + 1] + dep[i + 2] + dep[i + 3];
+    const A = L == null ? NaN : L + wl, B = demand + ov + wd;
+    rows.push({ k, mat, loanMat: loan[i] + amo[i], A, B, r: A / B, room: A - B, wd, wl, past: k < lpYm, actualNet: actual ? net : null });
   }
-  return { rows, lp, lcf, lpYm, demand };
+  return { rows, lp, lcf, lpYm, demand, ov };
 }
 const lmStat = (r, p) => !isFinite(r) ? 'plain' : r >= p.target / 100 ? 'good' : r >= 1 ? 'warn' : 'bad';
 const LM_SL = { good: '✓ 안전', warn: '▲ 주의', bad: '⚠ 미달', plain: '자료 없음' };
@@ -128,10 +145,10 @@ function renderLiq(live){
   const st = lmState(), p = lmP || { ...LM_DEF }, adm = isAdmin(), sim = lmSim(st, p);
   const cur = lmLast(st.points), rows = sim ? sim.rows.filter(r => !r.past) : [];
   const upload = `<div class="lmc"><h3>자료 올리기 <small>${adm ? 'ALM 엑셀을 올리면 숫자만 저장돼요 · 일별 규제유동성비율 보고서는 현황판에도 자동 반영' : '관리자가 올린 자료 기준'}</small></h3>
-    ${adm ? `<div class="lmdrop" id="lmDrop">ALM 엑셀 파일을 끌어다 놓거나 <b>여기를 눌러 선택</b><br><span class="lmsub">일별 규제유동성비율 보고서 · 일별 현금흐름분석(규제유동성) · 현금흐름분석(규제유동성) 월 · 규제유동성비율 보고서 월</span></div><input type="file" id="lmFile" multiple accept=".xlsx" hidden />` : ''}
+    ${adm ? `<div class="lmdrop" id="lmDrop">ALM 엑셀 또는 계좌 목록(엑셀·CSV)을 끌어다 놓거나 <b>여기를 눌러 선택</b><br><span class="lmsub">일별 규제유동성비율 보고서 · 일별 현금흐름분석(규제유동성) · 현금흐름분석(규제유동성) 월 · 규제유동성비율 보고서 월 · <b>수신 계좌 목록 · 대출 계좌 목록</b></span></div><input type="file" id="lmFile" multiple accept=".xlsx,.csv" hidden />` : ''}
     <div class="lmtw" style="margin-top:10px">${lmStatusTable(st, sim, adm)}</div>
     ${lmMsg ? `<div class="lmnote">${esc(lmMsg)}</div>` : ''}</div>`;
-  if (!cur && !st.base){
+  if (!cur && !st.base && !st.book){
     el.innerHTML = `<div class="lmc"><div class="lmempty">아직 올린 자료가 없어요 💧<br>${adm ? '아래에 ALM 보고서 엑셀을 올리면 현재 비율과 분기말 전망이 계산돼요.' : '관리자가 ALM 보고서를 올리면 여기에 상황판이 나타나요.'}</div></div>${upload}`;
     return;
   }
@@ -140,9 +157,9 @@ function renderLiq(live){
   let tiles = cur ? `<div class="lmt"><div class="l">현재 (${+cur.d.slice(5, 7)}/${+cur.d.slice(8, 10)} 기준)</div><div class="v">${lmPct(curR, 2)}</div><div class="n"><span class="lmchip ${cs}">${LM_SL[cs]}</span>GAP ${lmU(cur.A - cur.B)}</div></div>` : '';
   qs.forEach(q => { const s = lmStat(q.r, p); tiles += `<div class="lmt"><div class="l">${lmLab(q.k)}월말 전망</div><div class="v">${lmPct(q.r)}</div><div class="n"><span class="lmchip ${s}">${LM_SL[s]}</span>${q.room >= 0 ? '여유' : '부족'} ${lmU(Math.abs(q.room))}</div></div>`; });
   if (!sim) tiles += `<div class="lmt" style="grid-column:span 2"><div class="l">분기말 전망</div><div class="n" style="margin-top:8px;line-height:1.6">월별 만기표(현금흐름분석(규제유동성) 월 보고서)를 올리면 분기말 전망과 재예치 가이드가 계산돼요.</div></div>`;
-  let body = `<div class="lmsub" style="margin:-6px 2px 0">단위: 백만원 · 목표 ${p.target <= 100 ? '100% 초과 유지' : '내부 목표 ' + p.target + '% 이상'}${cur ? ` · 최근 일별 자료 ${cur.d}` : ''}${st.base ? ` · 월별 만기표 ${lmY(st.base.ym)}년 ${lmM(st.base.ym)}월말 기준` : ''}</div><div class="lmtiles">${tiles}</div>`;
+  let body = `<div class="lmsub" style="margin:-6px 2px 0">단위: 백만원 · 목표 ${p.target <= 100 ? '100% 초과 유지' : '내부 목표 ' + p.target + '% 이상'}${cur ? ` · 최근 일별 자료 ${cur.d}` : ''}${st.book ? ` · 계좌 목록 ${st.book.dep.asof} 기준` : st.base ? ` · 월별 만기표 ${lmY(st.base.ym)}년 ${lmM(st.base.ym)}월말 기준` : ''}</div><div class="lmtiles">${tiles}</div>`;
   if (sim){
-    const nowYm = sim.lpYm > 0 ? sim.lpYm : st.base.ym + 1, curRow = rows.find(r => r.k === nowYm) || rows[0];
+    const srcYm = st.book ? lmYmOf(st.book.dep.asof) - 1 : st.base.ym, nowYm = sim.lpYm > 0 ? sim.lpYm : srcYm + 1, curRow = rows.find(r => r.k === nowYm) || rows[0];
     const qeOf = (land) => { let q = land - 1; while (!lmIsQ(q)) q--; return q; };
     const advice = []; let g = '<tr><th>상품 기간</th><th>만기 도래월</th><th>영향 분기말</th><th>그 분기말 전망</th><th>여유액(백만원)</th><th>판단</th></tr>';
     LM_TERMS.forEach(([t, lab]) => {
@@ -151,7 +168,7 @@ function renderLiq(live){
       if (s === 'good') advice.push(lab);
       g += `<tr><td>${lab}</td><td>${lmLab(land)}</td><td>${lmLab(q)}월말</td><td>${qr ? lmPct(qr.r) : '-'}</td><td>${qr && isFinite(qr.room) ? lmF(qr.room) : '-'}</td><td><span class="lmchip ${s}">${{ good: '권장', warn: '소량만', bad: '피하기', plain: '자료 없음' }[s]}</span></td></tr>`;
     });
-    const remDays = sim.lcf && sim.lcf.dep && lmYmOf(sim.lcf.d) === nowYm ? sim.lcf.dep.slice(0, Math.max(0, lmDim(nowYm) - lmD(sim.lcf.d).getDate())).reduce((a, c) => a + c, 0) : curRow.mat;
+    const bkNow = st.book && lmYmOf(st.book.dep.asof) === nowYm; const remDays = bkNow ? (st.book.dep.overdue || 0) + ((st.book.dep.m || [])[0] || 0) : sim.lcf && sim.lcf.dep && lmYmOf(sim.lcf.d) === nowYm ? sim.lcf.dep.slice(0, Math.max(0, lmDim(nowYm) - lmD(sim.lcf.d).getDate())).reduce((a, c) => a + c, 0) : curRow.mat;
     // 할 일
     const t = [], worst = qs.slice().sort((a, c) => a.r - c.r)[0];
     if (cur) t.push(curR >= 1 ? `현재 비율은 <b>${lmPct(curR, 2)}</b>로 기준을 넘고 여유는 ${lmU(cur.A - cur.B)}입니다. ${curR < p.target / 100 ? `내부 목표 ${p.target}%까지 유동부채를 약 <b>${lmU(cur.B - cur.A / (p.target / 100))}</b> 줄여야 해요.` : (p.target > 100 ? '내부 목표도 충족해요.' : (cur.A - cur.B < 1000 ? '여유가 작으니 만기 도래분을 3개월 초과로 재예치해 두세요.' : ''))}`
@@ -162,16 +179,29 @@ function renderLiq(live){
     if (wm && wm.r < 1) t.push(`분기말이 아닌 달 중에는 <b>${lmLab(wm.k)}월말(${lmPct(wm.r)})</b>이 100% 아래로 내려가요. 조기경보 지표에 반영되므로 ${lmLab(wm.k + 1)}~${lmLab(wm.k + 3)}월 만기를 줄여 두세요.`);
     t.push(advice.length ? `이번 달 만기분 약 <b>${lmU(remDays)}</b>은 <b>${advice.join(', ')}</b> 상품으로 재예치하도록 권유하세요. "피하기" 기간은 줄이고, 3개월 이하는 곧 다시 만기가 오므로 소량만 받으세요.`
       : `이번 달 만기분 약 <b>${lmU(remDays)}</b>을 받을 여유 있는 기간이 없어요. 기간을 고르게 나누고 신규 장기 예탁으로 자산을 늘려야 해요.`);
-    if (p.overdue > 0 && cur) t.push(`만기경과 미해지 예탁금(약 <b>${lmU(p.overdue)}</b>)은 유동부채에 계속 남아요. 3개월 초과 상품으로 재예치하면 비율이 약 <b>${((cur.A / (cur.B - p.overdue) - curR) * 100).toFixed(1)}%p</b> 올라요.`);
-    else if (!p.overdue) t.push(`만기경과 미해지 예탁금 잔액이 0으로 돼 있어요. 아래 "가정 조절"에 실제 잔액을 넣으면 전망이 정확해져요.`);
-    if (sim.lcf && sim.lcf.dep){ const mx = sim.lcf.dep.map((v, i) => ({ v, i })).slice(1).sort((a, c) => c.v - a.v)[0], dd = lmD(sim.lcf.d); dd.setDate(dd.getDate() + mx.i + 1);
+    if (sim.ov > 0 && cur) t.push(`만기경과 미해지 예탁금(${st.book ? '계좌 목록 기준 ' : '약 '}<b>${lmU(sim.ov)}</b>${st.book ? `, 본점 ${lmF(st.book.dep.overdueHq)} / 지점 ${lmF(st.book.dep.overdueBr)}` : ''})은 유동부채에 계속 남아요. 3개월 초과 상품으로 재예치하면 비율이 약 <b>${((cur.A / (cur.B - sim.ov) - curR) * 100).toFixed(1)}%p</b> 올라요.`);
+    else if (!sim.ov && !st.book) t.push(`만기경과 미해지 예탁금 잔액이 0으로 돼 있어요. 아래 "가정 조절"에 실제 잔액을 넣으면 전망이 정확해져요.`);
+    if (st.book && st.book.dep.days){   // 분기말 직전 3일 만기(기준일에 만기경과로 남는 금액)와 31일 안 최대 만기일
+      const a = st.book.dep, a0 = lmD(a.asof); let qk = lmYmOf(a.asof); while (!lmIsQ(qk)) qk++;
+      const qe = new Date(lmY(qk), lmM(qk), 0), off = Math.round((qe - a0) / 864e5);
+      if (off >= 3 && off <= a.days.length){
+        const s3 = a.days.slice(off - 3, off).reduce((x, y) => x + y, 0), d0 = new Date(qe); d0.setDate(d0.getDate() - 2);
+        const bg = (a.big || []).filter(x => x.d >= `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, '0')}-${String(d0.getDate()).padStart(2, '0')}` && x.d <= `${qe.getFullYear()}-${String(qe.getMonth() + 1).padStart(2, '0')}-${String(qe.getDate()).padStart(2, '0')}`);
+        if (s3 > 0) t.push(`분기말(${qe.getMonth() + 1}/${qe.getDate()}) 직전 3일(${d0.getMonth() + 1}/${d0.getDate()}~${qe.getDate()})에 만기가 <b>${lmU(s3)}</b> 돌아와요${bg.length ? ` (5억원 이상 거액 ${bg.length}건 ${lmU(bg.reduce((x, y) => x + y.b, 0))})` : ''}. 기준일에 만기경과로 남지 않게 <b>갱신 의사를 미리 확인</b>하세요.`);
+      }
+      const f31 = a.days.slice(0, 31).map((v, i) => ({ v, i })).sort((x, y) => y.v - x.v)[0];
+      if (f31 && f31.v > 0){ const dd = new Date(a0); dd.setDate(dd.getDate() + f31.i + 1); t.push(`앞으로 31일 안에 만기가 가장 큰 날은 <b>${dd.getMonth() + 1}/${dd.getDate()}(${lmU(f31.v)})</b>입니다. 그 전에 갱신 의사를 확인하세요.`); }
+    } else if (sim.lcf && sim.lcf.dep){ const mx = sim.lcf.dep.map((v, i) => ({ v, i })).slice(1).sort((a, c) => c.v - a.v)[0], dd = lmD(sim.lcf.d); dd.setDate(dd.getDate() + mx.i + 1);
       t.push(`앞으로 31일 안에 만기가 가장 큰 날은 <b>${dd.getMonth() + 1}/${dd.getDate()}(${lmU(mx.v)})</b>입니다. 그 전에 갱신 의사를 확인하세요.`); }
-    const age = nowYm - st.base.ym; if (age >= 2) t.push(`월별 만기표가 ${lmM(st.base.ym)}월말 기준이라 <b>${age}개월 지났어요.</b> 그 뒤 재예치분의 만기는 가정으로 채워져 있으니 새 월간 보고서를 올려 주세요.`);
+    const age = nowYm - srcYm; if (st.book){ const ageD = Math.round((Date.parse(kstToday()) - Date.parse(st.book.dep.asof)) / 864e5); if (ageD > 35) t.push(`수신 계좌 목록이 <b>${ageD}일</b> 지났어요. 새 목록을 올려 주세요.`); } else if (age >= 2) t.push(`월별 만기표가 ${lmM(st.base.ym)}월말 기준이라 <b>${age}개월 지났어요.</b> 그 뒤 재예치분의 만기는 가정으로 채워져 있으니 새 월간 보고서를 올려 주세요.`);
     // 전망표 · 큰 만기일
     let pt = '<tr><th>월말</th><th>유동자산(백만원)</th><th>유동부채(백만원)</th><th>비율</th><th>여유(△부족, 백만원)</th><th>창의 예금 만기(백만원)</th><th>창의 대출 회수(백만원)</th><th>상태</th></tr>';
     rows.slice(0, 14).forEach(r => { const s = lmStat(r.r, p); pt += `<tr class="${lmIsQ(r.k) ? 'q' : ''}"><td>${lmLab(r.k)}월말${lmIsQ(r.k) ? ' (분기말)' : ''}</td><td>${lmF(r.A)}</td><td>${lmF(r.B)}</td><td>${lmPct(r.r)}</td><td>${lmF(r.room)}</td><td>${lmF(r.wd)}</td><td>${lmF(r.wl)}</td><td><span class="lmchip ${s}">${LM_SL[s]}</span></td></tr>`; });
     let dt = '<tr><th>날짜</th><th>예금 만기(백만원)</th><th>대출 만기(백만원)</th><th style="text-align:left">비고</th></tr>';
-    if (sim.lcf && sim.lcf.dep){ const b0 = lmD(sim.lcf.d); sim.lcf.dep.map((v, i) => ({ v, i })).sort((a, c) => c.v - a.v).slice(0, 7).sort((a, c) => a.i - c.i).forEach(o => { const dd = new Date(b0); dd.setDate(dd.getDate() + o.i + 1);
+    if (st.book && st.book.dep.days){ const b0 = lmD(st.book.dep.asof), ld = (st.book.loan && st.book.loan.days) || [];
+      st.book.dep.days.slice(0, 31).map((v, i) => ({ v, i })).sort((x, y) => y.v - x.v).slice(0, 7).sort((x, y) => x.i - y.i).forEach(o => { const dd = new Date(b0); dd.setDate(dd.getDate() + o.i + 1);
+        dt += `<tr><td>${dd.getMonth() + 1}/${dd.getDate()}</td><td>${lmF(o.v)}</td><td>${lmF(ld[o.i] || 0)}</td><td style="text-align:left"></td></tr>`; }); }
+    else if (sim.lcf && sim.lcf.dep){ const b0 = lmD(sim.lcf.d); sim.lcf.dep.map((v, i) => ({ v, i })).sort((a, c) => c.v - a.v).slice(0, 7).sort((a, c) => a.i - c.i).forEach(o => { const dd = new Date(b0); dd.setDate(dd.getDate() + o.i + 1);
       dt += `<tr><td>${dd.getMonth() + 1}/${dd.getDate()}</td><td>${lmF(o.v)}</td><td>${lmF((sim.lcf.loan || [])[o.i] || 0)}</td><td style="text-align:left">${o.i === 0 ? '만기경과 미해지분 포함' : ''}</td></tr>`; }); }
     else dt += '<tr><td colspan="4" style="text-align:left">일별 현금흐름분석 파일을 올리면 표시돼요.</td></tr>';
     const past = sim.rows.filter(r => r.actualNet != null).map(r => `${lmLab(r.k)}월 ${lmU(r.mat + r.actualNet)}`);
@@ -184,10 +214,11 @@ function renderLiq(live){
     <div class="lmc"><h3>비율 추이와 전망</h3><div class="lmleg"><span><i style="background:${LM_C.dep}"></i>실적</span><span><i style="background:${LM_C.proj}"></i>전망(월말, 아래 가정 기준)</span><span><i style="background:${LM_C.bad}"></i>기준 100%</span></div><div class="lmtw">${lmChartRatio(st, rows)}</div></div>
     <div class="lmc"><h3>월별 만기 구조 <small>가정 반영 후 · 예금 만기가 대출 회수보다 크게 몰린 달이 위험</small></h3><div class="lmleg"><span><i style="background:${LM_C.dep}"></i>저축성예수금 만기</span><span><i style="background:${LM_C.loan}"></i>대출 회수(3개월 창 산입분)</span></div><div class="lmtw">${lmChartMat(rows)}</div></div>
     <div class="lmc"><h3>분기말 · 월말 전망표</h3><div class="lmtw"><table class="lmtb">${pt}</table></div></div>
+    ${lmBookCards(st)}
     <div class="lmc" id="lmCtrlCard"><h3>가정 조절 <small>바꾸면 맨 위 전망 타일과 표·차트가 바로 다시 계산돼요${adm ? '' : ' · 저장은 관리자만'}</small></h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px"><button class="btn small primary" data-lm="opt">권장 재예치 배분 적용</button><button class="btn small" data-lm="reset">기본값으로</button>${adm ? `<button class="btn small" data-lm="save" ${dirty ? '' : 'disabled'}>가정 저장</button>` : ''}${dirty ? `<button class="btn small" data-lm="revert">저장된 가정으로</button>` : ''}<span class="lmsub" id="lmOptMsg">'권장 배분'은 월말 비율의 최저값이 가장 높아지는 재예치 기간 배분이에요(3개월 이하는 10% 이내). 각 항목 옆에 기본값과 권장값을 적어 두었어요.</span></div>
-      <div class="lmctrl">${lmCtrlHtml(p, lmRec(st, p, live))}</div>
-      <div class="lmnote"><b>가정으로 채운 부분</b> · 재예치 기간 비율은 합계 100%로 환산해요. · 월별 만기표 이후 재예치·신규된 금액(${past.join(', ') || '없음'})의 만기는 실제 값을 몰라 위 기간 비율로 나눴어요. · 요구불예수금 유동부채(${lmU(sim.demand)})는 그대로 둬요. · 신규 대출과 2년 이상 연장분은 전망 기간 안에 만기가 오지 않는 것으로 봐요.</div></div>
+      <div class="lmctrl">${lmCtrlHtml(p, lmRec(st, p, live), !!st.book)}</div>
+      <div class="lmnote"><b>가정으로 채운 부분</b> · 재예치 기간 비율은 합계 100%로 환산해요. · ${st.book ? `계좌 목록(기준일 ${st.book.dep.asof}) 이후에 새로 가입·재예치되는 금액의 만기는 위 기간 비율로 나눠요.` : `월별 만기표 이후 재예치·신규된 금액(${past.join(', ') || '없음'})의 만기는 실제 값을 몰라 위 기간 비율로 나눴어요.`} · 요구불예수금 유동부채(${lmU(sim.demand)})는 그대로 둬요. · 신규 대출과 2년 이상 연장분은 전망 기간 안에 만기가 오지 않는 것으로 봐요.</div></div>
     <div class="lmtwo"><div class="lmc"><h3>31일 이내 큰 만기일</h3><div class="lmtw"><table class="lmtb">${dt}</table></div></div>${upload}</div>`;
   } else {
     body += `<div class="lmc"><h3>비율 추이</h3><div class="lmtw">${lmChartRatio(st, [])}</div></div>${upload}`;
@@ -207,6 +238,27 @@ function renderLiq(live){
   el.innerHTML = body; lmTips(el);
 }
 
+// ---------- 계좌 목록으로 본 창별 만기 · 거액 만기 ----------
+function lmBookCards(st){
+  const bk = st.book; if (!bk) return '';
+  const a = bk.dep, lo = bk.loan, ym0 = lmYmOf(a.asof), sum = (arr, i1, n) => { let t = 0; for (let i = i1; i < i1 + n; i++) t += (arr && arr[i]) || 0; return t; };
+  let w = '<tr><th>분기말</th><th>창(만기월)</th><th>예금 만기(백만원)</th><th>본점 / 지점</th><th>대출 회수(백만원)</th></tr>';
+  for (let k = ym0; k <= ym0 + 12; k++){
+    if (!lmIsQ(k)) continue; const i1 = k + 1 - ym0; if (i1 + 2 > 35) break;
+    const d = sum(a.m, i1, 3), hq = sum(a.mHq, i1, 3), br = sum(a.mBr, i1, 3), l = lo ? sum(lo.lump, i1, 3) + sum(lo.amort, i1, 3) : 0;
+    w += `<tr><td>${lmLab(k)}월말</td><td>${lmLab(k + 1)}~${lmLab(k + 3)}</td><td>${lmF(d)}</td><td>${lmF(hq)} / ${lmF(br)}</td><td>${lo ? lmF(l) : '-'}</td></tr>`;
+  }
+  const big = (a.big || []).slice(0, 24); let bt = '<tr><th>만기일</th><th>구분</th><th>금액(백만원)</th></tr>';
+  big.forEach(x => { bt += `<tr><td>${+x.d.slice(5, 7)}/${+x.d.slice(8, 10)} <span class="lmsub">(${x.d.slice(2, 4)}년)</span></td><td>${esc(x.br)}</td><td>${lmF(x.b)}</td></tr>`; });
+  if (!big.length) bt += '<tr><td colspan="3" style="text-align:left">5억원 이상 거액 만기가 없어요.</td></tr>';
+  const npl = lo ? `<div class="lmsub" style="margin-top:8px">대출 계좌 목록(${esc(lo.asof)}): 정상 ${lmF(lo.normal)} · 요주의 ${lmF(lo.caution)} · <b>고정이하 ${lmF(lo.npl)}</b>(본점 ${lmF(lo.nplHq)} / 지점 ${lmF(lo.nplBr)}) · 만기경과 대출 ${lmF((lo.overdueOk || 0) + (lo.overdueNpl || 0))}(고정이하 ${lmF(lo.overdueNpl || 0)}) · 일시상환 ${Math.round((lo.lumpShare || 0) * 100)}%</div>` : '';
+  return `<div class="lmtwo">
+    <div class="lmc"><h3>계좌 목록으로 본 분기말 창 <small>${esc(a.asof)} 기준 · 기존 계좌만(이후 가입·재예치 제외)</small></h3><div class="lmtw"><table class="lmtb">${w}</table></div>
+      <div class="lmsub" style="margin-top:8px">수신 합계 ${lmU(a.total)} (본점 ${lmF(a.hq)} / 지점 ${lmF(a.br)}) · 만기경과 미해지 <b>${lmU(a.overdue)}</b>(본점 ${lmF(a.overdueHq)} / 지점 ${lmF(a.overdueBr)}) · 적금류 ${Math.round((a.jeok || 0) / (a.total || 1) * 1000) / 10}%</div>${npl}</div>
+    <div class="lmc"><h3>거액(5억원 이상) 예금 만기 <small>총 ${(a.big || []).length}건</small></h3><div class="lmtw"><table class="lmtb">${bt}</table></div><div class="lmsub" style="margin-top:8px">계좌 번호·성명은 저장하지 않아요. 큰 만기는 미리 갱신 의사를 확인해 두세요.</div></div>
+  </div>`;
+}
+
 function lmTips(el){
   el.querySelectorAll('[data-tip]').forEach(n => { if (n.dataset.tb) return; n.dataset.tb = '1';
     n.addEventListener('mousemove', (e) => { const tp = $('lmTip'); tp.innerHTML = n.dataset.tip; tp.style.display = 'block'; tp.style.left = Math.min(window.innerWidth - tp.offsetWidth - 8, e.clientX + 14) + 'px'; tp.style.top = (e.clientY + 14) + 'px'; });
@@ -215,10 +267,10 @@ function lmTips(el){
 function lmStatusTable(st, sim, adm){
   const latest = (k) => lmReports.filter(r => r.kind === k).map(r => r.base_date).sort().pop();
   const today = kstToday(), dAgo = (d) => d ? Math.round((Date.parse(today) - Date.parse(d)) / 864e5) : null;
-  const need = { daily_ratio: ['매 영업일', 4], daily_cf: ['주 1회 이상', 10], monthly_cf: ['월 1회', 62], monthly_ratio: ['월 1회', 62] };
+  const need = { daily_ratio: ['매 영업일', 4], daily_cf: ['주 1회 이상', 10], monthly_cf: ['월 1회', 62], monthly_ratio: ['월 1회', 62], book_dep: ['월 1회 이상 (분기말 전)', 35], book_loan: ['월 1회 이상 (분기말 전)', 35] };
   let h = '<table class="lmtb"><tr><th>자료</th><th style="text-align:left">최신 기준일</th><th>올리는 주기</th><th>상태</th>' + (adm ? '<th></th>' : '') + '</tr>';
   Object.keys(LM_KIND).forEach(k => { const d = latest(k), ago = dAgo(d), s = !d ? 'plain' : ago > need[k][1] ? 'warn' : 'good';
-    h += `<tr><td>${LM_KIND[k]}</td><td style="text-align:left">${d || '없음'}</td><td>${need[k][0]}</td><td><span class="lmchip ${s}">${!d ? '없음' : s === 'warn' ? '갱신 필요' : '최신'}</span></td>${adm ? `<td>${d ? `<button class="lmx" title="이 자료 삭제" data-lmdel="${k}|${d}">✕</button>` : ''}</td>` : ''}</tr>`; });
+    h += `<tr><td>${LM_KIND[k]}</td><td style="text-align:left">${d || '없음'}${d && k.startsWith('book_') ? ` · 합계 ${lmF((lmReports.find(r => r.kind === k && r.base_date === d) || { data: {} }).data.total || 0)}` : ''}</td><td>${need[k][0]}</td><td><span class="lmchip ${s}">${!d ? '없음' : s === 'warn' ? '갱신 필요' : '최신'}</span></td>${adm ? `<td>${d ? `<button class="lmx" title="이 자료 삭제" data-lmdel="${k}|${d}">✕</button>` : ''}</td>` : ''}</tr>`; });
   return h + '</table>';
 }
 let lmRecKey = '', lmRecVal = null;
@@ -235,10 +287,11 @@ function lmRec(st, p, live){   // 권장 배분은 순증·만기경과·연장 
   if (key !== lmRecKey && !live){ lmRecKey = key; lmRecVal = lmBest(st, p); }
   return lmRecVal;
 }
-function lmCtrlHtml(p, rec){
+function lmCtrlHtml(p, rec, hasBook){
   const tsum = (p.t3 + p.t6 + p.t10 + p.t12 + p.t13) || 1;
   const C = [['depNet', '저축성예수금 순증 (월)', -5000, 5000, 100], ['loanNet', '대출 순증 (월)', -2000, 4000, 50], ['overdue', '만기경과 미해지 잔액', 0, 8000, 100], ['ext1', '만기 대출 중 1년 연장 비율 (나머지는 2년 이상)', 0, 100, 5], ['target', '내부 관리 목표 (기준은 100% 초과)', 100, 120, 1]]
     .concat(LM_TERMS.map(([, lab, key]) => [key, '재예치 기간: ' + lab, 0, 100, 1]));
+  if (hasBook) C.splice(C.findIndex(c => c[0] === 'overdue'), 1);   // 만기경과 미해지는 계좌 목록 값을 자동으로 쓴다
   const isT = (k) => k[0] === 't' && k !== 'target', fmtV = (k, v) => isT(k) ? Math.round(v / tsum * 100) + '%' : (k === 'ext1' || k === 'target') ? v + '%' : lmU(v);
   const hint = (k) => `기본 ${isT(k) ? LM_DEF[k] + '%' : fmtV(k, LM_DEF[k])}` + (isT(k) && rec ? ` · 권장 ${rec.p[k]}%` : '');
   return C.map(([k, lab, mn, mx, stp]) => `<div><label>${lab} <span class="lmdef">${hint(k)}</span></label><div class="r"><input type="range" data-lmp="${k}" min="${mn}" max="${mx}" step="${stp}" value="${p[k]}" /><output>${fmtV(k, p[k])}</output></div></div>`).join('');
@@ -342,14 +395,80 @@ function lmParseBook(wb){
   }
   return { skip: title || '알 수 없는 파일' };
 }
+// ---------- 계좌 목록(수신 · 대출) 집계: 파일은 브라우저에서만 읽고 월별 합계만 저장 ----------
+function lmDateOf(v){   // 'YYYY-MM-DD' · 20261112 · 엑셀 날짜 → 'YYYY-MM-DD'
+  if (v == null || v === '') return null;
+  if (v instanceof Date && !isNaN(v)) return new Date(v.getTime() - v.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+  const t = String(v).trim(); let m = t.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/); if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = t.match(/^(\d{4})(\d{2})(\d{2})$/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const n = Number(t); if (n > 30000 && n < 80000){ const d = new Date(Date.UTC(1899, 11, 30) + n * 864e5); return d.toISOString().slice(0, 10); }
+  return null;
+}
+const lmAddDays = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const lmDayDiff = (a, b) => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5);
+const lmR = (arr) => arr.map(x => Math.round(x));
+function lmAggDep(rows, H){
+  const ix = (n) => H.indexOf(n), iB = ix('본지점'), iP = ix('상품명'), iS = ix('신규일'), iM = ix('만기일'), iA = ix('계좌잔액');
+  const acc = []; rows.forEach(r => { if (!r) return; const s = lmDateOf(r[iS]), m = lmDateOf(r[iM]), b = lmNum(r[iA]) / 1e6; if (s && m && b > 0) acc.push({ br: String(r[iB] ?? '').trim() || '미구분', p: String(r[iP] ?? '').trim(), s, m, b }); });
+  if (!acc.length) throw new Error('읽을 수 있는 계좌가 없어요 (열: 본지점·상품명·신규일·만기일·계좌잔액)');
+  const asof = acc.reduce((x, y) => y.s > x ? y.s : x, '0000-00-00'), a0 = lmYmOf(asof), N = 36;
+  const m = new Array(N).fill(0), mHq = new Array(N).fill(0), mBr = new Array(N).fill(0), days = new Array(62).fill(0);
+  let total = 0, jeok = 0, hq = 0, br = 0, ov = 0, ovH = 0, ovB = 0; const big = [];
+  acc.forEach(x => {
+    total += x.b; if (x.br === '본점') hq += x.b; else br += x.b; if (x.p.includes('적금')) jeok += x.b;
+    if (x.m <= asof){ ov += x.b; if (x.br === '본점') ovH += x.b; else ovB += x.b; return; }
+    const i = lmYmOf(x.m) - a0; if (i >= 0 && i < N){ m[i] += x.b; if (x.br === '본점') mHq[i] += x.b; else mBr[i] += x.b; }
+    const di = lmDayDiff(asof, x.m) - 1; if (di >= 0 && di < 62) days[di] += x.b;
+    if (x.b >= 500) big.push({ d: x.m, b: Math.round(x.b), br: x.br });
+  });
+  big.sort((x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : y.b - x.b);
+  return { asof, n: acc.length, total: Math.round(total), jeok: Math.round(jeok), hq: Math.round(hq), br: Math.round(br), overdue: Math.round(ov), overdueHq: Math.round(ovH), overdueBr: Math.round(ovB), m: lmR(m), mHq: lmR(mHq), mBr: lmR(mBr), days: lmR(days), big: big.slice(0, 60) };
+}
+function lmAggLoan(rows, H, asof){
+  const ix = (n) => H.indexOf(n), iC = ix('조합코드'), iM = ix('만기일자'), iBal = ix('대출잔액'), iP = ix('원금상환방법'), iG = ix('건전성등급');
+  const N = 36, a0 = lmYmOf(asof), lump = new Array(N).fill(0), amort = new Array(N).fill(0), days = new Array(62).fill(0);
+  let total = 0, normal = 0, caution = 0, npl = 0, nplH = 0, nplB = 0, lumpAll = 0, ovOk = 0, ovNpl = 0, n = 0;
+  rows.forEach(r => {
+    if (!r) return; const m = lmDateOf(r[iM]), b = lmNum(r[iBal]) / 1e6; if (!m || !(b > 0)) return; n++;
+    const g = String(r[iG] ?? '').trim(), pm = String(r[iP] ?? '').trim(), isHq = String(r[iC]).trim() === '201';
+    const bad = g.startsWith('고정') || g.startsWith('회수') || g.startsWith('추정'), ok = g === '정상' || g.startsWith('요주의');
+    total += b; if (g === '정상') normal += b; else if (g.startsWith('요주의')) caution += b; else if (bad){ npl += b; if (isHq) nplH += b; else nplB += b; }
+    if (pm === '일시상환') lumpAll += b;
+    if (!ok) return;   // 고정이하 등은 유동자산에서 제외
+    if (m <= asof){ ovOk += b; return; }
+    if (pm === '일시상환'){ const i = lmYmOf(m) - a0; if (i >= 0 && i < N) lump[i] += b; const di = lmDayDiff(asof, m) - 1; if (di >= 0 && di < 62) days[di] += b; }
+    else { const M = Math.max(1, lmYmOf(m) - a0), per = b / M; for (let k = 1; k <= M && k < N; k++) amort[k] += per; }   // 분할상환은 남은 개월 수로 균등 회수한다고 근사
+  });
+  ovNpl = 0; rows.forEach(r => { if (!r) return; const m = lmDateOf(r[iM]), b = lmNum(r[iBal]) / 1e6, g = String(r[iG] ?? '').trim(); if (m && b > 0 && m <= asof && (g.startsWith('고정') || g.startsWith('회수') || g.startsWith('추정'))) ovNpl += b; });
+  if (!n) throw new Error('읽을 수 있는 대출이 없어요 (열: 만기일자·대출잔액·원금상환방법·건전성등급)');
+  return { asof, n, total: Math.round(total), normal: Math.round(normal), caution: Math.round(caution), npl: Math.round(npl), nplHq: Math.round(nplH), nplBr: Math.round(nplB), lumpShare: total ? lumpAll / total : 0, overdueOk: Math.round(ovOk), overdueNpl: Math.round(ovNpl), lump: lmR(lump), amort: lmR(amort), days: lmR(days) };
+}
+async function lmReadFile(f){
+  if (/\.csv$/i.test(f.name)){
+    const buf = await f.arrayBuffer(); let txt = new TextDecoder('utf-8').decode(buf);
+    if (txt.includes('\ufffd')){ try { txt = new TextDecoder('euc-kr').decode(buf); } catch (e) {} }
+    return XLSX.read(txt, { type: 'string', raw: true });
+  }
+  return XLSX.read(await f.arrayBuffer());
+}
+function lmParseList(wb){   // 계좌 목록이면 집계해서 돌려주고, 아니면 null
+  const sh = wb.Sheets[wb.SheetNames[0]], all = XLSX.utils.sheet_to_json(sh, { header: 1, defval: null, raw: true });
+  const H = (all[0] || []).map(x => String(x ?? '').replace(/\s/g, '')), rows = all.slice(1);
+  if (H.includes('계좌잔액') && H.includes('만기일') && H.includes('신규일')){ const d = lmAggDep(rows, H); return { kind: 'book_dep', base_date: d.asof, data: d }; }
+  if (H.includes('대출잔액') && H.includes('만기일자')){
+    const dep = lmLast(lmReports.filter(r => r.kind === 'book_dep').map(r => ({ d: r.base_date }))), today = kstToday();
+    const asof = dep && Math.abs(lmDayDiff(dep.d, today)) <= 7 ? dep.d : today, d = lmAggLoan(rows, H, asof); return { kind: 'book_loan', base_date: asof, data: d };
+  }
+  return null;
+}
 async function lmUpload(files){
   if (!isAdmin()) return toast('자료 올리기는 관리자만 할 수 있어요');
-  files = files.filter(f => /\.xlsx$/i.test(f.name)); if (!files.length) return toast('엑셀(.xlsx) 파일을 올려주세요');
+  files = files.filter(f => /\.(xlsx|csv)$/i.test(f.name)); if (!files.length) return toast('엑셀(.xlsx) 또는 CSV 파일을 올려주세요');
   try { await lmLoadXlsx(); } catch (e) { return alert(e.message); }
   const ok = [], bad = [];
   for (const f of files){
     try {
-      const rep = lmParseBook(XLSX.read(await f.arrayBuffer()));
+      const wb = await lmReadFile(f), rep = lmParseList(wb) || lmParseBook(wb);
       if (rep.skip){ bad.push(`${f.name}: 쓰지 않는 보고서(${rep.skip})`); continue; }
       const { error } = await sb.from('liq_reports').upsert({ ...rep, uploaded_by: me, updated_at: new Date().toISOString() }, { onConflict: 'kind,base_date' });
       if (error) throw new Error(error.message);
