@@ -1185,7 +1185,7 @@
     if (divn === 'liq' && typeof loadLiq === 'function') loadLiq();
   };
   // 모바일 햄버거 메뉴: 가려진 업무구분 버튼(#divBtns)을 서랍에 크게 다시 보여주고, 누르면 원래 버튼을 눌러 같은 동작을 한다
-  const NAV_IC = { home: '📊', deposit: '💼', credit: '💳', appraisal: '🏛', debt: '🛠', personal: '🔒', event: '🎉' };
+  const NAV_IC = { home: '📊', liq: '💧', deposit: '💼', credit: '💳', appraisal: '🏛', debt: '🛠', personal: '🔒', event: '🎉' };
   const navBtns = () => [...document.querySelectorAll('#divBtns button')].filter(b => b.style.display !== 'none');
   const navLabel = (b) => b.querySelector('.lf').textContent.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '').trim();
   function syncNav(){
