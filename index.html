@@ -60,6 +60,27 @@
   .bar{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 20px; padding-top:max(10px, env(safe-area-inset-top));
     background:rgba(0,0,0,.28); color:#fff; }
   .logo{ font-size:19px; font-weight:800; white-space:nowrap; }
+  .burger,.curDiv{ display:none; } #newBtn .bs{ display:none; }
+  .burger{ position:relative; border:0; background:rgba(20,24,40,.06); color:var(--ink); width:40px; height:40px; border-radius:12px; font-size:21px; line-height:1; cursor:pointer; align-items:center; justify-content:center; flex:none; }
+  .burger .bd{ display:none; position:absolute; top:6px; right:6px; width:10px; height:10px; border-radius:50%; background:#e5484d; border:2px solid #fff; } .burger.dot .bd{ display:block; }
+  .curDiv{ font-size:17px; font-weight:800; letter-spacing:-.02em; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  #navOv{ position:fixed; inset:0; z-index:70; background:rgba(15,20,35,0); visibility:hidden; transition:background .2s, visibility 0s .2s; }
+  #navOv.open{ background:rgba(15,20,35,.45); visibility:visible; transition:background .2s; }
+  #navSheet{ position:absolute; top:0; left:0; bottom:0; width:min(82vw,320px); background:#fff; box-shadow:8px 0 30px rgba(0,0,0,.18); padding:max(14px, env(safe-area-inset-top)) 14px 24px; overflow:auto; transform:translateX(-102%); transition:transform .22s ease; }
+  #navOv.open #navSheet{ transform:none; }
+  #navSheet .nh{ display:flex; align-items:center; justify-content:space-between; padding:4px 6px 12px; font-size:17px; letter-spacing:-.02em; }
+  #navSheet .nx{ border:0; background:#f1f3f7; width:36px; height:36px; border-radius:50%; font-size:15px; cursor:pointer; color:#44546f; }
+  #navList{ display:flex; flex-direction:column; gap:4px; }
+  #navList button{ display:flex; align-items:center; gap:12px; width:100%; border:0; background:transparent; text-align:left; padding:14px 12px; border-radius:14px; font-size:16.5px; font-weight:700; color:var(--ink); cursor:pointer; min-height:48px; }
+  #navList button .ic{ width:26px; text-align:center; font-size:19px; flex:none; } #navList button .t{ flex:1; }
+  #navList button .nb{ font-size:12px; font-weight:800; background:var(--accent-soft); color:var(--accent); border-radius:99px; padding:2px 9px; }
+  #navList button.on{ background:#16181d; color:#fff; } #navList button.on .nb{ background:#fff; color:#16181d; }
+  @media (max-width:760px){
+    .burger{ display:inline-flex; } .curDiv{ display:inline-block; }
+    .divs{ display:none !important; }
+    .bar{ flex-wrap:nowrap !important; gap:8px !important; } .bar .logo{ font-size:20px; } .bar .logo .lt{ display:none; }
+    #newBtn .bf{ display:none; } #newBtn .bs{ display:inline; }
+  }
   .spacer{ flex:1; }
   .pill{ font-size:12.5px; font-weight:700; padding:5px 10px; border-radius:99px; background:rgba(255,255,255,.2); color:#fff; white-space:nowrap; }
   .pill.link{ cursor:pointer; }
@@ -464,7 +485,8 @@
 
 <div id="app">
   <div class="bar">
-    <span class="logo">🧚 할일요정</span>
+    <button class="burger" id="navBurger" type="button" aria-label="메뉴 열기" aria-expanded="false" aria-controls="navOv"><span class="bg">☰</span><i class="bd"></i></button>
+    <span class="logo">🧚<span class="lt"> 할일요정</span></span><span class="curDiv" id="curDiv"></span>
     <div class="divs" id="divBtns">
       <button data-div="home"><span class="lf">📊 현황판</span><span class="ls">현황</span></button>
       <button data-div="liq"><span class="lf">💧 유동성관리</span><span class="ls">유동성</span></button>
@@ -480,6 +502,7 @@
     <button class="btn glass small" id="newBtn">＋ 새 업무</button>
     <span id="whoPh" style="display:none"></span><button class="whoBtn" id="who" title="내 프로필 (사진·이름 변경)"></button>
   </div>
+  <div id="navOv" aria-hidden="true"><div id="navSheet" role="dialog" aria-label="메뉴"><div class="nh"><b>🧚 할일요정</b><button type="button" class="nx" id="navClose" aria-label="메뉴 닫기">✕</button></div><div id="navList"></div></div></div>
   <div id="wrap">
     <div id="main">
     <div id="hello"><div id="helloT"></div><span id="clockPh" style="display:none"></span><div id="clock"><div class="cdd"></div><div class="cdt"></div><div class="cd2"></div></div></div>
@@ -888,7 +911,9 @@
     const fundTab = debt && typeof dbTab !== 'undefined' && dbTab === 'fund';
     const w = !home && !ev && !liq && !fundTab && (personal || canWrite(divn));   // debt 도 canWrite('debt'), 현황판에는 새 업무 버튼 없음
     $('newBtn').style.display = w ? '' : 'none';
-    $('newBtn').textContent = debt ? (typeof dbTab !== 'undefined' && dbTab === 'survey' ? '＋ 조사 대상 등록' : '＋ 연체채권 등록') : personal ? '＋ 개인 할 일' : appr ? (typeof apTab !== 'undefined' && apTab === 'rti' ? '＋ 새 RTI 계산' : typeof apTab !== 'undefined' && apTab === 'dep' ? '＋ 새 차감계산' : '＋ 새 감정평가 의뢰') : '＋ 새 업무';
+    { const full = debt ? (typeof dbTab !== 'undefined' && dbTab === 'survey' ? '＋ 조사 대상 등록' : '＋ 연체채권 등록') : personal ? '＋ 개인 할 일' : appr ? (typeof apTab !== 'undefined' && apTab === 'rti' ? '＋ 새 RTI 계산' : typeof apTab !== 'undefined' && apTab === 'dep' ? '＋ 새 차감계산' : '＋ 새 감정평가 의뢰') : '＋ 새 업무',
+        short = { '＋ 조사 대상 등록': '＋ 조사 등록', '＋ 연체채권 등록': '＋ 채권 등록', '＋ 개인 할 일': '＋ 할 일', '＋ 새 RTI 계산': '＋ 새 계산', '＋ 새 차감계산': '＋ 새 계산', '＋ 새 감정평가 의뢰': '＋ 새 의뢰' }[full] || full;
+      $('newBtn').innerHTML = `<span class="bf">${esc(full)}</span><span class="bs">${esc(short)}</span>`; $('newBtn').title = full.replace('＋ ', ''); }
     $('roPill').style.display = w || home || ev || liq || fundTab ? 'none' : '';
     $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
     renderRecentComments();
@@ -1159,6 +1184,28 @@
     if (divn === 'event' && typeof loadEvent === 'function') loadEvent();
     if (divn === 'liq' && typeof loadLiq === 'function') loadLiq();
   };
+  // 모바일 햄버거 메뉴: 가려진 업무구분 버튼(#divBtns)을 서랍에 크게 다시 보여주고, 누르면 원래 버튼을 눌러 같은 동작을 한다
+  const NAV_IC = { home: '📊', deposit: '💼', credit: '💳', appraisal: '🏛', debt: '🛠', personal: '🔒', event: '🎉' };
+  const navBtns = () => [...document.querySelectorAll('#divBtns button')].filter(b => b.style.display !== 'none');
+  const navLabel = (b) => b.querySelector('.lf').textContent.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '').trim();
+  function syncNav(){
+    const act = document.querySelector('#divBtns button.on'); $('curDiv').textContent = act ? navLabel(act) : '';
+    let n = 0; document.querySelectorAll('#divBtns button:not(.on) .n').forEach(x => { if (x.style.display !== 'none') n += parseInt(x.textContent) || 0; });
+    $('navBurger').classList.toggle('dot', n > 0);
+  }
+  function openNav(){
+    $('navList').innerHTML = navBtns().map(b => { const nb = b.querySelector('.n'), c = nb && nb.style.display !== 'none' ? (nb.textContent || '').trim() : ''; return `<button type="button" data-nav="${b.dataset.div}" class="${b.classList.contains('on') ? 'on' : ''}"><span class="ic">${NAV_IC[b.dataset.div] || '•'}</span><span class="t">${esc(navLabel(b))}</span>${c ? `<span class="nb">${esc(c)}</span>` : ''}</button>`; }).join('');
+    $('navOv').classList.add('open'); $('navOv').setAttribute('aria-hidden', 'false'); $('navBurger').setAttribute('aria-expanded', 'true'); document.body.style.overflow = 'hidden';
+  }
+  function closeNav(){ $('navOv').classList.remove('open'); $('navOv').setAttribute('aria-hidden', 'true'); $('navBurger').setAttribute('aria-expanded', 'false'); document.body.style.overflow = ''; }
+  $('navBurger').onclick = openNav; $('navClose').onclick = closeNav;
+  $('navOv').addEventListener('click', (e) => {
+    if (e.target === $('navOv')) return closeNav();
+    const b = e.target.closest('[data-nav]'); if (!b) return;
+    closeNav(); const orig = document.querySelector(`#divBtns [data-div="${b.dataset.nav}"]`); if (orig) orig.click();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('navOv').classList.contains('open')) closeNav(); });
+  new MutationObserver(syncNav).observe($('divBtns'), { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style'] }); syncNav();
   $('list').addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]');
     if (go){
