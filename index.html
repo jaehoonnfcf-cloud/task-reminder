@@ -540,16 +540,27 @@
   }
   /* 웹(1440px 이상): 업무 상세를 팝업 대신 오른쪽에 붙는 패널로. 열려 있는 동안 앱 틀이 왼쪽으로 줄고, 시세·뉴스 열은 잠시 가린다 */
   .trow.sel{ box-shadow:0 0 0 2px var(--accent), var(--sh); }
+  #dockHint{ display:none; }
+  #app:not([data-div="home"]) #quoteCard, #app:not([data-div="home"]) #newsCard{ display:none; }   /* 시세정보·경제뉴스는 현황판에서만 */
   @media (min-width:1440px){
     body.dock-open #detailOv{ position:fixed; inset:auto; top:20px; right:20px; bottom:20px; width:400px; padding:0; background:transparent; overflow:visible; z-index:50; }
     body.dock-open #detailOv .panel{ max-width:none; width:100%; height:100%; margin:0; overflow-y:auto; border-radius:26px; padding:24px 22px; box-shadow:0 10px 40px rgba(80,50,180,.16); }
     html body.dock-open #app[style*="flex"]{ width:calc(100% - 460px); max-width:none; margin:20px 0 20px 20px; grid-template-columns:250px minmax(0,1fr); }
     html body.dock-open #app[style*="flex"] #side{ display:none; }
-    /* 본문이 좁아지므로 목록 줄은 좁은 화면용 배치(제목 위, 진행·담당·버튼 아래)를 쓴다 */
-    body.dock-open .thead{ display:none; }
-    body.dock-open .trow{ grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"type title due" ". prog prog" ". who act"; gap:8px 14px; padding:14px 20px; align-items:center; }
-    body.dock-open .c-type{ grid-area:type; flex-direction:row; align-items:center; } body.dock-open .c-title{ grid-area:title; } body.dock-open .c-due{ grid-area:due; justify-self:end; }
-    body.dock-open .c-prog{ grid-area:prog; } body.dock-open .c-who{ grid-area:who; } body.dock-open .c-act{ grid-area:act; justify-self:end; }
+    /* 대출취급·공통업무: 오른쪽 400px 열을 처음부터 확보해서, 상세를 열고 닫아도 메뉴·본문 크기와 줄 배치가 바뀌지 않게 한다.
+       평소에는 안내·내 정보·최근 댓글이 그 자리에 있고, 업무를 열면 같은 자리에 상세 패널이 나온다 */
+    html body #app[style*="flex"][data-div="credit"], html body #app[style*="flex"][data-div="deposit"]{ width:calc(100% - 460px); max-width:none; margin:20px 0 20px 20px; grid-template-columns:250px minmax(0,1fr); }
+    html body:not(.dock-open) #app[style*="flex"][data-div="credit"] #side, html body:not(.dock-open) #app[style*="flex"][data-div="deposit"] #side{ display:flex; flex-direction:column; gap:14px; position:fixed; top:20px; right:20px; bottom:20px; width:400px; margin:0; overflow-y:auto; }
+    #app[data-div="credit"] #dockHint, #app[data-div="deposit"] #dockHint{ display:block; }
+    /* 본문 폭이 고정되므로 목록 줄은 처음부터 좁은 배치(제목 위, 진행·담당·버튼 아래) */
+    html body #app[data-div="credit"] .thead, html body #app[data-div="deposit"] .thead{ display:none; }
+    html body #app[data-div="credit"] .trow, html body #app[data-div="deposit"] .trow{ grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"type title due" ". prog prog" ". who act"; gap:8px 14px; padding:14px 20px; align-items:center; }
+    html body #app[data-div="credit"] .c-type, html body #app[data-div="deposit"] .c-type{ grid-area:type; flex-direction:row; align-items:center; }
+    html body #app[data-div="credit"] .c-title, html body #app[data-div="deposit"] .c-title{ grid-area:title; }
+    html body #app[data-div="credit"] .c-due, html body #app[data-div="deposit"] .c-due{ grid-area:due; justify-self:end; }
+    html body #app[data-div="credit"] .c-prog, html body #app[data-div="deposit"] .c-prog{ grid-area:prog; }
+    html body #app[data-div="credit"] .c-who, html body #app[data-div="deposit"] .c-who{ grid-area:who; }
+    html body #app[data-div="credit"] .c-act, html body #app[data-div="deposit"] .c-act{ grid-area:act; justify-self:end; }
     body.dock-open #detailPanel .steps{ flex-direction:column; flex-wrap:nowrap; gap:8px; }
     body.dock-open #detailPanel .step{ width:100%; border-radius:14px; }
   }
@@ -644,10 +655,11 @@
     </div>
     </div>
     <aside id="side">
+      <div class="side-card" id="dockHint"><div class="side-h"><span>🗂 업무 상세</span></div><div class="side-empty">업무를 누르면 상세가 이 자리에 나와요</div></div>
       <div class="side-card" id="meCard"><div class="mc-who"></div><div class="mc-clock"></div><div id="onlineBox"></div></div>
-      <div class="side-card"><div class="side-h"><span>📈 시세정보 <button class="q-mg" id="qManage" type="button">관리</button></span><span class="muted" id="qTime"></span></div><div id="quotes"><div class="side-empty">불러오는 중...</div></div></div>
+      <div class="side-card" id="quoteCard"><div class="side-h"><span>📈 시세정보 <button class="q-mg" id="qManage" type="button">관리</button></span><span class="muted" id="qTime"></span></div><div id="quotes"><div class="side-empty">불러오는 중...</div></div></div>
       <div class="side-card" id="rcCard" style="display:none"><div class="side-h"><span>💬 최근 댓글</span><span class="muted">눌러서 업무 열기</span></div><div id="rcList"></div></div>
-      <div class="side-card"><div class="side-h"><span>📰 경제뉴스</span><span class="muted" id="nTime"></span></div><div id="news"><div class="side-empty">불러오는 중...</div></div></div>
+      <div class="side-card" id="newsCard"><div class="side-h"><span>📰 경제뉴스</span><span class="muted" id="nTime"></span></div><div id="news"><div class="side-empty">불러오는 중...</div></div></div>
     </aside>
   </div>
 </div>
