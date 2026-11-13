@@ -304,7 +304,7 @@ function renderApDetail(){
     <div class="apinfo">
       <div><div class="k">의뢰번호</div><div class="v">${esc(apCaseNo(c))}</div></div>
       <div><div class="k">취급구분</div><div class="v">${esc(apTypeText(c))}</div></div>
-      ${c.loan_task_id && typeof byId === 'function' && byId(c.loan_task_id) ? `<div><div class="k">연결 대출 건</div><div class="v"><button class="btn small" data-act="goloan">💰 ${esc(typeof loanLine === 'function' ? loanLine(byId(c.loan_task_id)) : byId(c.loan_task_id).title)} ›</button></div></div>` : ''}
+      ${c.loan_task_id && typeof byId === 'function' && byId(c.loan_task_id) ? `<div style="grid-column:1/-1"><div class="k">연결 대출 건</div><div class="v"><button class="btn small" data-act="goloan" style="max-width:100%;white-space:normal;text-align:left;height:auto;line-height:1.4">💰 ${esc(typeof loanLine === 'function' ? loanLine(byId(c.loan_task_id)) : byId(c.loan_task_id).title)} ›</button></div></div>` : ''}
       <div><div class="k">의뢰자</div><div class="v">${esc(nameOf(c.requester_email))}</div></div>
       <div><div class="k">의뢰일</div><div class="v">${esc(c.request_date)}</div></div>
       <div><div class="k">대출신청금액</div><div class="v">${c.loan_amount === null || c.loan_amount === undefined ? '-' : `${esc(apWon(c.loan_amount))}<div class="muted" style="font-weight:500">${Number(c.loan_amount).toLocaleString('ko-KR')}원</div>`}</div></div>
