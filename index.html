@@ -516,11 +516,18 @@
   #tabBar{ display:none; }
   .divs .n:empty{ display:none; }
   #navList button.on{ background:var(--accent-soft); color:#5b2be0; } #navList button.on .nb{ background:#fff; color:#5b2be0; }   /* 건수 로드 전·0건일 때 빈 알약이 보이지 않게 */
-  /* 웹(넓은 화면): 왼쪽 사이드바 + 오른쪽 본문. 업무구분 버튼(#divBtns)을 그대로 세로 메뉴로 쓴다 */
-  @media (min-width:1024px){
+  /* =====================================================================
+     웹 레이아웃 (1360px 이상 사이드바 틀 / 1200px 이상 서랍·컨트롤) — 모든 화면 공통
+     · 앱 틀: 사이드바(250) | 본문. 현황판을 뺀 모든 화면의 본문 폭·여백·메뉴 크기가 같다 (1360px 미만은 기존 상단 메뉴 방식)
+     · 오른쪽 열(접속자·시세·뉴스)은 현황판에서만 (1500px 이상)
+     · 업무 상세는 오른쪽에서 겹쳐 나오는 서랍 → 열고 닫아도 화면 크기·배치가 바뀌지 않는다
+     ===================================================================== */
+  .trow.sel{ box-shadow:0 0 0 2px var(--accent), var(--sh); }
+  @media (min-width:1360px){
     html body #app[style*="flex"]{ display:grid !important; grid-template-columns:250px minmax(0,1fr); grid-template-rows:auto 1fr; column-gap:0; width:calc(100% - 40px); max-width:1560px; min-height:calc(100vh - 40px); min-height:calc(100dvh - 40px); margin:20px auto; padding:0; align-content:stretch; border-radius:26px; overflow:clip; box-shadow:0 10px 40px rgba(80,50,180,.12); background:linear-gradient(to right,#fff 250px,var(--shell) 250px) !important; }
     html body #app[style*="flex"] .bar{ grid-column:1; grid-row:1 / -1; position:sticky; top:20px; align-self:start; height:calc(100vh - 40px); height:calc(100dvh - 40px); width:auto; max-width:none; margin:0; padding:26px 16px 18px; flex-direction:column; align-items:stretch; flex-wrap:nowrap; gap:6px; background:transparent; overflow-y:auto; color:var(--ink); }
-    html body #app[style*="flex"] #wrap{ grid-column:2; grid-row:1 / -1; max-width:none; margin:0; padding:26px 28px 48px; }
+    html body #app[style*="flex"] #wrap{ grid-column:2; grid-row:1 / -1; max-width:none; margin:0; padding:26px 32px 48px; display:flex; flex-direction:column; align-items:stretch; }
+    html body #app[style*="flex"] #side{ display:none; }
     .bar .logo{ font-size:21px; padding:2px 10px 18px; }
     .divs{ display:flex; flex-direction:column; align-items:stretch; background:transparent; box-shadow:none; padding:0; margin:0; border-radius:0; gap:6px; }
     .divs button{ display:flex; align-items:center; gap:8px; text-align:left; padding:13px 14px; border-radius:12px; font-size:14.5px; font-weight:600; color:#44546f; }
@@ -531,38 +538,34 @@
     #newBtn{ width:100%; min-height:48px; border-radius:14px; font-size:15px; }
     .bar .whoBtn{ width:100%; justify-content:flex-start; padding:8px 10px; border-radius:14px; background:var(--shell); }
   }
-  /* 아주 넓은 화면: 오른쪽 시세·뉴스 열 유지 (사이드바 | 본문 | 시세·뉴스) */
-  @media (min-width:1500px){
-    html body #app[style*="flex"]{ grid-template-columns:250px minmax(0,1fr) 350px; max-width:1800px; }
-    html body #app[style*="flex"] #tgBanner{ grid-column:2; grid-row:1; margin:26px 24px 0 28px; }
-    html body #app[style*="flex"] #main{ grid-column:2; grid-row:2; padding:22px 20px 48px 28px; }
-    html body #app[style*="flex"] #side{ grid-column:3; grid-row:1 / -1; align-self:start; margin:26px 26px 26px 0; position:sticky; top:46px; }
-  }
-  /* 웹(1440px 이상): 업무 상세를 팝업 대신 오른쪽에 붙는 패널로. 열려 있는 동안 앱 틀이 왼쪽으로 줄고, 시세·뉴스 열은 잠시 가린다 */
-  .trow.sel{ box-shadow:0 0 0 2px var(--accent), var(--sh); }
-  #dockHint{ display:none; }
-  #app:not([data-div="home"]) #quoteCard, #app:not([data-div="home"]) #newsCard{ display:none; }   /* 시세정보·경제뉴스는 현황판에서만 */
-  @media (min-width:1440px){
-    body.dock-open #detailOv{ position:fixed; inset:auto; top:20px; right:20px; bottom:20px; width:400px; padding:0; background:transparent; overflow:visible; z-index:50; }
-    body.dock-open #detailOv .panel{ max-width:none; width:100%; height:100%; margin:0; overflow-y:auto; border-radius:26px; padding:24px 22px; box-shadow:0 10px 40px rgba(80,50,180,.16); }
-    html body.dock-open #app[style*="flex"]{ width:calc(100% - 460px); max-width:none; margin:20px 0 20px 20px; grid-template-columns:250px minmax(0,1fr); }
-    html body.dock-open #app[style*="flex"] #side{ display:none; }
-    /* 대출취급·공통업무: 오른쪽 400px 열을 처음부터 확보해서, 상세를 열고 닫아도 메뉴·본문 크기와 줄 배치가 바뀌지 않게 한다.
-       평소에는 안내·내 정보·최근 댓글이 그 자리에 있고, 업무를 열면 같은 자리에 상세 패널이 나온다 */
-    html body #app[style*="flex"][data-div="credit"], html body #app[style*="flex"][data-div="deposit"]{ width:calc(100% - 460px); max-width:none; margin:20px 0 20px 20px; grid-template-columns:250px minmax(0,1fr); }
-    html body:not(.dock-open) #app[style*="flex"][data-div="credit"] #side, html body:not(.dock-open) #app[style*="flex"][data-div="deposit"] #side{ display:flex; flex-direction:column; gap:14px; position:fixed; top:20px; right:20px; bottom:20px; width:400px; margin:0; overflow-y:auto; }
-    #app[data-div="credit"] #dockHint, #app[data-div="deposit"] #dockHint{ display:block; }
-    /* 본문 폭이 고정되므로 목록 줄은 처음부터 좁은 배치(제목 위, 진행·담당·버튼 아래) */
-    html body #app[data-div="credit"] .thead, html body #app[data-div="deposit"] .thead{ display:none; }
-    html body #app[data-div="credit"] .trow, html body #app[data-div="deposit"] .trow{ grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"type title due" ". prog prog" ". who act"; gap:8px 14px; padding:14px 20px; align-items:center; }
-    html body #app[data-div="credit"] .c-type, html body #app[data-div="deposit"] .c-type{ grid-area:type; flex-direction:row; align-items:center; }
-    html body #app[data-div="credit"] .c-title, html body #app[data-div="deposit"] .c-title{ grid-area:title; }
-    html body #app[data-div="credit"] .c-due, html body #app[data-div="deposit"] .c-due{ grid-area:due; justify-self:end; }
-    html body #app[data-div="credit"] .c-prog, html body #app[data-div="deposit"] .c-prog{ grid-area:prog; }
-    html body #app[data-div="credit"] .c-who, html body #app[data-div="deposit"] .c-who{ grid-area:who; }
-    html body #app[data-div="credit"] .c-act, html body #app[data-div="deposit"] .c-act{ grid-area:act; justify-self:end; }
+  @media (min-width:1200px){
+    /* 업무 상세 서랍: 화면 위에 겹쳐 나온다 (본문 크기·줄 배치는 그대로) */
+    body.dock-open #detailOv{ position:fixed; inset:auto; top:20px; right:20px; bottom:20px; width:420px; padding:0; background:transparent; overflow:visible; z-index:50; }
+    body.dock-open #detailOv .panel{ max-width:none; width:100%; height:100%; margin:0; overflow-y:auto; border-radius:26px; padding:24px 22px; box-shadow:0 16px 50px rgba(40,30,100,.28); border:1px solid #e9e7f3; }
     body.dock-open #detailPanel .steps{ flex-direction:column; flex-wrap:nowrap; gap:8px; }
     body.dock-open #detailPanel .step{ width:100%; border-radius:14px; }
+  }
+  /* 아주 넓은 화면: 현황판만 오른쪽 열(접속자·시세·뉴스)을 둔다 */
+  @media (min-width:1500px){
+    html body #app[style*="flex"][data-div="home"]{ grid-template-columns:250px minmax(0,1fr) 350px; }
+    html body #app[style*="flex"][data-div="home"] #wrap{ display:contents; }
+    html body #app[style*="flex"][data-div="home"] #tgBanner{ grid-column:2; grid-row:1; margin:26px 24px 0 32px; }
+    html body #app[style*="flex"][data-div="home"] #main{ grid-column:2; grid-row:2; padding:22px 24px 48px 32px; }
+    html body #app[style*="flex"][data-div="home"] #side{ display:flex; grid-column:3; grid-row:1 / -1; align-self:start; margin:26px 26px 26px 0; position:sticky; top:46px; }
+    html body #meCard:not(:has(.ol-h)){ display:none; }   /* 접속자가 없으면 빈 카드를 숨김 */
+  }
+  /* 최근 댓글 카드는 1200px 이상에서만 본문 아래에 보인다 (이전에는 넓은 화면의 오른쪽 열에만 있었다) */
+  @media (max-width:1199px){ #main > #rcCard{ display:none !important; } }
+  /* 화면 안 메뉴·버튼 크기 통일 (모든 화면 공통): 큰 컨트롤 40px / 작은 버튼 36px */
+  @media (min-width:761px){
+    #wrap .seg{ padding:3px; }
+    #wrap .seg button{ min-height:34px; padding:0 16px; font-size:14px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+    #wrap .toolbar select, #wrap .toolbar .search, #wrap .toolbar .btn{ min-height:40px; font-size:14px; }
+    #wrap .btn.small{ min-height:36px; padding:0 14px; font-size:13.5px; }
+    #wrap .toolbar .btn.small{ min-height:40px; }
+    #wrap .pfnav button, #wrap .evleg button{ min-height:36px; font-size:13.5px; }
+    #wrap .quick input{ min-height:40px; font-size:14px; border-radius:99px; }
+    #wrap .quick .btn{ min-height:40px; }
   }
   /* 모바일: 하단 탭바 */
   @media (max-width:760px){
@@ -655,7 +658,6 @@
     </div>
     </div>
     <aside id="side">
-      <div class="side-card" id="dockHint"><div class="side-h"><span>🗂 업무 상세</span></div><div class="side-empty">업무를 누르면 상세가 이 자리에 나와요</div></div>
       <div class="side-card" id="meCard"><div class="mc-who"></div><div class="mc-clock"></div><div id="onlineBox"></div></div>
       <div class="side-card" id="quoteCard"><div class="side-h"><span>📈 시세정보 <button class="q-mg" id="qManage" type="button">관리</button></span><span class="muted" id="qTime"></span></div><div id="quotes"><div class="side-empty">불러오는 중...</div></div></div>
       <div class="side-card" id="rcCard" style="display:none"><div class="side-h"><span>💬 최근 댓글</span><span class="muted">눌러서 업무 열기</span></div><div id="rcList"></div></div>
@@ -900,13 +902,14 @@
     renderOnline();
   }
   // 넓은 화면(사이드 영역이 보일 때)에서는 내 프로필·시계를 시세정보 위 카드로 옮기고, 좁은 화면에서는 원래 자리로 돌려놓는다
-  const mqSide = window.matchMedia('(min-width:1500px)');
+  const mqSide = window.matchMedia('(min-width:99999px)');   // 프로필·시계는 이제 옮기지 않는다 (프로필=사이드바 아래, 시계=화면 제목 옆)
   function placeMe(){
     const who = $('who'), clock = $('clock'); if (!who || !clock) return;
     if (mqSide.matches){ document.querySelector('#meCard .mc-who').appendChild(who); document.querySelector('#meCard .mc-clock').appendChild(clock); }
     else { $('whoPh').after(who); $('clockPh').after(clock); }
   }
   mqSide.addEventListener ? mqSide.addEventListener('change', placeMe) : mqSide.addListener(placeMe); placeMe();
+  { const rc = $('rcCard'), mn = $('main'); if (rc && mn) mn.appendChild(rc); }   // 최근 댓글 카드: 오른쪽 열이 현황판 전용이 되어 본문 맨 아래로
   // 지금 접속 중인 사람 (Supabase Realtime Presence — 저장되지 않고 접속이 끊기면 자동으로 사라짐)
   let presChan = null, onlineKeys = [];
   function renderOnline(){
@@ -1464,8 +1467,8 @@
   });
 
   // ---------- 상세 ----------
-  // 넓은 화면(1440px 이상)에서는 상세를 팝업 대신 오른쪽에 붙는 패널로 보여준다(같은 패널·같은 동작, 배치만 CSS로 다름). 그보다 좁으면 기존 팝업
-  const dockOn = () => window.matchMedia('(min-width:1440px)').matches;
+  // 넓은 화면(1200px 이상)에서는 상세를 팝업 대신 오른쪽에서 겹쳐 나오는 서랍으로 보여준다(같은 패널·같은 동작, 배치만 CSS로 다름). 그보다 좁으면 기존 팝업
+  const dockOn = () => window.matchMedia('(min-width:1200px)').matches;
   const markSel = () => document.querySelectorAll('#list .trow').forEach(r => r.classList.toggle('sel', openId != null && +r.dataset.id === openId));
   function openDetail(id){ openId = id; renderDetail(byId(id)); $('detailOv').style.display = 'block'; const d = dockOn(); document.body.classList.toggle('dock-open', d); document.body.style.overflow = d ? '' : 'hidden'; markSel(); }
   function closeDetail(){ openId = null; $('detailOv').style.display = 'none'; document.body.classList.remove('dock-open'); document.body.style.overflow = ''; markSel(); }
