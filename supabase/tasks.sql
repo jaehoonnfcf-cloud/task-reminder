@@ -838,3 +838,8 @@ create policy arf_ins on public.appraisal_reply_files for insert to authenticate
 create policy arf_del on public.appraisal_reply_files for delete to authenticated using (has_appraisal() and (created_by = auth.email() or is_admin()));
 grant select, insert, delete on public.appraisal_reply_files to authenticated;
 alter publication supabase_realtime add table public.appraisal_reply_files;
+
+-- 대출진행 업무: 대출금액(백만원 단위, 정수) / 담보요약(수기 입력, 예: 근화동-아파트)
+alter table public.work_tasks add column if not exists loan_amount bigint check (loan_amount is null or loan_amount >= 0),
+  add column if not exists collateral text check (collateral is null or char_length(collateral) <= 100);
+grant update (loan_amount, collateral) on public.work_tasks to authenticated;

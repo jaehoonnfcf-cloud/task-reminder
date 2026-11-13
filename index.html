@@ -175,6 +175,16 @@
   .pfold{ cursor:pointer; user-select:none; }
 
   /* 요약 타일 */
+  #loanDash{ background:rgba(255,255,255,.96); border-radius:16px; padding:14px 16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(9,30,66,.18); }
+  #loanDash .ldt{ font-weight:800; font-size:15px; margin-bottom:10px; } #loanDash .ldt small{ font-weight:500; color:var(--muted); font-size:12px; margin-left:6px; }
+  #loanDash .ldg{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  #loanDash .ld{ border-radius:12px; padding:12px 14px; background:#f4f6fa; border-left:5px solid #9aa5b8; }
+  #loanDash .ld.ldc{ border-left-color:#f0a020; } #loanDash .ld.ldp{ border-left-color:#2f6fed; } #loanDash .ld.ldx2{ border-left-color:#1f9d55; } #loanDash .ld.ldt2{ background:#eaf0ff; border-left-color:#1c2b4a; }
+  #loanDash .ldh{ font-weight:800; font-size:14px; } #loanDash .ldh small{ display:block; font-weight:500; color:var(--muted); font-size:11.5px; margin-top:1px; }
+  #loanDash .ldn{ font-size:26px; font-weight:800; margin-top:6px; line-height:1.1; } #loanDash .ldn span,#loanDash .lda span{ font-size:12px; font-weight:600; color:var(--muted); margin-left:3px; }
+  #loanDash .lda{ font-size:18px; font-weight:800; margin-top:2px; } #loanDash .lda em{ font-style:normal; font-size:12px; font-weight:700; color:#2f6fed; margin-left:6px; }
+  #loanDash .ldx{ font-size:11.5px; color:var(--muted); margin-top:4px; min-height:14px; }
+  @media (max-width:720px){ #loanDash .ldg{ grid-template-columns:repeat(2,1fr); } }
   #tiles,#ptiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .tile{ background:rgba(255,255,255,.96); border-radius:14px; padding:14px 18px; cursor:pointer; border:2px solid transparent; box-shadow:0 1px 3px rgba(9,30,66,.18); text-align:left; }
   .tile:hover{ background:#fff; }
@@ -508,6 +518,7 @@
     <div id="hello"><div id="helloT"></div><span id="clockPh" style="display:none"></span><div id="clock"><div class="cdd"></div><div class="cdt"></div><div class="cd2"></div></div></div>
     <div id="home"><div id="cal"></div><div id="perf"></div></div>
     <div id="shared">
+    <div id="loanDash"></div>
     <div id="tiles"></div>
     <div class="list-panel">
       <div class="toolbar">
@@ -647,7 +658,9 @@
     <select id="fType"><option value="loan">대출진행 (단계별)</option><option value="general">일반업무 (단건)</option></select>
     <div id="fStageRow"><label>현재 진행 단계 (이전 단계는 완료 처리됩니다)</label><select id="fStage"></select></div>
   </div>
-  <label id="fTitleLabel">고객명 / 대출 건명</label><input id="fTitle" />
+  <label id="fTitleLabel">고객명</label><input id="fTitle" />
+  <div id="fLoanRow"><label>대출금액 (백만원 단위)</label><input id="fAmt" inputmode="numeric" placeholder="예: 300 (= 3억원)" autocomplete="off" />
+  <label>담보요약</label><input id="fColl" maxlength="100" placeholder="예: 근화동-아파트" autocomplete="off" /></div>
   <label>상세 (선택)</label><textarea id="fDetail" rows="2"></textarea>
   <div class="row">
     <div><label>요청자</label><select id="fBy"></select></div>
@@ -931,6 +944,7 @@
     const effType = divn === 'credit' ? fType : 'all';
     const divTasks = tasks.filter(t => taskDiv(t) === divn);
 
+    renderLoanDash(divn === 'credit' ? divTasks : null);
     // 요약 타일 (이 업무구분 전체 기준)
     const open = divTasks.filter(isOpen);
     const cnt = (g) => open.filter(t => dueGrp(t, today) === g).length;
@@ -985,13 +999,42 @@
     $('list').innerHTML = html;
   }
 
+  // ---------- 대출진행 대시보드 (여신업무 상단): 단계별 3구분 집계 ----------
+  // 1단계 = 협의 / 2~4단계 = 진행 / 5단계(대출실행) = 실행. 미진행 처리된 건은 제외.
+  // 실행 = 5단계 진행 중 + 실행 완료(전 단계 완료)한 건 중 올해 완료분
+  const fmtAmt = (m) => { const n = Number(m) || 0; return `${n.toLocaleString('ko-KR')}백만원${n >= 100 ? ` (${(n / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}억)` : ''}`; };
+  function renderLoanDash(list){
+    const el = $('loanDash'); if (!el) return;
+    if (!list){ el.innerHTML = ''; el.style.display = 'none'; return; }
+    const year = kstToday().slice(0, 4), loans = list.filter(t => t.task_type === 'loan' && !isDropped(t));
+    const g = { c: [], p: [], x: [], xd: [] };
+    loans.forEach(t => {
+      const ci = curIdx(t), n = stepsOf(t).length;
+      if (ci >= n){ if (kstDay(doneAtOf(t)).slice(0, 4) === year) g.xd.push(t); }
+      else if (ci === 0) g.c.push(t); else if (ci < n - 1) g.p.push(t); else g.x.push(t);
+    });
+    const sum = (a) => a.reduce((s, t) => s + (Number(t.loan_amount) || 0), 0), noAmt = (a) => a.filter(t => t.loan_amount == null).length;
+    const x = g.x.concat(g.xd);
+    const card = (cls, name, def, a, extra) => `<div class="ld ${cls}"><div class="ldh">${name}<small>${def}</small></div><div class="ldn">${a.length}<span>건</span></div>
+      <div class="lda">${sum(a).toLocaleString('ko-KR')}<span>백만원</span>${sum(a) >= 100 ? `<em>${(sum(a) / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}억</em>` : ''}</div>
+      <div class="ldx">${extra || ''}${noAmt(a) ? `금액 미입력 ${noAmt(a)}건` : ''}</div></div>`;
+    const all = g.c.concat(g.p, x);
+    el.style.display = '';
+    el.innerHTML = `<div class="ldt">💰 대출진행 현황 <small>미진행 제외 · 금액은 대출금액 합계</small></div><div class="ldg">`
+      + card('ldc', '협의', '1단계 · 대출상담', g.c) + card('ldp', '진행', '2~4단계 · 신청~결재', g.p)
+      + card('ldx2', '실행', '5단계 · 대출실행', x, `대기 ${g.x.length} · 올해 실행완료 ${g.xd.length}<br>`)
+      + `<div class="ld ldt2"><div class="ldh">합계<small>협의+진행+실행</small></div><div class="ldn">${all.length}<span>건</span></div><div class="lda">${sum(all).toLocaleString('ko-KR')}<span>백만원</span>${sum(all) >= 100 ? `<em>${(sum(all) / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}억</em>` : ''}</div><div class="ldx">${noAmt(all) ? `금액 미입력 ${noAmt(all)}건` : ''}</div></div></div>`;
+  }
+  // 대출금액 입력칸: 숫자만, 천단위 쉼표
+  document.addEventListener('input', (e) => { if (e.target && e.target.id === 'fAmt'){ const d = e.target.value.replace(/[^\d]/g, ''); e.target.value = d ? Number(d).toLocaleString('ko-KR') : ''; } });
+
   // 완료일: 일반업무 = 담당자 중 가장 늦은 완료, 대출진행 = 마지막 단계 완료, 미진행 = 미진행 처리일
   const doneAtOf = (t) => isDropped(t) ? (t.dropped_at || '') : (t.task_type === 'loan' ? t.work_task_steps.map(s => s.done_at || '') : t.work_task_assignees.map(a => a.done_at || '')).reduce((m, v) => v > m ? v : m, '');
   const kstDay = (iso) => iso ? new Date(new Date(iso).getTime() + 9 * 3600e3).toISOString().slice(0, 10) : '';
   let closedAll = false;
   function rowHtml(t, doneMode){
     const today = kstToday(), g = dueGrp(t, today), loan = t.task_type === 'loan', steps = stepsOf(t), asg = t.work_task_assignees;
-    const sub = [t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
+    const sub = [t.task_type === 'loan' && t.loan_amount != null && `${fmtAmt(t.loan_amount)}`, t.task_type === 'loan' && t.collateral, t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
     let prog, act = '';
     if (loan && isDropped(t)){
       const ds = steps.find(s => s.seq === t.dropped_step);
@@ -1231,7 +1274,7 @@
     const cur = steps[curIdx(t)];
     let body = '';
     if (t.detail) body += `<div class="kv"><div class="k">상세</div><div class="v">${esc(t.detail)}</div></div>`;
-    const info = [t.directed_by && `요청: ${t.directed_by}`, t.due_date && `기한: ${t.due_date}`].filter(Boolean).join('  ·  ');
+    const info = [loan && t.loan_amount != null && `대출금액: ${fmtAmt(t.loan_amount)}`, loan && t.collateral && `담보: ${t.collateral}`, t.directed_by && `요청: ${t.directed_by}`, t.due_date && `기한: ${t.due_date}`].filter(Boolean).join('  ·  ');
     if (info) body += `<div class="kv"><div class="k">정보</div><div class="v">${esc(info)}</div></div>`;
     if (loan){
       const lastDone = [...steps].reverse().find(s => s.done_at), dropped = isDropped(t);
@@ -1346,8 +1389,9 @@
   function syncType(){
     const loan = $('fType').value === 'loan';
     $('fStageRow').style.display = loan ? 'block' : 'none';
-    $('fTitleLabel').textContent = loan ? '고객명 / 대출 건명' : '업무 내용';
-    $('fTitle').placeholder = loan ? '예: 홍길동 담보대출 1억' : '예: 3분기 연체 현황 보고서 작성';
+    $('fTitleLabel').textContent = loan ? '고객명' : '업무 내용';
+    $('fTitle').placeholder = loan ? '예: 홍길동' : '예: 3분기 연체 현황 보고서 작성';
+    $('fLoanRow').style.display = loan ? 'block' : 'none';
   }
   $('fType').onchange = syncType;
   function fillRequesters(current){
@@ -1363,7 +1407,8 @@
     $('fHead').textContent = mode === 'edit' ? '업무 수정' : `새 업무 등록 · ${DIVS[fdiv]}`;
     $('fTypeRow').style.display = mode === 'edit' || fdiv === 'deposit' ? 'none' : 'block';     // 수신/기타는 일반업무만
     if (mode === 'new'){ $('fType').value = fdiv === 'deposit' || fType === 'general' ? 'general' : 'loan'; $('fStage').value = '0'; syncType(); }
-    else $('fTitleLabel').textContent = t.task_type === 'loan' ? '고객명 / 대출 건명' : '업무 내용';
+    else { const lo = t.task_type === 'loan'; $('fTitleLabel').textContent = lo ? '고객명' : '업무 내용'; $('fTitle').placeholder = lo ? '예: 홍길동' : ''; $('fLoanRow').style.display = lo ? 'block' : 'none'; }
+    $('fAmt').value = t && t.loan_amount != null ? Number(t.loan_amount).toLocaleString('ko-KR') : ''; $('fColl').value = t ? (t.collateral || '') : '';
     $('fScope').value = t ? (t.scope || '') : '';
     $('fTitle').value = t ? t.title : ''; $('fDetail').value = t ? (t.detail || '') : ''; fillRequesters(t ? t.directed_by : ''); $('fDue').value = t ? (t.due_date || '') : '';
     const cur = new Set(t ? t.work_task_assignees.map(a => a.email) : [me]);
@@ -1386,11 +1431,17 @@
     if (!scope) return alert('본점 / 지점 / 통합 중 하나를 선택해주세요.');
     if (!title || !emails.length) return alert('내용과 담당자를 입력해주세요.');
     const patch = { title, detail: $('fDetail').value.trim() || null, scope, directed_by: $('fBy').value || null, due_date: $('fDue').value || null };
+    const isLoanForm = formMode === 'edit' ? byId(editId) && byId(editId).task_type === 'loan' : $('fType').value === 'loan';
+    if (isLoanForm){
+      const raw = $('fAmt').value.replace(/[,\s]/g, '');
+      if (raw && !/^\d+$/.test(raw)) return alert('대출금액은 백만원 단위의 숫자(정수)로 입력해주세요. 예: 300 (= 3억원)');
+      patch.loan_amount = raw ? +raw : null; patch.collateral = $('fColl').value.trim() || null;
+    }
     $('fSave').disabled = true;
     try {
       if (formMode === 'edit'){
         const t = byId(editId); if (!t) return;
-        const changed = ['title', 'detail', 'scope', 'directed_by', 'due_date'].some(k => (t[k] || null) !== patch[k]);
+        const changed = ['title', 'detail', 'scope', 'directed_by', 'due_date', 'loan_amount', 'collateral'].some(k => k in patch && (t[k] ?? null) !== patch[k]);
         const before = t.work_task_assignees.map(a => a.email);
         const isOwner = ownerOrAdmin(t);
         const added = isOwner ? emails.filter(e => !before.includes(e)) : [], removed = isOwner ? before.filter(e => !emails.includes(e)) : [];
