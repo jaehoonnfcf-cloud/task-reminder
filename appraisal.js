@@ -245,7 +245,7 @@ function apRowHtml(c){
   }
   const first = props[0];
   return `<div class="aprow" data-ap="${c.id}">
-    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}${apCmts(c).length ? ` <span class="cmtc">💬 ${apCmts(c).length}</span>` : ''}</div><div class="ts">${c.handling_type ? `<b>${esc(c.handling_type === '기타' && c.handling_note ? `기타·${c.handling_note}` : c.handling_type)}</b> · ` : ''}의뢰 ${esc(nameOf(c.requester_email))}${c.loan_amount !== null && c.loan_amount !== undefined ? ` · 신청 ${esc(apWon(c.loan_amount))}` : ''}${c.archived_at ? ` · 📦 보관 ${esc(c.archived_at.slice(5, 10).replace('-', '/'))}` : ''}</div></div>
+    <div><div class="tt"><span class="chip sc-${esc(c.scope)}">${esc(c.scope)}</span> ${esc(c.debtor_name)}${apCmts(c).length ? ` <span class="cmtc">💬 ${apCmts(c).length}</span>` : ''}${c.loan_task_id ? ' <span class="cmtc">💰 대출연결</span>' : ''}</div><div class="ts">${c.handling_type ? `<b>${esc(c.handling_type === '기타' && c.handling_note ? `기타·${c.handling_note}` : c.handling_type)}</b> · ` : ''}의뢰 ${esc(nameOf(c.requester_email))}${c.loan_amount !== null && c.loan_amount !== undefined ? ` · 신청 ${esc(apWon(c.loan_amount))}` : ''}${c.archived_at ? ` · 📦 보관 ${esc(c.archived_at.slice(5, 10).replace('-', '/'))}` : ''}</div></div>
     <div><b>${props.length}건</b>${first ? ` · ${esc(first.address)}${props.length > 1 ? ` 외 ${props.length - 1}` : ''}` : ''}</div>
     <div>${reqs.map(r => `${(() => { const sm = apReqSum(r, props); return `<span class="afc ${sm.done ? 'ok' : ''}" ${sm.mode === 'items' && !sm.done ? `title="미입력: ${esc(sm.miss.join(', '))}번"` : ''}>${esc(apFirmName(r.firm_id))}${sm.done ? ' ✓' : sm.mode === 'items' ? ` ${sm.filled}/${sm.count}` : ''}</span>`; })()}`).join('') || '<span class="muted">의뢰기관 없음</span>'}</div>
     <div>${money}</div>
@@ -304,6 +304,7 @@ function renderApDetail(){
     <div class="apinfo">
       <div><div class="k">의뢰번호</div><div class="v">${esc(apCaseNo(c))}</div></div>
       <div><div class="k">취급구분</div><div class="v">${esc(apTypeText(c))}</div></div>
+      ${c.loan_task_id && typeof byId === 'function' && byId(c.loan_task_id) ? `<div><div class="k">연결 대출 건</div><div class="v"><button class="btn small" data-act="goloan">💰 ${esc(typeof loanLine === 'function' ? loanLine(byId(c.loan_task_id)) : byId(c.loan_task_id).title)} ›</button></div></div>` : ''}
       <div><div class="k">의뢰자</div><div class="v">${esc(nameOf(c.requester_email))}</div></div>
       <div><div class="k">의뢰일</div><div class="v">${esc(c.request_date)}</div></div>
       <div><div class="k">대출신청금액</div><div class="v">${c.loan_amount === null || c.loan_amount === undefined ? '-' : `${esc(apWon(c.loan_amount))}<div class="muted" style="font-weight:500">${Number(c.loan_amount).toLocaleString('ko-KR')}원</div>`}</div></div>
@@ -364,6 +365,7 @@ $('apDetailPanel').addEventListener('click', async (e) => {
   const act = b.dataset.act;
   if (act === 'close') return apCloseDetail();
   if (act === 'edit') return apOpenForm(c.id);
+  if (act === 'goloan') return typeof goLoanTask === 'function' && goLoanTask(c.loan_task_id);
   if (act === 'map') return apShowOnMap(c);
   if (act === 'print') return apPrint(c);
   if (act === 'fax') return apOpenFax(c);
@@ -472,7 +474,7 @@ async function apLookupLand(pnu){
 }
 
 // ---------- 등록 / 수정 폼 ----------
-function apOpenForm(id, prefill){
+function apOpenForm(id, prefill, loanPre){
   if (!apCan()) return alert('감정평가에 등록할 권한이 없어요. 관리자에게 문의해주세요.');
   apFormId = id || null;
   const c = id ? apCases.find(x => x.id === id) : null;
@@ -485,6 +487,7 @@ function apOpenForm(id, prefill){
     <label>취급구분 <span style="color:var(--danger)">*</span></label>
     <div class="checks" id="apfType">${AP_TYPES.map(v => `<label><input type="radio" name="apfTypeR" value="${v}" ${c && c.handling_type === v ? 'checked' : ''}/> ${v}</label>`).join('')}</div>
     <input id="apfTypeNote" maxlength="100" placeholder="기타 사유를 입력하세요 (필수)" style="margin-top:8px;display:none" />
+    <div id="apfLoanLink" style="display:none"><label>연결할 대출 건 (대출취급) <span class="muted" style="font-weight:500">· 신규대출 단계 3 '감정평가'와 이어져요</span></label><select id="apfLoanTask"></select></div>
     <div class="row">
       <div><label>채무자 (예정자) <span style="color:var(--danger)">*</span></label><input id="apfDebtor" maxlength="60" placeholder="이름" /></div>
       <div><label>의뢰자 (자동)</label><input id="apfReq" disabled /></div>
@@ -503,6 +506,18 @@ function apOpenForm(id, prefill){
   $('apfTypeNote').value = c ? (c.handling_note || '') : ''; apTypeSync();
   $('apfDebtor').value = c ? c.debtor_name : '';
   $('apfReq').value = nameOf(c ? c.requester_email : me); $('apfDate').value = c ? c.request_date : kstToday(); $('apfLoan').value = c && c.loan_amount !== null && c.loan_amount !== undefined ? Number(c.loan_amount).toLocaleString('ko-KR') : ''; apLoanHint(); $('apfMemo').value = c ? (c.memo || '') : '';
+  if (typeof tasks !== 'undefined'){   // 연결 가능한 대출 건: 진행 중인 건 + 이미 연결된 건
+    const cur = c ? c.loan_task_id : null;
+    const opts = tasks.filter(t => t.task_type === 'loan' && ((!t.dropped_at && !isDone(t)) || t.id === cur || (loanPre && t.id === loanPre.id)));
+    $('apfLoanTask').innerHTML = '<option value="">(연결 안 함)</option>' + opts.map(t => `<option value="${t.id}">${esc(typeof loanLine === 'function' ? loanLine(t) : t.title)}${t.scope ? ' · ' + esc(t.scope) : ''}</option>`).join('');
+    $('apfLoanTask').value = cur ? String(cur) : '';
+  }
+  if (loanPre && !c){   // 대출 건에서 '감정 의뢰'로 들어온 경우: 고객명·본점/지점·신규대출을 미리 채움
+    $('apfDebtor').value = loanPre.title || '';
+    const sr = document.querySelector(`input[name=apfScopeR][value="${loanPre.scope}"]`); if (sr) sr.checked = true;
+    const tr = document.querySelector('input[name=apfTypeR][value="신규대출"]'); if (tr) tr.checked = true;
+    $('apfLoanTask').value = String(loanPre.id); apTypeSync();
+  }
   (props.length ? props : [null]).forEach(p => apAddPropBlock(p));
   if (prefill && !c){ const b0 = document.querySelector('#apfProps .apblock'); b0.querySelector('.pq').value = prefill.addr; apApplyAddress(b0, prefill); }
   $('apFormOv').style.display = 'block'; document.body.style.overflow = 'hidden';
@@ -512,6 +527,7 @@ function apLoanHint(){ const n = apNum($('apfLoan').value); $('apfLoanHint').tex
 function apTypeSync(){
   const t = document.querySelector('input[name=apfTypeR]:checked');
   $('apfTypeNote').style.display = t && t.value === '기타' ? 'block' : 'none';
+  const ll = $('apfLoanLink'); if (ll) ll.style.display = t && t.value === '신규대출' ? 'block' : 'none';   // 연결은 신규대출만
 }
 function apCloseForm(){ $('apFormOv').style.display = 'none'; apFormId = null; document.body.style.overflow = $('apDetailOv').style.display === 'block' ? 'hidden' : ''; }
 function apRenumber(){
@@ -642,6 +658,8 @@ async function apSaveForm(){
   const firms = [...document.querySelectorAll('#apFirmList input:checked')].map(i => +i.value);
   const notify = [...document.querySelectorAll('#apNotifyList input:checked')].map(i => i.value);
   const patch = { scope, handling_type: htype, handling_note: htype === '기타' ? hnote : null, debtor_name: debtor, request_date: $('apfDate').value || kstToday(), loan_amount: apNum($('apfLoan').value), memo: $('apfMemo').value.trim() || null, notify_emails: notify };
+  { const lt = htype === '신규대출' && $('apfLoanTask') ? $('apfLoanTask').value : '', old = apFormId ? (apCases.find(x => x.id === apFormId) || {}).loan_task_id : null;
+    if (lt || old) patch.loan_task_id = lt ? +lt : null; }   // 연결 안 쓰면 컬럼을 건드리지 않음
   $('apfSave').disabled = true;
   try {
     let cid = apFormId;

@@ -843,3 +843,14 @@ alter publication supabase_realtime add table public.appraisal_reply_files;
 alter table public.work_tasks add column if not exists loan_amount bigint check (loan_amount is null or loan_amount >= 0),
   add column if not exists collateral text check (collateral is null or char_length(collateral) <= 100);
 grant update (loan_amount, collateral) on public.work_tasks to authenticated;
+
+-- 대출취급 3단계 '감정평가': 감정 방식(외부감정/자체감정/감정 불요) + 자체감정 금액(백만원) + 기록자·시각,
+-- 담보심사 건(신규대출)과 대출 건 연결
+alter table public.work_tasks
+  add column if not exists appraisal_mode text check (appraisal_mode in ('external','own','none')),
+  add column if not exists own_appraisal_amount bigint check (own_appraisal_amount is null or own_appraisal_amount >= 0),
+  add column if not exists appraisal_reason text check (appraisal_reason is null or char_length(appraisal_reason) <= 100),
+  add column if not exists appraisal_set_by text,
+  add column if not exists appraisal_set_at timestamptz;
+grant update (appraisal_mode, own_appraisal_amount, appraisal_reason, appraisal_set_by, appraisal_set_at) on public.work_tasks to authenticated;
+alter table public.appraisal_cases add column if not exists loan_task_id bigint references public.work_tasks(id) on delete set null;

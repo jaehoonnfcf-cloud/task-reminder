@@ -183,8 +183,12 @@
   #loanDash .lm{ display:flex; align-items:baseline; gap:8px; margin:4px 0 6px; } #loanDash .lm b{ font-size:30px; font-weight:800; letter-spacing:-.02em; line-height:1.1; } #loanDash u{ text-decoration:none; } #loanDash .lm b u{ font-size:15px; font-weight:700; margin-left:1px; }
   #loanDash .lm span{ font-size:14px; font-weight:700; opacity:.7; }
   #loanDash .lr{ display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0; border-top:1px solid rgba(120,130,150,.22); } #loanDash .lr span:first-child{ font-weight:700; } #loanDash .lr .z{ opacity:.4; }
+  #loanDash .ldw{ margin-top:10px; font-size:13px; background:rgba(255,255,255,.96); border-radius:12px; padding:9px 14px; box-shadow:0 1px 3px rgba(9,30,66,.18); } #loanDash .ldw span{ opacity:.65; } #loanDash .ldw u{ text-decoration:none; }
   #loanDash .lw{ font-size:11px; opacity:.6; margin-top:2px; }
   @media (max-width:900px){ #loanDash .ldg{ grid-template-columns:repeat(2,1fr); gap:10px; } #loanDash .lm b{ font-size:24px; } }
+  .apmsum{ margin-bottom:8px; } .apmseg{ display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; } .apmseg button{ border:1px solid var(--line); background:#fff; border-radius:999px; padding:6px 14px; font-weight:700; cursor:pointer; font-family:inherit; } .apmseg button.on{ background:#1c2b4a; color:#fff; border-color:#1c2b4a; }
+  .apmf{ display:grid; gap:8px; margin:8px 0; } .aplinks{ display:flex; flex-direction:column; gap:6px; margin:8px 0; } .aplk{ text-align:left; border:1px solid var(--line); background:#f7f9fc; border-radius:10px; padding:8px 12px; cursor:pointer; font-family:inherit; font-size:13.5px; }
+  .segs i.na{ background:repeating-linear-gradient(45deg,#d5d9e2,#d5d9e2 3px,#eef0f5 3px,#eef0f5 6px); }
   #tiles,#ptiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .tile{ background:rgba(255,255,255,.96); border-radius:14px; padding:14px 18px; cursor:pointer; border:2px solid transparent; box-shadow:0 1px 3px rgba(9,30,66,.18); text-align:left; }
   .tile:hover{ background:#fff; }
@@ -1001,6 +1005,69 @@
     $('list').innerHTML = html;
   }
 
+  // ---------- 대출 ↔ 감정평가 연결 / 감정 방식 (3단계 '감정평가') ----------
+  // 감정 방식: 외부감정(담보심사 건과 연결) / 자체감정(금액 기록) / 감정 불요(신용·보증서 등, 3단계 자동 통과)
+  const APM = { external: '외부감정', own: '자체감정', none: '감정 불요' };
+  const APM_REASONS = ['신용대출', '보증서대출', '기타'];
+  let apDraft = null;   // { id, mode }: 저장 전에 고른 방식
+  const linkedAppr = (t) => (typeof apCases !== 'undefined' ? apCases : []).filter(c => c.loan_task_id === t.id);
+  function apprStatus(c){
+    if (typeof apReqs !== 'function') return '';
+    const reqs = apReqs(c), props = apProps(c);
+    if (!reqs.length) return '의뢰 전';
+    if (c.chosen_firm_id) return '채택 완료';
+    const done = reqs.filter(r => apReqSum(r, props).done).length;
+    return done === reqs.length ? '가격 회신 완료' : `회신 ${done}/${reqs.length}`;
+  }
+  const apmLine = (t) => !t.appraisal_mode ? '' : t.appraisal_mode === 'own' ? `자체감정${t.own_appraisal_amount != null ? ' ' + Number(t.own_appraisal_amount).toLocaleString('ko-KR') + '백만원' : ''}` : t.appraisal_mode === 'none' ? `감정 불요${t.appraisal_reason ? '(' + t.appraisal_reason + ')' : ''}` : '외부감정';
+  function apprHtml(t, dropped){
+    const mode = apDraft && apDraft.id === t.id ? apDraft.mode : t.appraisal_mode, can = canAct(t) && !dropped;
+    const keepAmt = $('apAmt') && openId === t.id ? $('apAmt').value : null, keepNote = $('apNote') && openId === t.id ? $('apNote').value : null;
+    const amt0 = keepAmt !== null ? keepAmt : t.own_appraisal_amount != null ? Number(t.own_appraisal_amount).toLocaleString('ko-KR') : '';
+    const note0 = keepNote !== null ? keepNote : (t.appraisal_reason || '');
+    const links = linkedAppr(t);
+    const saved = t.appraisal_mode ? `<div class="apmsum"><b>${esc(apmLine(t))}</b>${t.appraisal_reason && t.appraisal_mode === 'own' ? ` · ${esc(t.appraisal_reason)}` : ''}${t.appraisal_set_by ? `<span class="muted"> · ${esc(nameOf(t.appraisal_set_by))} ${fmtTs(t.appraisal_set_at)} 기록</span>` : ''}</div>` : `<div class="muted" style="margin-bottom:6px">감정 방식이 아직 정해지지 않았어요.</div>`;
+    const ctl = can ? `<div class="apmseg">${Object.keys(APM).map(k => `<button type="button" class="${mode === k ? 'on' : ''}" data-d="apm:${k}">${APM[k]}</button>`).join('')}</div>`
+      + (mode === 'own' ? `<div class="apmf"><input id="apAmt" inputmode="numeric" placeholder="자체감정 금액 (백만원)" value="${esc(amt0)}" autocomplete="off" /><input id="apNote" maxlength="100" placeholder="사유·메모 (예: 외부 감정가는 참고만 함)" value="${esc(note0)}" /></div>` : '')
+      + (mode === 'none' ? `<div class="apmf"><div class="reasons">${APM_REASONS.map(r => `<button type="button" class="btn small" data-d="apr:${r}">${r}</button>`).join('')}</div><input id="apNote" maxlength="100" placeholder="불요 사유 (필수)" value="${esc(note0)}" /></div>` : '')
+      + (mode ? `<div class="acts"><button class="btn primary" data-d="apsave">💾 감정 방식 저장</button></div>` : '') : '';
+    const lk = links.length ? `<div class="aplinks">${links.map(c => `<button type="button" class="aplk" data-d="apgo:${c.id}">🏛 ${esc(typeof apCaseNo === 'function' ? apCaseNo(c) : '감정평가')} · <b>${esc(apprStatus(c))}</b> ›</button>`).join('')}</div>` : '';
+    const req = can && mode !== 'none' && (typeof apCan !== 'function' || apCan()) ? `<div class="acts"><button class="btn" data-d="apreq">＋ 이 대출 건으로 감정 의뢰</button></div>` : '';
+    return `<div class="kv"><div class="k">감정 방식</div><div class="v">${saved}${ctl}${lk}${req}</div></div>`;
+  }
+  function goAppraisal(fn){
+    closeDetail();
+    const b = document.querySelector('#divBtns [data-div="appraisal"]'); if (b && divn !== 'appraisal') b.click();
+    setTimeout(fn, 80);
+  }
+  window.goLoanTask = (id) => {   // 담보심사 화면에서 연결된 대출 건으로 이동
+    if (typeof apCloseDetail === 'function') apCloseDetail();
+    const b = document.querySelector('#divBtns [data-div="credit"]'); if (b && divn !== 'credit') b.click();
+    setTimeout(() => openDetail(id), 80);
+  };
+  async function saveApprMode(t){
+    const mode = apDraft && apDraft.id === t.id ? apDraft.mode : t.appraisal_mode; if (!mode) return alert('감정 방식을 선택해주세요.');
+    const note = ($('apNote') ? $('apNote').value : '').trim();
+    const patch = { appraisal_mode: mode, own_appraisal_amount: null, appraisal_reason: null, appraisal_set_by: me, appraisal_set_at: new Date().toISOString() };
+    if (mode === 'own'){
+      const raw = ($('apAmt') ? $('apAmt').value : '').replace(/[,\s]/g, '');
+      if (!/^\d+$/.test(raw) || +raw <= 0) return alert('자체감정 금액을 백만원 단위의 숫자로 입력해주세요. 예: 450 (= 4억 5천만원)');
+      patch.own_appraisal_amount = +raw; patch.appraisal_reason = note || null;
+    } else if (mode === 'none'){
+      if (!note) return alert('감정이 필요 없는 사유를 입력하거나 아래 버튼에서 골라주세요.');
+      patch.appraisal_reason = note;
+    }
+    const { error } = await sb.from('work_tasks').update(patch).eq('id', t.id);
+    if (error) return alert(error.message);
+    // 기록: 댓글에 남긴다 (누가 언제 어떤 방식으로 정했는지)
+    const log = `📝 감정 방식: ${apmLine({ ...t, ...patch })}${mode === 'own' && patch.appraisal_reason ? ' · ' + patch.appraisal_reason : ''}`;
+    await sb.from('work_task_comments').insert({ task_id: t.id, body: log });
+    apDraft = null;
+    if (mode === 'none' && curIdx(t) === 2) await completeStep(t.id, 3);   // 감정 불요: 3단계 자동 통과
+    await loadTasks(); loadComments(t.id);
+  }
+  document.addEventListener('input', (e) => { if (e.target && e.target.id === 'apAmt'){ const d = e.target.value.replace(/[^\d]/g, ''); e.target.value = d ? Number(d).toLocaleString('ko-KR') : ''; } });
+
   // ---------- 대출진행 대시보드 (여신업무 상단): 단계별 3구분 집계 ----------
   // 1단계 = 협의 / 2~4단계 = 진행 / 5단계(대출실행) = 실행. 미진행 처리된 건은 제외.
   // 실행 = 5단계 진행 중 + 실행 완료(전 단계 완료)한 건 중 올해 완료분
@@ -1028,7 +1095,13 @@
     const all = G.c.concat(G.p, G.x);
     el.style.display = '';
     el.innerHTML = `<div class="ldg">` + card('kc', '협의', '1단계', G.c) + card('kp', '진행', '2~4단계', G.p)
-      + card('kx', '실행', '5단계', G.x, `대기 ${G.x.length - xd.length} · 올해 완료 ${xd.length}<br>`) + card('kt', '합계', '미진행 제외', all) + `</div>`;
+      + card('kx', '실행', '5단계', G.x, `대기 ${G.x.length - xd.length} · 올해 완료 ${xd.length}<br>`) + card('kt', '합계', '미진행 제외', all) + `</div>`
+      + (() => {
+        const w = loans.filter(t => curIdx(t) === 2 && t.appraisal_mode !== 'none');
+        if (!w.length) return '';
+        const n = (m) => w.filter(t => (t.appraisal_mode || 'x') === m).length;
+        return `<div class="ldw">⏳ 감정평가 단계 대기 <b>${w.length}건 · ${big(sum(w))}</b> <span>(외부 ${n('external')} · 자체 ${n('own')} · 방식 미정 ${n('x')})</span></div>`;
+      })();
   }
   // 대출금액 입력칸: 숫자만, 천단위 쉼표
   document.addEventListener('input', (e) => { if (e.target && e.target.id === 'fAmt'){ const d = e.target.value.replace(/[^\d]/g, ''); e.target.value = d ? Number(d).toLocaleString('ko-KR') : ''; } });
@@ -1039,7 +1112,7 @@
   let closedAll = false;
   function rowHtml(t, doneMode){
     const today = kstToday(), g = dueGrp(t, today), loan = t.task_type === 'loan', steps = stepsOf(t), asg = t.work_task_assignees;
-    const sub = [t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
+    const sub = [t.task_type === 'loan' && apmLine(t) && `감정 ${apmLine(t)}`, t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
     let prog, act = '';
     if (loan && isDropped(t)){
       const ds = steps.find(s => s.seq === t.dropped_step);
@@ -1047,7 +1120,7 @@
         + `<span class="pl drop">⛔ 미진행 · <b>${esc(ds ? ds.name : '')}</b> 단계</span>`;
     } else if (loan){
       const ci = curIdx(t), c = steps[ci];
-      prog = `<span class="segs">${steps.map((s, i) => `<i class="${s.done_at ? 'ok' : i === ci ? 'cur' : ''}"></i>`).join('')}</span>`
+      prog = `<span class="segs">${steps.map((s, i) => `<i class="${s.done_at ? 'ok' : i === ci ? 'cur' : s.seq === 3 && t.appraisal_mode === 'none' ? 'na' : ''}"></i>`).join('')}</span>`
         + (c ? `<span class="pl"><b>${esc(c.name)}</b> ${ci + 1}/${steps.length}</span>` : `<span class="pl ok">전 단계 완료</span>`);
       if (c && canAct(t)) act = `<button class="go" data-go="step:${t.id}:${c.seq}">✔ ${esc(c.name)} 완료</button>`;
     } else {
@@ -1188,9 +1261,15 @@
 
   // ---------- 동작 (공통) ----------
   async function completeStep(tid, seq){
+    const tk = byId(tid);
+    if (seq === 3 && tk && tk.task_type === 'loan' && !tk.appraisal_mode && !confirm('감정 방식(외부감정 / 자체감정 / 감정 불요)이 아직 기록되지 않았어요.\n그래도 감정평가 단계를 완료할까요?')) return false;
     const { error } = await sb.from('work_task_steps').update({ done_at: new Date().toISOString() }).eq('task_id', tid).eq('seq', seq);
     if (error){ alert(error.message); return false; }
     await sb.functions.invoke('task-notify', { body: { event: 'step_done', task_id: tid, seq } });
+    if (seq === 2 && tk && tk.appraisal_mode === 'none'){   // 감정 불요: 바로 다음(3단계)도 통과
+      const r = await sb.from('work_task_steps').update({ done_at: new Date().toISOString() }).eq('task_id', tid).eq('seq', 3);
+      if (!r.error) await sb.functions.invoke('task-notify', { body: { event: 'step_done', task_id: tid, seq: 3 } });
+    }
     return true;
   }
   async function undoStep(tid, seq){
@@ -1293,6 +1372,7 @@
         ${canAct(t) && !dropped ? `<div class="acts">${cur ? `<button class="btn primary" data-d="step:${cur.seq}">✔ ${esc(cur.name)} 완료</button>` : ''}
         ${lastDone && canUndoStep(t, lastDone) ? `<button class="btn" data-d="undo:${lastDone.seq}">↩ ${esc(lastDone.name)} 되돌리기</button>` : ''}
         ${cur ? `<button class="btn danger" data-d="drop">⛔ 미진행 처리</button>` : ''}</div>` : ''}</div>`;
+      body += apprHtml(t, dropped);
       body += `<div class="kv"><div class="k">담당자</div><div class="v asgs">${t.work_task_assignees.map(a => `<span class="asgc">${avHtml(a.email, '', 'margin:0')}${esc(nameOf(a.email))}</span>`).join('')}</div></div>`;
     } else {
       body += `<div class="kv"><div class="k">담당자별 진행</div>${t.work_task_assignees.map(a => `<div class="asg ${a.done_at ? 'ok' : ''}">
@@ -1347,6 +1427,11 @@
     if (kind === 'edit') return openForm('edit', t.id);
     if (kind === 'drop') return openDrop(t);
     if (kind === 'cover') return typeof loanCoverPrint === 'function' ? loanCoverPrint(t) : undefined;
+    if (kind === 'apm'){ apDraft = { id: t.id, mode: arg }; return renderDetail(t); }
+    if (kind === 'apr'){ if ($('apNote')) $('apNote').value = arg === '기타' ? '' : arg; if (arg === '기타' && $('apNote')) $('apNote').focus(); return; }
+    if (kind === 'apsave'){ b.disabled = true; try { await saveApprMode(t); } finally { b.disabled = false; } return; }
+    if (kind === 'apgo') return goAppraisal(() => typeof apOpenDetail === 'function' && apOpenDetail(+arg));
+    if (kind === 'apreq') return goAppraisal(() => typeof apOpenForm === 'function' && apOpenForm(null, null, { id: t.id, title: t.title, scope: t.scope }));
     if (kind === 'resume'){
       if (!confirm('미진행을 해제하고 진행을 재개할까요?')) return;
       const { error } = await sb.rpc('set_loan_dropped', { p_task: t.id, p_drop: false });
