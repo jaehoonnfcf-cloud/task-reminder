@@ -816,3 +816,25 @@ create policy ls_ins on public.liq_settings for insert to authenticated with che
 create policy ls_upd on public.liq_settings for update to authenticated using (is_admin()) with check (is_admin());
 grant select, insert, update on public.liq_settings to authenticated;
 alter publication supabase_realtime add table public.liq_settings;
+
+-- 감정평가 > 평가기관 가격 회신 이미지/PDF 첨부: Storage 버킷 'appraisal-replies'(비공개, 10MB, jpeg/png/webp/heic/pdf) + appraisal_reply_files(request_id, path, name, mime, size)
+--   조회: 팀원 전체 / 올리기: has_appraisal() / 삭제: 올린 사람·관리자. 파일은 {case_id}/{request_id}/{시각}_{난수}.확장자 경로.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('appraisal-replies', 'appraisal-replies', false, 10485760, array['image/jpeg','image/png','image/webp','image/heic','image/heif','application/pdf'])
+on conflict (id) do nothing;
+create policy apr_obj_sel on storage.objects for select to authenticated using (bucket_id = 'appraisal-replies' and public.is_member());
+create policy apr_obj_ins on storage.objects for insert to authenticated with check (bucket_id = 'appraisal-replies' and public.has_appraisal());
+create policy apr_obj_del on storage.objects for delete to authenticated using (bucket_id = 'appraisal-replies' and public.has_appraisal() and (owner = auth.uid() or public.is_admin()));
+create table if not exists public.appraisal_reply_files (
+  id bigint generated always as identity primary key,
+  request_id bigint not null references public.appraisal_requests(id) on delete cascade,
+  path text not null unique, name text, mime text, size integer,
+  created_by text not null default auth.email(), created_at timestamptz not null default now()
+);
+create index if not exists appraisal_reply_files_req_idx on public.appraisal_reply_files (request_id);
+alter table public.appraisal_reply_files enable row level security;
+create policy arf_sel on public.appraisal_reply_files for select to authenticated using (is_member());
+create policy arf_ins on public.appraisal_reply_files for insert to authenticated with check (has_appraisal() and created_by = auth.email());
+create policy arf_del on public.appraisal_reply_files for delete to authenticated using (has_appraisal() and (created_by = auth.email() or is_admin()));
+grant select, insert, delete on public.appraisal_reply_files to authenticated;
+alter publication supabase_realtime add table public.appraisal_reply_files;

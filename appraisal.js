@@ -159,7 +159,7 @@ function apReqSum(r, props){
 
 async function loadAppraisal(){
   const [c, f, st] = await Promise.all([
-    sb.from('appraisal_cases').select('*, appraisal_properties(*), appraisal_requests(*, appraisal_prices(*)), appraisal_comments(*)').order('id', { ascending: false }),
+    sb.from('appraisal_cases').select('*, appraisal_properties(*), appraisal_requests(*, appraisal_prices(*), appraisal_reply_files(*)), appraisal_comments(*)').order('id', { ascending: false }),
     sb.from('appraisal_firms').select('*').order('sort'),
     sb.from('appraisal_settings').select('*'),
   ]);
@@ -312,7 +312,7 @@ function renderApDetail(){
     ${c.memo ? `<div class="apsec"><div class="k">메모</div><div style="white-space:pre-wrap">${esc(c.memo)}</div></div>` : ''}
     <div class="apsec"><div class="k">물건 (${props.length}건)</div><div class="apm"><table class="apt"><thead><tr><th>#</th><th>구분</th><th>소재지</th><th>지목</th><th style="text-align:right">면적</th></tr></thead><tbody>${propRows || '<tr><td colspan="5" class="muted">등록된 물건이 없어요.</td></tr>'}</tbody></table></div></div>
     <div class="apsec"><div class="k">평가기관별 가격 ${can ? '· 기관별로 입력하고 저장하세요' : ''}</div>
-      ${reqs.length && props.length ? `<div class="apm"><table class="apt"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td><b>전체금액만 입력</b><div class="muted">물건별 금액 없이 총액만 받은 경우</div></td>${tinp}</tr><tr class="tot"><td>합계</td>${tot}</tr><tr><td><b>특이사항</b><div class="muted">기관별 코멘트</div></td>${notes}</tr><tr><td></td>${save}</tr></tbody></table></div>` : '<div class="blk-empty">의뢰한 평가기관이나 물건이 없어요. 수정에서 추가해주세요.</div>'}
+      ${reqs.length && props.length ? `<div class="apm"><table class="apt"><thead><tr><th>물건</th>${head}</tr></thead><tbody>${body}<tr><td><b>전체금액만 입력</b><div class="muted">물건별 금액 없이 총액만 받은 경우</div></td>${tinp}</tr><tr class="tot"><td>합계</td>${tot}</tr><tr><td><b>특이사항</b><div class="muted">기관별 코멘트</div></td>${notes}</tr>${typeof aprCell === 'function' ? `<tr><td><b>회신 이미지</b><div class="muted">가격을 이미지·PDF로 받은 경우</div></td>${reqs.map(r => `<td class="c ${c.chosen_firm_id === r.firm_id ? 'chosen' : ''}">${aprCell(r, can)}</td>`).join('')}</tr>` : ''}<tr><td></td>${save}</tr></tbody></table></div>` : '<div class="blk-empty">의뢰한 평가기관이나 물건이 없어요. 수정에서 추가해주세요.</div>'}
       ${can && c.chosen_firm_id ? '<div style="margin-top:8px"><button class="btn small" data-act="unchoose">채택 해제 (가격만 조회)</button></div>' : ''}
     </div>
     <div class="apsec" id="apCmtWrap"><div class="k">💬 담당자 의견 · 대출가능액 <span class="muted" style="font-weight:500">(${apCmts(c).length}건)</span></div>
@@ -323,6 +323,7 @@ function renderApDetail(){
     const inp = $('apDetailPanel').querySelector(`[data-k="${k}"]`);
     if (inp && !inp.disabled && inp.value !== val){ inp.value = val; inp.dispatchEvent(new Event('input', { bubbles: true })); }
   });
+  if (typeof aprHydrate === 'function') aprHydrate();
 }
 $('apDetailPanel').addEventListener('input', (e) => {
   const inp = e.target.closest('input.amt, input.tamt'); if (!inp) return;
@@ -338,6 +339,7 @@ $('apDetailPanel').addEventListener('input', (e) => {
   P.querySelector(`[data-tot="${rid}"]`).textContent = apWon(sum);
 });
 $('apDetailPanel').addEventListener('change', async (e) => {
+  if (e.target.matches('input.rfin') && typeof aprUpload === 'function') return aprUpload(e.target);
   const c = apCases.find(x => x.id === apOpenId); if (!c) return;
   if (e.target.matches('input[data-act=choose]')){
     const fid = +e.target.value;
@@ -348,6 +350,7 @@ $('apDetailPanel').addEventListener('change', async (e) => {
   }
 });
 $('apDetailPanel').addEventListener('click', async (e) => {
+  const rf = e.target.closest('[data-rf]'); if (rf && typeof aprClick === 'function') return aprClick(rf);
   const cd = e.target.closest('[data-cdel]');
   if (cd){
     if (!confirm('이 의견을 삭제할까요?')) return;
