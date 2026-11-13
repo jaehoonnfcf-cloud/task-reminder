@@ -175,18 +175,16 @@
   .pfold{ cursor:pointer; user-select:none; }
 
   /* 요약 타일 */
-  #loanDash{ background:rgba(255,255,255,.96); border-radius:16px; padding:14px 16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(9,30,66,.18); }
-  #loanDash .ldt{ font-weight:800; font-size:15px; margin-bottom:10px; } #loanDash .ldt small{ font-weight:500; color:var(--muted); font-size:12px; margin-left:6px; }
-  #loanDash .ldw{ overflow-x:auto; }
-  #loanDash .ldtb{ width:100%; border-collapse:separate; border-spacing:6px; min-width:560px; }
-  #loanDash th,#loanDash td{ text-align:left; vertical-align:top; padding:9px 12px; border-radius:10px; background:#f4f6fa; font-weight:500; }
-  #loanDash thead th{ background:none; padding:2px 12px; font-weight:800; font-size:14px; } #loanDash thead th small{ display:block; font-weight:500; color:var(--muted); font-size:11px; }
-  #loanDash thead .hc{ border-bottom:3px solid #f0a020; } #loanDash thead .hp{ border-bottom:3px solid #2f6fed; } #loanDash thead .hx{ border-bottom:3px solid #1f9d55; } #loanDash thead .ht{ border-bottom:3px solid #1c2b4a; }
-  #loanDash tbody th.rh{ width:74px; background:none; padding-left:4px; } #loanDash td.tc{ background:#eaf0ff; } #loanDash .ldsum td{ background:#e9ecf3; } #loanDash .ldsum td.tc{ background:#dbe5ff; } #loanDash .ldsum th{ font-size:13px; }
-  #loanDash td b{ font-size:22px; font-weight:800; line-height:1.1; display:block; } #loanDash td b small{ font-size:12px; color:var(--muted); font-weight:600; margin-left:2px; }
-  #loanDash td span{ font-size:13px; font-weight:700; display:block; margin-top:2px; } #loanDash td span em{ font-style:normal; color:#2f6fed; font-size:12px; margin-left:3px; } #loanDash td .ld0{ color:#b0b7c5; font-weight:400; }
-  #loanDash td i{ display:block; font-style:normal; font-size:11px; color:var(--muted); margin-top:3px; }
-  @media (max-width:720px){ #loanDash td b{ font-size:18px; } #loanDash th,#loanDash td{ padding:7px 9px; } }
+  #loanDash{ margin-bottom:14px; }
+  #loanDash .ldg{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  #loanDash .ld{ background:rgba(255,255,255,.96); border-radius:16px; padding:12px 16px 10px; box-shadow:0 1px 3px rgba(9,30,66,.18); border-top:5px solid var(--lc); }
+  #loanDash .ld.kc{ --lc:#f0a020; } #loanDash .ld.kp{ --lc:#2f6fed; } #loanDash .ld.kx{ --lc:#1f9d55; } #loanDash .ld.kt{ --lc:#1c2b4a; background:#1c2b4a; color:#fff; }
+  #loanDash .lh{ display:flex; justify-content:space-between; align-items:baseline; font-weight:800; font-size:14px; } #loanDash .lh small{ font-weight:500; font-size:11.5px; opacity:.65; }
+  #loanDash .lm{ display:flex; align-items:baseline; gap:8px; margin:4px 0 6px; } #loanDash .lm b{ font-size:30px; font-weight:800; letter-spacing:-.02em; line-height:1.1; } #loanDash u{ text-decoration:none; } #loanDash .lm b u{ font-size:15px; font-weight:700; margin-left:1px; }
+  #loanDash .lm span{ font-size:14px; font-weight:700; opacity:.7; }
+  #loanDash .lr{ display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0; border-top:1px solid rgba(120,130,150,.22); } #loanDash .lr span:first-child{ font-weight:700; } #loanDash .lr .z{ opacity:.4; }
+  #loanDash .lw{ font-size:11px; opacity:.6; margin-top:2px; }
+  @media (max-width:900px){ #loanDash .ldg{ grid-template-columns:repeat(2,1fr); gap:10px; } #loanDash .lm b{ font-size:24px; } }
   #tiles,#ptiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .tile{ background:rgba(255,255,255,.96); border-radius:14px; padding:14px 18px; cursor:pointer; border:2px solid transparent; box-shadow:0 1px 3px rgba(9,30,66,.18); text-align:left; }
   .tile:hover{ background:#fff; }
@@ -1013,29 +1011,24 @@
     const el = $('loanDash'); if (!el) return;
     if (!list){ el.innerHTML = ''; el.style.display = 'none'; return; }
     const year = kstToday().slice(0, 4), loans = list.filter(t => t.task_type === 'loan' && !isDropped(t));
-    const SC = ['본점', '지점', '통합'];
-    // 구분(본점/지점/통합) × 단계(협의/진행/실행)
-    const mk = () => ({ c: [], p: [], x: [], xd: [] });
-    const by = { 본점: mk(), 지점: mk(), 통합: mk() };
+    const G = { c: [], p: [], x: [] }, xd = [];
     loans.forEach(t => {
-      const g = by[t.scope] || by['통합'], ci = curIdx(t), n = stepsOf(t).length;
-      if (ci >= n){ if (kstDay(doneAtOf(t)).slice(0, 4) === year) g.xd.push(t); }
-      else if (ci === 0) g.c.push(t); else if (ci < n - 1) g.p.push(t); else g.x.push(t);
+      const ci = curIdx(t), n = stepsOf(t).length;
+      if (ci >= n){ if (kstDay(doneAtOf(t)).slice(0, 4) === year){ G.x.push(t); xd.push(t); } }
+      else if (ci === 0) G.c.push(t); else if (ci < n - 1) G.p.push(t); else G.x.push(t);
     });
     const sum = (a) => a.reduce((s, t) => s + (Number(t.loan_amount) || 0), 0);
-    const amt = (m) => `${m.toLocaleString('ko-KR')}백만${m >= 100 ? ` <em>${(m / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}억</em>` : ''}`;
-    const cell = (a, extra) => a.length ? `<b>${a.length}<small>건</small></b><span>${amt(sum(a))}</span>${a.some(t => t.loan_amount == null) ? `<i>금액 미입력 ${a.filter(t => t.loan_amount == null).length}</i>` : ''}${extra || ''}` : '<span class="ld0">-</span>';
-    const rowOf = (g) => ({ c: g.c, p: g.p, x: g.x.concat(g.xd), xn: g.x.length, xd: g.xd.length });
-    const rows = SC.filter(k => k !== '통합' || Object.values(by[k]).some(a => a.length)).map(k => [k, rowOf(by[k])]);
-    const tot = { c: [], p: [], x: [], xn: 0, xd: 0 };
-    rows.forEach(([, r]) => { tot.c = tot.c.concat(r.c); tot.p = tot.p.concat(r.p); tot.x = tot.x.concat(r.x); tot.xn += r.xn; tot.xd += r.xd; });
-    const all = (r) => r.c.concat(r.p, r.x);
-    const xinfo = (r) => r.x.length ? `<i>대기 ${r.xn} · 올해 실행완료 ${r.xd}</i>` : '';
+    const big = (m) => m >= 100 ? `${(m / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}<u>억</u>` : `${m.toLocaleString('ko-KR')}<u>백만</u>`;
+    const scs = ['본점', '지점'].concat(loans.some(t => t.scope !== '본점' && t.scope !== '지점') ? ['통합'] : []);
+    const inSc = (a, k) => a.filter(t => k === '통합' ? t.scope !== '본점' && t.scope !== '지점' : t.scope === k);
+    const card = (cls, name, def, a, warn) => `<div class="ld ${cls}"><div class="lh">${name}<small>${def}</small></div>
+      <div class="lm"><b>${big(sum(a))}</b><span>${a.length}건</span></div>
+      ${scs.map(k => { const b = inSc(a, k); return `<div class="lr"><span>${k}</span>${b.length ? `<span>${b.length}건 · ${big(sum(b))}</span>` : '<span class="z">-</span>'}</div>`; }).join('')}
+      <div class="lw">${warn || ''}${a.some(t => t.loan_amount == null) ? `금액 미입력 ${a.filter(t => t.loan_amount == null).length}건 제외` : ''}</div></div>`;
+    const all = G.c.concat(G.p, G.x);
     el.style.display = '';
-    el.innerHTML = `<div class="ldt">💰 대출진행 현황 <small>미진행 제외 · 금액 = 대출금액 합계</small></div>
-      <div class="ldw"><table class="ldtb"><thead><tr><th></th><th class="hc">협의<small>1단계</small></th><th class="hp">진행<small>2~4단계</small></th><th class="hx">실행<small>5단계 · 대출실행</small></th><th class="ht">합계</th></tr></thead><tbody>`
-      + rows.map(([k, r]) => `<tr><th class="rh sc-${k}"><span class="chip sc-${k}">${k}</span></th><td>${cell(r.c)}</td><td>${cell(r.p)}</td><td>${cell(r.x, xinfo(r))}</td><td class="tc">${cell(all(r))}</td></tr>`).join('')
-      + `<tr class="ldsum"><th class="rh">전체</th><td>${cell(tot.c)}</td><td>${cell(tot.p)}</td><td>${cell(tot.x, xinfo(tot))}</td><td class="tc">${cell(all(tot))}</td></tr></tbody></table></div>`;
+    el.innerHTML = `<div class="ldg">` + card('kc', '협의', '1단계', G.c) + card('kp', '진행', '2~4단계', G.p)
+      + card('kx', '실행', '5단계', G.x, `대기 ${G.x.length - xd.length} · 올해 완료 ${xd.length}<br>`) + card('kt', '합계', '미진행 제외', all) + `</div>`;
   }
   // 대출금액 입력칸: 숫자만, 천단위 쉼표
   document.addEventListener('input', (e) => { if (e.target && e.target.id === 'fAmt'){ const d = e.target.value.replace(/[^\d]/g, ''); e.target.value = d ? Number(d).toLocaleString('ko-KR') : ''; } });
