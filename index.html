@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="theme-color" content="#e9e4fc" />
+<meta name="theme-color" content="#f0ebe1" />
 <meta name="apple-mobile-web-app-title" content="할일요정" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32" />
@@ -22,8 +22,8 @@
   *{ box-sizing:border-box; }
   html{ -webkit-text-size-adjust:100%; }
   html{ overflow-y:scroll; scrollbar-gutter:stable; }   /* 화면(업무구분)마다 세로 스크롤바 유무가 달라 가로폭이 흔들리지 않도록 항상 자리를 둔다 */
-  html{ background:#eceef3; }
-  body{ margin:0; color:var(--ink); background:#eceef3; -webkit-tap-highlight-color:transparent;
+  html{ background:#f0ebe1; }
+  body{ margin:0; color:var(--ink); background:#f0ebe1; -webkit-tap-highlight-color:transparent;
     font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Segoe UI',sans-serif; letter-spacing:-0.01em; }
   button,input,select,textarea{ font-family:inherit; font-size:16px; color:var(--ink); }
   .muted{ color:var(--muted); font-size:13px; }
@@ -113,7 +113,7 @@
   .ni{ display:block; padding:11px 16px; border-bottom:1px solid #f0f1f3; text-decoration:none; color:var(--ink); }
   .ni:hover{ background:#f6f8ff; }
   .ni .nm{ display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); margin-bottom:3px; }
-  .ni .src{ font-weight:800; color:#5b3fc4; background:#e5e1fa; padding:1px 7px; border-radius:5px; }
+  .ni .src{ font-weight:800; color:#8a5200; background:#fff2d9; padding:1px 7px; border-radius:5px; }
   .ni .nt{ font-size:14px; font-weight:600; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .side-empty{ padding:22px 16px; color:var(--muted); font-size:13.5px; text-align:center; }
   @media (min-width:1500px){
@@ -170,8 +170,8 @@
   .rrow{ display:grid; grid-template-columns:minmax(0,1fr) 150px auto; gap:12px; align-items:center; padding:12px 18px; border-bottom:1px solid var(--line); }
   .rrow.off{ opacity:.55; }
   .rrow .rnext{ font-size:13px; color:#44546f; }
-  .chip.sc-본점{ background:#dbeafe; color:#1e40af; } .chip.sc-지점{ background:#dcfce7; color:#166534; } .chip.sc-통합{ background:#ede9fe; color:#5b21b6; }
-  .chip.rc{ background:#ede9fe; color:#5b21b6; }
+  .chip.sc-본점{ background:#dbeafe; color:#1e40af; } .chip.sc-지점{ background:#dcfce7; color:#166534; } .chip.sc-통합{ background:#fbeed3; color:#7a4500; }
+  .chip.rc{ background:#fff2d9; color:#7a4500; }
   .pfold{ cursor:pointer; user-select:none; }
 
   /* 요약 타일 */
@@ -218,7 +218,7 @@
   .trow:hover{ background:#f6f8ff; }
   .trow.done{ opacity:.7; }
   .tp{ display:inline-block; font-size:12px; font-weight:800; padding:3px 8px; border-radius:6px; background:#dbeafe; color:#0b5cc4; text-align:center; }
-  .tp.loan{ background:#e5e1fa; color:#5b3fc4; }
+  .tp.loan{ background:#fff2d9; color:#7a4500; }
   .tt{ font-size:15.5px; font-weight:700; line-height:1.35; word-break:break-word; }
   .ts{ font-size:12.5px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .prog{ display:flex; align-items:center; gap:9px; min-width:0; }
@@ -290,11 +290,11 @@
   :root{
     --ink:#16181d; --muted:#8a90a0; --line:#eceef3; --accent:#5b4bff; --accent-soft:#eceaff;
     --danger:#e5484d; --danger-soft:#fdecec; --warn:#c77700; --warn-soft:#fff3dc; --green:#12a150; --green-soft:#e6f7ee;
-    --bg:#eceef3; --chipbg:#f1f3f7; --field:#f5f6fa;
+    --bg:#f0ebe1; --chipbg:#f1eee7; --field:#f6f4ef;
     --sh:0 1px 2px rgba(20,24,40,.04),0 10px 28px rgba(20,24,40,.07),inset 0 1px 0 #fff;
     --sh-hover:0 1px 2px rgba(20,24,40,.05),0 16px 38px rgba(20,24,40,.11),inset 0 1px 0 #fff;
   }
-  #login,#app,#app[data-div]{ background:radial-gradient(1100px 480px at 50% -140px,#fff 0%,rgba(255,255,255,0) 70%),#eceef3 !important; }
+  #login,#app,#app[data-div]{ background:radial-gradient(1100px 480px at 50% -140px,#fff 0%,rgba(255,255,255,0) 70%),#f0ebe1 !important; }
   .muted{ color:var(--muted); }
   /* 입력 */
   input,textarea,select{ border:1px solid #e3e6ee; border-radius:14px; background-color:var(--field); }
@@ -329,7 +329,7 @@
   #wrap{ padding:6px 28px 48px; gap:16px; }
   /* 넓은 화면: 시세·뉴스 열이 맨 위(헤더 줄)부터 시작하고, 헤더(메뉴·새 업무·프로필)는 왼쪽 열 폭 안에서 우측 정렬 */
   @media (min-width:1500px){
-    body{ background:radial-gradient(1100px 480px at 50% -140px,#fff 0%,rgba(255,255,255,0) 70%),#eceef3; }
+    body{ background:radial-gradient(1100px 480px at 50% -140px,#fff 0%,rgba(255,255,255,0) 70%),#f0ebe1; }
     #app[style*="flex"]{ display:grid !important; grid-template-columns:minmax(0,1fr) 350px; grid-template-rows:auto auto 1fr; column-gap:18px; width:100%; max-width:1736px; margin:0 auto; padding:0 28px; align-content:start; }
     #app[style*="flex"] .bar{ grid-column:1; grid-row:1; max-width:none; margin:0; padding-left:0; padding-right:0; }
     #app[style*="flex"] #wrap{ display:contents; }
@@ -356,7 +356,7 @@
   #tiles,#ptiles{ gap:16px; }
   .tile{ background:#fff; border-radius:24px; padding:18px 20px; border:2px solid transparent; box-shadow:var(--sh); display:flex; flex-direction:column; align-items:flex-start; transition:box-shadow .15s, transform .15s; font-family:inherit; }
   .tile:hover{ background:#fff; box-shadow:var(--sh-hover); transform:translateY(-1px); }
-  .tile.sel{ border-color:var(--accent); box-shadow:0 0 0 4px var(--accent-soft), var(--sh); }
+  .tile.sel{ border-color:#ecc57a; box-shadow:0 0 0 4px var(--accent-soft), var(--sh); }
   .tile::before{ content:'📋'; display:grid; place-items:center; width:40px; height:40px; border-radius:14px; background:#fff; box-shadow:var(--sh); font-size:19px; margin-bottom:12px; }
   .tile.over::before{ content:'🔥'; } .tile.today::before{ content:'⏰'; } .tile.loan::before{ content:'📌'; }
   #ptiles .tile.loan::before{ content:'🔁'; } #ptiles .tile:not(.over):not(.today):not(.loan)::before{ content:'🗓'; }
@@ -489,50 +489,50 @@
      v3 대시보드형 개편 — 연보라 바깥 + 흰 앱 틀 / 웹 왼쪽 사이드바 / 모바일 하단 탭바 / 파스텔 요약 카드
      (기능·데이터 로직은 그대로 두고 스타일과 배치만 덧씌움)
      ===================================================================== */
-  :root{ --accent:#6d3df0; --accent-soft:#ede8ff; --shell:#f5f4fa; --lav:#e9e4fc; }
+  :root{ --accent:#9a5b00; --accent-soft:#fcf1dc; --amber:#fdf0d5; --amber-ink:#7a4500; --shell:#f8f6f1; --lav:#f0ebe1;
+    --sh:0 1px 2px rgba(60,45,20,.04),0 4px 14px rgba(60,45,20,.05); --sh-hover:0 1px 2px rgba(60,45,20,.05),0 8px 22px rgba(60,45,20,.09); }   /* 크림 바탕 + 앰버 포인트 + 브라운 글자, 그림자는 더 약하게 */
   html,body{ background:var(--lav); }
-  .btn.primary,#newBtn,.go{ background:var(--accent); color:#fff; box-shadow:0 6px 16px rgba(109,61,240,.28); }
-  .btn.primary:hover,.go:hover{ background:#5b2be0; }
-  .seg button.on{ background:var(--accent); color:#fff; }
-  .divs button.on{ background:var(--accent-soft); color:#5b2be0; }
-  .divs button.on .n{ background:#fff; color:#5b2be0; }
+  .btn.primary,#newBtn,.go{ background:var(--amber); color:var(--amber-ink); font-weight:700; border:1px solid #f1d9a6; box-shadow:none; }
+  .btn.primary:hover,.go:hover{ background:#fbe6bd; }
+  .seg button.on{ background:var(--amber); color:var(--amber-ink); }
+  .divs button.on{ background:var(--accent-soft); color:#7a4500; }
+  .divs button.on .n{ background:#fff; color:#7a4500; }
   /* 대출 단계 요약 카드: 단계별 파스텔 */
   #loanDash{ background:#fff; border-radius:24px; padding:14px; }
   #loanDash .ld{ border-top:0; border-radius:20px; padding:16px 18px 12px; box-shadow:none; background:#f1f3f7; }
-  #loanDash .ld.kc{ background:#a9f0dc; color:#0f3d33; }
-  #loanDash .ld.kp{ background:#7c5cf0; color:#fff; }
-  #loanDash .ld.kx{ background:#fde3a0; color:#4a3600; }
-  #loanDash .ld.kt{ background:#1f2230; color:#fff; }
+  #loanDash .ld.kc{ background:#fbf3e1; color:#4a3300; }
+  #loanDash .ld.kp{ background:#fceadb; color:#4a2600; }
+  #loanDash .ld.kx{ background:#eaf3e3; color:#1d3d1d; }
+  #loanDash .ld.kt{ background:#efeadf; color:#2b2118; }
   #loanDash .ld .lh small,#loanDash .ld .lm span,#loanDash .ld .lw{ opacity:.8; }
   #loanDash .ld .lr{ border-top-color:rgba(0,0,0,.14); }
-  #loanDash .ld.kp .lr,#loanDash .ld.kt .lr{ border-top-color:rgba(255,255,255,.28); }
-  #loanDash .ldw{ background:var(--shell); border-radius:16px; box-shadow:none; }
+    #loanDash .ldw{ background:var(--shell); border-radius:16px; box-shadow:none; }
   /* 목록: 현재 단계 막대 색을 단계별로 */
-  .segs i:nth-child(1).cur{ background:#8a94a8; } .segs i:nth-child(2).cur{ background:#0c66e4; } .segs i:nth-child(3).cur{ background:#6d28d9; }
-  .segs i:nth-child(4).cur{ background:#d98200; } .segs i:nth-child(5).cur{ background:#1f9d6a; }
-  .c-prog:has(.segs i:nth-child(2).cur) .pl b{ color:#0c66e4; } .c-prog:has(.segs i:nth-child(3).cur) .pl b{ color:#6d28d9; }
-  .c-prog:has(.segs i:nth-child(4).cur) .pl b{ color:#a35200; } .c-prog:has(.segs i:nth-child(5).cur) .pl b{ color:#17694a; }
+  .segs i:nth-child(1).cur{ background:#b5afa3; } .segs i:nth-child(2).cur{ background:#6a9fd0; } .segs i:nth-child(3).cur{ background:#f2b44d; }
+  .segs i:nth-child(4).cur{ background:#e8856f; } .segs i:nth-child(5).cur{ background:#6fbf88; }
+  .c-prog:has(.segs i:nth-child(1).cur) .pl b{ color:#5f5a50; } .c-prog:has(.segs i:nth-child(2).cur) .pl b{ color:#1d5fa0; } .c-prog:has(.segs i:nth-child(3).cur) .pl b{ color:#8a5200; }
+  .c-prog:has(.segs i:nth-child(4).cur) .pl b{ color:#b3412c; } .c-prog:has(.segs i:nth-child(5).cur) .pl b{ color:#2a7a45; }
   /* 모바일 하단 탭바 */
   #tabBar{ display:none; }
   .divs .n:empty{ display:none; }
-  #navList button.on{ background:var(--accent-soft); color:#5b2be0; } #navList button.on .nb{ background:#fff; color:#5b2be0; }   /* 건수 로드 전·0건일 때 빈 알약이 보이지 않게 */
+  #navList button.on{ background:var(--accent-soft); color:#7a4500; } #navList button.on .nb{ background:#fff; color:#7a4500; }   /* 건수 로드 전·0건일 때 빈 알약이 보이지 않게 */
   /* =====================================================================
      웹 레이아웃 (1360px 이상 사이드바 틀 / 1200px 이상 서랍·컨트롤) — 모든 화면 공통
      · 앱 틀: 사이드바(250) | 본문. 현황판을 뺀 모든 화면의 본문 폭·여백·메뉴 크기가 같다 (1360px 미만은 기존 상단 메뉴 방식)
      · 오른쪽 열(접속자·시세·뉴스)은 현황판에서만 (1500px 이상)
      · 업무 상세는 오른쪽에서 겹쳐 나오는 서랍 → 열고 닫아도 화면 크기·배치가 바뀌지 않는다
      ===================================================================== */
-  .trow.sel{ box-shadow:0 0 0 2px var(--accent), var(--sh); }
+  .trow.sel{ box-shadow:0 0 0 2px #ecc57a, var(--sh); }
   @media (min-width:1360px){
-    html body #app[style*="flex"]{ display:grid !important; grid-template-columns:250px minmax(0,1fr); grid-template-rows:auto 1fr; column-gap:0; width:calc(100% - 40px); max-width:1560px; min-height:calc(100vh - 40px); min-height:calc(100dvh - 40px); margin:20px auto; padding:0; align-content:stretch; border-radius:26px; overflow:clip; box-shadow:0 10px 40px rgba(80,50,180,.12); background:linear-gradient(to right,#fff 250px,var(--shell) 250px) !important; }
+    html body #app[style*="flex"]{ display:grid !important; grid-template-columns:250px minmax(0,1fr); grid-template-rows:auto 1fr; column-gap:0; width:calc(100% - 40px); max-width:1560px; min-height:calc(100vh - 40px); min-height:calc(100dvh - 40px); margin:20px auto; padding:0; align-content:stretch; border-radius:26px; overflow:clip; box-shadow:0 10px 40px rgba(90,70,30,.10); background:linear-gradient(to right,#fff 250px,var(--shell) 250px) !important; }
     html body #app[style*="flex"] .bar{ grid-column:1; grid-row:1 / -1; position:sticky; top:20px; align-self:start; height:calc(100vh - 40px); height:calc(100dvh - 40px); width:auto; max-width:none; margin:0; padding:26px 16px 18px; flex-direction:column; align-items:stretch; flex-wrap:nowrap; gap:6px; background:transparent; overflow-y:auto; color:var(--ink); }
     html body #app[style*="flex"] #wrap{ grid-column:2; grid-row:1 / -1; max-width:none; margin:0; padding:26px 32px 48px; display:flex; flex-direction:column; align-items:stretch; }
     html body #app[style*="flex"] #side{ display:none; }
     .bar .logo{ font-size:21px; padding:2px 10px 18px; }
     .divs{ display:flex; flex-direction:column; align-items:stretch; background:transparent; box-shadow:none; padding:0; margin:0; border-radius:0; gap:6px; }
     .divs button{ display:flex; align-items:center; gap:8px; text-align:left; padding:13px 14px; border-radius:12px; font-size:14.5px; font-weight:600; color:#44546f; }
-    .divs button:hover{ background:#f3f0ff; color:var(--ink); }
-    .divs button.on,.divs button.on:hover{ background:var(--accent-soft); color:#5b2be0; font-weight:800; }
+    .divs button:hover{ background:#f8f3e8; color:var(--ink); }
+    .divs button.on,.divs button.on:hover{ background:var(--accent-soft); color:#7a4500; font-weight:800; }
     .divs .n{ margin-left:auto; }
     .bar .pill{ align-self:flex-start; }
     #newBtn{ width:100%; min-height:48px; border-radius:14px; font-size:15px; }
@@ -541,7 +541,7 @@
   @media (min-width:1200px){
     /* 업무 상세 서랍: 화면 위에 겹쳐 나온다 (본문 크기·줄 배치는 그대로) */
     body.dock-open #detailOv{ position:fixed; inset:auto; top:20px; right:20px; bottom:20px; width:420px; padding:0; background:transparent; overflow:visible; z-index:50; }
-    body.dock-open #detailOv .panel{ max-width:none; width:100%; height:100%; margin:0; overflow-y:auto; border-radius:26px; padding:24px 22px; box-shadow:0 16px 50px rgba(40,30,100,.28); border:1px solid #e9e7f3; }
+    body.dock-open #detailOv .panel{ max-width:none; width:100%; height:100%; margin:0; overflow-y:auto; border-radius:26px; padding:24px 22px; box-shadow:0 16px 50px rgba(60,45,20,.25); border:1px solid #e9e3d6; }
     body.dock-open #detailPanel .steps{ flex-direction:column; flex-wrap:nowrap; gap:8px; }
     body.dock-open #detailPanel .step{ width:100%; border-radius:14px; }
   }
@@ -567,13 +567,26 @@
     #wrap .quick input{ min-height:40px; font-size:14px; border-radius:99px; }
     #wrap .quick .btn{ min-height:40px; }
   }
+  /* 메뉴 선 아이콘, 프로필(이름·관리자 배지), 사이드바 로그아웃 */
+  .mi{ width:18px; height:18px; flex:none; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:-3px; }
+  .divs .lf{ display:inline-flex; align-items:center; gap:8px; } .divs .lf .mi{ width:16px; height:16px; }
+  #navList .ic .mi{ width:22px; height:22px; } #navList button .ic{ color:#7a4500; }
+  .whoBtn .wm{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; line-height:1.2; }
+  .whoBtn .role{ font-style:normal; font-size:11px; font-weight:800; padding:1px 8px; border-radius:99px; background:#fbefd5; color:#7a4500; }
+  .sbLogout{ display:none; }
+  @media (min-width:1360px){
+    .divs .lf .mi{ width:20px; height:20px; }
+    .divs button.on .mi{ stroke:#e8890c; }
+    .sbLogout{ display:flex; align-items:center; gap:12px; width:100%; margin-top:2px; padding:12px 14px; border:0; border-radius:12px; background:transparent; font-size:14.5px; font-weight:600; color:#b3412c; cursor:pointer; }
+    .sbLogout:hover{ background:#fdf0ec; } .sbLogout .mi{ width:20px; height:20px; }
+  }
   /* 모바일: 하단 탭바 */
   @media (max-width:760px){
-    #tabBar{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:60; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #e9e7f3; }
+    #tabBar{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:60; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #e9e3d6; }
     #tabBar button{ flex:1; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:50px; border:0; background:transparent; font-size:11px; font-weight:600; color:#626f86; cursor:pointer; }
     #tabBar svg{ width:24px; height:24px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
     #tabBar .ti{ display:flex; align-items:center; justify-content:center; width:48px; height:30px; border-radius:15px; }
-    #tabBar button.on{ color:#5b2be0; font-weight:800; } #tabBar button.on .ti{ background:var(--accent-soft); }
+    #tabBar button.on{ color:#7a4500; font-weight:800; } #tabBar button.on .ti{ background:var(--accent-soft); }
     #tabBar .tb{ position:absolute; top:0; left:calc(50% + 6px); min-width:18px; height:18px; padding:0 4px; border-radius:9px; background:#c9372c; color:#fff; font-size:10.5px; font-weight:800; display:flex; align-items:center; justify-content:center; }
     #wrap{ padding-bottom:calc(96px + env(safe-area-inset-bottom)); }
     html,body{ background:var(--shell); }
@@ -607,7 +620,7 @@
     <span class="spacer"></span>
     <span class="pill ro" id="roPill" style="display:none" title="이 업무구분에 대한 등록·수정 권한이 없습니다">👀 보기 전용</span>
     <button class="btn glass small" id="newBtn">＋ 새 업무</button>
-    <span id="whoPh" style="display:none"></span><button class="whoBtn" id="who" title="내 프로필 (사진·이름 변경)"></button>
+    <span id="whoPh" style="display:none"></span><button class="whoBtn" id="who" title="내 프로필 (사진·이름 변경)"></button><button type="button" class="sbLogout" id="sbLogout"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>로그아웃</span></button>
   </div>
   <div id="navOv" aria-hidden="true"><div id="navSheet" role="dialog" aria-label="메뉴"><div class="nh"><b>🧚 할일요정</b><button type="button" class="nx" id="navClose" aria-label="메뉴 닫기">✕</button></div><div id="navList"></div></div></div>
   <nav id="tabBar" aria-label="주 메뉴">
@@ -841,6 +854,7 @@
   $('loginBtn').onclick = doLogin;
   $('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   $('pLogout').onclick = () => { closeProfile(); sb.auth.signOut(); };
+  $('sbLogout').onclick = () => { sb.auth.signOut(); };
   $('pAdmin').onclick = () => { closeProfile(); openAdmin(); };
   sb.auth.onAuthStateChange((_e, session) => session ? start(session) : show(false));
   function show(on){
@@ -898,7 +912,7 @@
   }
 
   function renderWho(){
-    $('who').innerHTML = avHtml(me, '', 'margin:0') + `<span class="wn">${esc(nameOf(me))}</span>`;
+    $('who').innerHTML = avHtml(me, '', 'margin:0') + `<span class="wm"><span class="wn">${esc(nameOf(me))}</span>${isAdmin() ? '<i class="role">관리자</i>' : ''}</span>`;
     renderOnline();
   }
   // 넓은 화면(사이드 영역이 보일 때)에서는 내 프로필·시계를 시세정보 위 카드로 옮기고, 좁은 화면에서는 원래 자리로 돌려놓는다
@@ -1414,7 +1428,13 @@
     if (divn === 'liq' && typeof loadLiq === 'function') loadLiq();
   };
   // 모바일 햄버거 메뉴: 가려진 업무구분 버튼(#divBtns)을 서랍에 크게 다시 보여주고, 누르면 원래 버튼을 눌러 같은 동작을 한다
-  const NAV_IC = { home: '📊', liq: '💧', deposit: '💼', credit: '💳', appraisal: '🏛', debt: '🛠', personal: '🔒', event: '🎉' };
+  const mi = (d) => `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+  const NAV_IC = {
+    home: mi('<path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 8h6V4h-6z"/>'), liq: mi('<path d="M12 3s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/>'),
+    deposit: mi('<path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>'), credit: mi('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M3 13h18"/>'),
+    appraisal: mi('<path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/>'), debt: mi('<path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.4 2.4-2.6-.6-.6-2.6z"/>'),
+    personal: mi('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'), event: mi('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>') };
+  document.querySelectorAll('#divBtns button[data-div]').forEach(b => { const lf = b.querySelector('.lf'); if (lf && NAV_IC[b.dataset.div]) lf.innerHTML = NAV_IC[b.dataset.div] + '<span>' + esc(lf.textContent.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '').trim()) + '</span>'; });
   const navBtns = () => [...document.querySelectorAll('#divBtns button')].filter(b => b.style.display !== 'none');
   const navLabel = (b) => b.querySelector('.lf').textContent.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '').trim();
   function syncNav(){

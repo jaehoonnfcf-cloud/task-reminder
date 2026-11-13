@@ -50,7 +50,7 @@ const apM2Py = (m2) => { const p = apPy(m2); return `${Number(m2).toLocaleString
   .afc.ok{ background:var(--green-soft); color:var(--green); }
   .apmoney{ font-size:14px; font-weight:700; line-height:1.4; }
   .apmoney small{ display:block; font-size:12px; font-weight:500; color:var(--muted); }
-  .chip.sc-본점{ background:var(--accent-soft); color:var(--accent); } .chip.sc-지점{ background:#eef1f6; color:#4b5563; } .chip.sc-통합{ background:#f3eefc; color:#7c3aed; }
+  .chip.sc-본점{ background:var(--accent-soft); color:var(--accent); } .chip.sc-지점{ background:#eef1f6; color:#4b5563; } .chip.sc-통합{ background:#fbeed3; color:#7a4500; }
   .apPanel{ max-width:1040px !important; }
   .apsec{ margin-top:22px; } .apsec > .k{ font-size:13px; font-weight:800; color:#44546f; margin-bottom:8px; }
   .apinfo{ margin-top:14px; display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px 18px; }
