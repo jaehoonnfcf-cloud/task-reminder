@@ -177,14 +177,16 @@
   /* 요약 타일 */
   #loanDash{ background:rgba(255,255,255,.96); border-radius:16px; padding:14px 16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(9,30,66,.18); }
   #loanDash .ldt{ font-weight:800; font-size:15px; margin-bottom:10px; } #loanDash .ldt small{ font-weight:500; color:var(--muted); font-size:12px; margin-left:6px; }
-  #loanDash .ldg{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
-  #loanDash .ld{ border-radius:12px; padding:12px 14px; background:#f4f6fa; border-left:5px solid #9aa5b8; }
-  #loanDash .ld.ldc{ border-left-color:#f0a020; } #loanDash .ld.ldp{ border-left-color:#2f6fed; } #loanDash .ld.ldx2{ border-left-color:#1f9d55; } #loanDash .ld.ldt2{ background:#eaf0ff; border-left-color:#1c2b4a; }
-  #loanDash .ldh{ font-weight:800; font-size:14px; } #loanDash .ldh small{ display:block; font-weight:500; color:var(--muted); font-size:11.5px; margin-top:1px; }
-  #loanDash .ldn{ font-size:26px; font-weight:800; margin-top:6px; line-height:1.1; } #loanDash .ldn span,#loanDash .lda span{ font-size:12px; font-weight:600; color:var(--muted); margin-left:3px; }
-  #loanDash .lda{ font-size:18px; font-weight:800; margin-top:2px; } #loanDash .lda em{ font-style:normal; font-size:12px; font-weight:700; color:#2f6fed; margin-left:6px; }
-  #loanDash .ldx{ font-size:11.5px; color:var(--muted); margin-top:4px; min-height:14px; }
-  @media (max-width:720px){ #loanDash .ldg{ grid-template-columns:repeat(2,1fr); } }
+  #loanDash .ldw{ overflow-x:auto; }
+  #loanDash .ldtb{ width:100%; border-collapse:separate; border-spacing:6px; min-width:560px; }
+  #loanDash th,#loanDash td{ text-align:left; vertical-align:top; padding:9px 12px; border-radius:10px; background:#f4f6fa; font-weight:500; }
+  #loanDash thead th{ background:none; padding:2px 12px; font-weight:800; font-size:14px; } #loanDash thead th small{ display:block; font-weight:500; color:var(--muted); font-size:11px; }
+  #loanDash thead .hc{ border-bottom:3px solid #f0a020; } #loanDash thead .hp{ border-bottom:3px solid #2f6fed; } #loanDash thead .hx{ border-bottom:3px solid #1f9d55; } #loanDash thead .ht{ border-bottom:3px solid #1c2b4a; }
+  #loanDash tbody th.rh{ width:74px; background:none; padding-left:4px; } #loanDash td.tc{ background:#eaf0ff; } #loanDash .ldsum td{ background:#e9ecf3; } #loanDash .ldsum td.tc{ background:#dbe5ff; } #loanDash .ldsum th{ font-size:13px; }
+  #loanDash td b{ font-size:22px; font-weight:800; line-height:1.1; display:block; } #loanDash td b small{ font-size:12px; color:var(--muted); font-weight:600; margin-left:2px; }
+  #loanDash td span{ font-size:13px; font-weight:700; display:block; margin-top:2px; } #loanDash td span em{ font-style:normal; color:#2f6fed; font-size:12px; margin-left:3px; } #loanDash td .ld0{ color:#b0b7c5; font-weight:400; }
+  #loanDash td i{ display:block; font-style:normal; font-size:11px; color:var(--muted); margin-top:3px; }
+  @media (max-width:720px){ #loanDash td b{ font-size:18px; } #loanDash th,#loanDash td{ padding:7px 9px; } }
   #tiles,#ptiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .tile{ background:rgba(255,255,255,.96); border-radius:14px; padding:14px 18px; cursor:pointer; border:2px solid transparent; box-shadow:0 1px 3px rgba(9,30,66,.18); text-align:left; }
   .tile:hover{ background:#fff; }
@@ -500,8 +502,8 @@
     <div class="divs" id="divBtns">
       <button data-div="home"><span class="lf">📊 현황판</span><span class="ls">현황</span></button>
       <button data-div="liq"><span class="lf">💧 유동성관리</span><span class="ls">유동성</span></button>
-      <button data-div="deposit"><span class="lf">수신/기타</span><span class="ls">수신</span><span class="n" id="nDeposit"></span></button>
-      <button data-div="credit"><span class="lf">여신업무</span><span class="ls">여신</span><span class="n" id="nCredit"></span></button>
+      <button data-div="credit"><span class="lf">💰 대출취급</span><span class="ls">대출</span><span class="n" id="nCredit"></span></button>
+      <button data-div="deposit"><span class="lf">📋 공통업무</span><span class="ls">공통</span><span class="n" id="nDeposit"></span></button>
       <button data-div="appraisal"><span class="lf">🏛 담보심사</span><span class="ls">담보</span><span class="n" id="nAppraisal"></span></button>
       <button data-div="debt" id="debtBtn"><span class="lf">🛠 사후관리</span><span class="ls">사후</span><span class="n" id="nDebt"></span></button>
       <button data-div="personal"><span class="lf">🔒 개인업무</span><span class="ls">개인</span><span class="n" id="nPersonal"></span></button>
@@ -624,8 +626,8 @@
     <div class="row"><input id="aName" placeholder="이름 (예: 홍길동)" maxlength="30" /><input id="aEmail" type="email" placeholder="로그인 이메일" /></div>
     <div class="row" style="margin-top:8px"><input id="aPw" type="text" placeholder="초기 비밀번호 (8자 이상)" autocomplete="off" /></div>
     <div class="checks" style="margin-top:10px">
-      <label><input type="checkbox" id="aCredit" checked /> 여신업무</label>
-      <label><input type="checkbox" id="aDeposit" /> 수신/기타</label>
+      <label><input type="checkbox" id="aCredit" checked /> 대출취급</label>
+      <label><input type="checkbox" id="aDeposit" /> 공통업무</label>
       <label><input type="checkbox" id="aAdmin" /> 관리자</label>
     </div>
     <button class="btn primary" id="aAdd" style="margin-top:14px;min-height:44px;padding:8px 26px">등록</button>
@@ -654,8 +656,8 @@
   <label>본점 / 지점 / 통합 <span style="color:var(--danger)">*</span></label>
   <select id="fScope"><option value="">선택하세요 (필수)</option><option value="본점">본점</option><option value="지점">지점</option><option value="통합">통합</option></select>
   <div id="fTypeRow">
-    <label>업무 구분</label>
-    <select id="fType"><option value="loan">대출진행 (단계별)</option><option value="general">일반업무 (단건)</option></select>
+    <label id="fTypeLbl" style="display:none">업무 구분</label>
+    <select id="fType" style="display:none"><option value="loan">대출진행 (단계별)</option><option value="general">일반업무 (단건)</option></select>
     <div id="fStageRow"><label>현재 진행 단계 (이전 단계는 완료 처리됩니다)</label><select id="fStage"></select></div>
   </div>
   <label id="fTitleLabel">고객명</label><input id="fTitle" />
@@ -687,7 +689,7 @@
   const REQUESTERS = ['상무', '과장'];   // 요청자 선택 목록 (추가하려면 여기에 이름을 넣으세요)
   const PALETTE = ['#e2483d', '#d97706', '#1f845a', '#0c66e4', '#8250df', '#c9348c', '#0f7a8a', '#5e6c84'];
 
-  const DIVS = { credit: '여신업무', deposit: '수신/기타', appraisal: '담보심사' };
+  const DIVS = { credit: '대출취급', deposit: '공통업무', appraisal: '담보심사' };
   let me = '', meRow = null, members = [], tasks = [], openId = null, formMode = 'new', editId = null;
   let divn = 'credit', foldOther = false;
   let fType = 'all', fGrp = null, fScope = 'all';     // 구분 필터 / 타일로 고른 그룹
@@ -695,10 +697,11 @@
   try { fType = localStorage.getItem('fType') || 'all'; storedDiv = localStorage.getItem('div'); } catch (e) {}
 
   // 권한: 해당 업무구분의 등록·수정·단계수정 가능 여부 (DB 에서도 같은 규칙으로 막음)
-  const permOf = (d, m) => !!m && (d === 'credit' ? m.perm_credit : d === 'appraisal' ? (m.perm_appraisal || m.is_admin) : d === 'debt' ? (m.perm_debt || m.is_admin) : m.perm_deposit);
+  const permOf = (d, m) => !!m && (d === 'credit' ? m.perm_credit : d === 'appraisal' ? (m.perm_appraisal || m.is_admin) : d === 'debt' ? (m.perm_debt || m.is_admin) : (m.perm_deposit || m.perm_credit));   // 공통업무는 대출·공통 권한 중 하나면 됨
   const canWrite = (d) => permOf(d, meRow);
   const isAdmin = () => !!(meRow && meRow.is_admin);
-  const taskDiv = (t) => t.division === 'deposit' ? 'deposit' : 'credit';
+  // 화면 구분: 대출진행(단계별) = 대출취급, 그 밖의 단건 업무(예전 여신 일반업무 포함) = 공통업무
+  const taskDiv = (t) => t.task_type === 'loan' ? 'credit' : 'deposit';
   // 사진(아바타): 비공개 저장소의 임시 주소(서명 URL)로 보여준다
   const avatarUrl = {};
   const avPath = (email) => email.replace('@', '_at_') + '.jpg';
@@ -883,7 +886,7 @@
       html = all.slice(0, 5).map(c => `<button class="rc" data-rcap="${c._k.id}">${head(c, `감정평가${c._k.scope ? '·' + esc(c._k.scope) : ''}`, c._k.debtor_name)}</button>`).join('');
     } else {   // 수신/기타·여신 화면: 그 화면 업무의 댓글만
       html = recentCmts.filter(c => { const t = byId(c.task_id); return t && taskDiv(t) === divn; }).slice(0, 5)
-        .map(c => { const t = byId(c.task_id); return `<button class="rc" data-rc="${c.task_id}">${head(c, `${divn === 'deposit' ? '수신' : '여신'}${t.scope ? '·' + esc(t.scope) : ''}`, t.title)}</button>`; }).join('');
+        .map(c => { const t = byId(c.task_id); return `<button class="rc" data-rc="${c.task_id}">${head(c, `${divn === 'deposit' ? '공통' : '대출'}${t.scope ? '·' + esc(t.scope) : ''}`, t.title)}</button>`; }).join('');
     }
     $('rcList').innerHTML = html || '<div class="side-empty">아직 댓글이 없어요.</div>';
   }
@@ -928,7 +931,7 @@
         short = { '＋ 조사 대상 등록': '＋ 조사 등록', '＋ 연체채권 등록': '＋ 채권 등록', '＋ 개인 할 일': '＋ 할 일', '＋ 새 RTI 계산': '＋ 새 계산', '＋ 새 차감계산': '＋ 새 계산', '＋ 새 감정평가 의뢰': '＋ 새 의뢰' }[full] || full;
       $('newBtn').innerHTML = `<span class="bf">${esc(full)}</span><span class="bs">${esc(short)}</span>`; $('newBtn').title = full.replace('＋ ', ''); }
     $('roPill').style.display = w || home || ev || liq || fundTab ? 'none' : '';
-    $('typeSeg').style.display = divn === 'credit' ? 'flex' : 'none';
+    $('typeSeg').style.display = 'none';   // 대출/일반은 이제 메뉴로 분리됨
     renderRecentComments();
   }
 
@@ -941,7 +944,7 @@
     if (divn === 'appraisal') return renderAppraisal();
     if (divn === 'debt') return renderDebt();
     const today = kstToday(), q = $('q').value.trim().toLowerCase(), status = $('status').value, mine = $('mine').checked;
-    const effType = divn === 'credit' ? fType : 'all';
+    const effType = 'all';
     const divTasks = tasks.filter(t => taskDiv(t) === divn);
 
     renderLoanDash(divn === 'credit' ? divTasks : null);
@@ -1007,23 +1010,29 @@
     const el = $('loanDash'); if (!el) return;
     if (!list){ el.innerHTML = ''; el.style.display = 'none'; return; }
     const year = kstToday().slice(0, 4), loans = list.filter(t => t.task_type === 'loan' && !isDropped(t));
-    const g = { c: [], p: [], x: [], xd: [] };
+    const SC = ['본점', '지점', '통합'];
+    // 구분(본점/지점/통합) × 단계(협의/진행/실행)
+    const mk = () => ({ c: [], p: [], x: [], xd: [] });
+    const by = { 본점: mk(), 지점: mk(), 통합: mk() };
     loans.forEach(t => {
-      const ci = curIdx(t), n = stepsOf(t).length;
+      const g = by[t.scope] || by['통합'], ci = curIdx(t), n = stepsOf(t).length;
       if (ci >= n){ if (kstDay(doneAtOf(t)).slice(0, 4) === year) g.xd.push(t); }
       else if (ci === 0) g.c.push(t); else if (ci < n - 1) g.p.push(t); else g.x.push(t);
     });
-    const sum = (a) => a.reduce((s, t) => s + (Number(t.loan_amount) || 0), 0), noAmt = (a) => a.filter(t => t.loan_amount == null).length;
-    const x = g.x.concat(g.xd);
-    const card = (cls, name, def, a, extra) => `<div class="ld ${cls}"><div class="ldh">${name}<small>${def}</small></div><div class="ldn">${a.length}<span>건</span></div>
-      <div class="lda">${sum(a).toLocaleString('ko-KR')}<span>백만원</span>${sum(a) >= 100 ? `<em>${(sum(a) / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}억</em>` : ''}</div>
-      <div class="ldx">${extra || ''}${noAmt(a) ? `금액 미입력 ${noAmt(a)}건` : ''}</div></div>`;
-    const all = g.c.concat(g.p, x);
+    const sum = (a) => a.reduce((s, t) => s + (Number(t.loan_amount) || 0), 0);
+    const amt = (m) => `${m.toLocaleString('ko-KR')}백만${m >= 100 ? ` <em>${(m / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}억</em>` : ''}`;
+    const cell = (a, extra) => a.length ? `<b>${a.length}<small>건</small></b><span>${amt(sum(a))}</span>${a.some(t => t.loan_amount == null) ? `<i>금액 미입력 ${a.filter(t => t.loan_amount == null).length}</i>` : ''}${extra || ''}` : '<span class="ld0">-</span>';
+    const rowOf = (g) => ({ c: g.c, p: g.p, x: g.x.concat(g.xd), xn: g.x.length, xd: g.xd.length });
+    const rows = SC.filter(k => k !== '통합' || Object.values(by[k]).some(a => a.length)).map(k => [k, rowOf(by[k])]);
+    const tot = { c: [], p: [], x: [], xn: 0, xd: 0 };
+    rows.forEach(([, r]) => { tot.c = tot.c.concat(r.c); tot.p = tot.p.concat(r.p); tot.x = tot.x.concat(r.x); tot.xn += r.xn; tot.xd += r.xd; });
+    const all = (r) => r.c.concat(r.p, r.x);
+    const xinfo = (r) => r.x.length ? `<i>대기 ${r.xn} · 올해 실행완료 ${r.xd}</i>` : '';
     el.style.display = '';
-    el.innerHTML = `<div class="ldt">💰 대출진행 현황 <small>미진행 제외 · 금액은 대출금액 합계</small></div><div class="ldg">`
-      + card('ldc', '협의', '1단계 · 대출상담', g.c) + card('ldp', '진행', '2~4단계 · 신청~결재', g.p)
-      + card('ldx2', '실행', '5단계 · 대출실행', x, `대기 ${g.x.length} · 올해 실행완료 ${g.xd.length}<br>`)
-      + `<div class="ld ldt2"><div class="ldh">합계<small>협의+진행+실행</small></div><div class="ldn">${all.length}<span>건</span></div><div class="lda">${sum(all).toLocaleString('ko-KR')}<span>백만원</span>${sum(all) >= 100 ? `<em>${(sum(all) / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}억</em>` : ''}</div><div class="ldx">${noAmt(all) ? `금액 미입력 ${noAmt(all)}건` : ''}</div></div></div>`;
+    el.innerHTML = `<div class="ldt">💰 대출진행 현황 <small>미진행 제외 · 금액 = 대출금액 합계</small></div>
+      <div class="ldw"><table class="ldtb"><thead><tr><th></th><th class="hc">협의<small>1단계</small></th><th class="hp">진행<small>2~4단계</small></th><th class="hx">실행<small>5단계 · 대출실행</small></th><th class="ht">합계</th></tr></thead><tbody>`
+      + rows.map(([k, r]) => `<tr><th class="rh sc-${k}"><span class="chip sc-${k}">${k}</span></th><td>${cell(r.c)}</td><td>${cell(r.p)}</td><td>${cell(r.x, xinfo(r))}</td><td class="tc">${cell(all(r))}</td></tr>`).join('')
+      + `<tr class="ldsum"><th class="rh">전체</th><td>${cell(tot.c)}</td><td>${cell(tot.p)}</td><td>${cell(tot.x, xinfo(tot))}</td><td class="tc">${cell(all(tot))}</td></tr></tbody></table></div>`;
   }
   // 대출금액 입력칸: 숫자만, 천단위 쉼표
   document.addEventListener('input', (e) => { if (e.target && e.target.id === 'fAmt'){ const d = e.target.value.replace(/[^\d]/g, ''); e.target.value = d ? Number(d).toLocaleString('ko-KR') : ''; } });
@@ -1405,8 +1414,8 @@
     if (mode === 'new' && !canWrite(divn)) return alert(`${DIVS[divn]}에 등록할 권한이 없어요. 관리자에게 문의해주세요.`);
     const fdiv = t ? taskDiv(t) : divn;
     $('fHead').textContent = mode === 'edit' ? '업무 수정' : `새 업무 등록 · ${DIVS[fdiv]}`;
-    $('fTypeRow').style.display = mode === 'edit' || fdiv === 'deposit' ? 'none' : 'block';     // 수신/기타는 일반업무만
-    if (mode === 'new'){ $('fType').value = fdiv === 'deposit' || fType === 'general' ? 'general' : 'loan'; $('fStage').value = '0'; syncType(); }
+    $('fTypeRow').style.display = mode === 'new' && fdiv === 'credit' ? 'block' : 'none';     // 대출취급 신규 등록일 때만 '현재 진행 단계' 선택
+    if (mode === 'new'){ $('fType').value = fdiv === 'credit' ? 'loan' : 'general'; $('fStage').value = '0'; syncType(); }
     else { const lo = t.task_type === 'loan'; $('fTitleLabel').textContent = lo ? '고객명' : '업무 내용'; $('fTitle').placeholder = lo ? '예: 홍길동' : ''; $('fLoanRow').style.display = lo ? 'block' : 'none'; }
     $('fAmt').value = t && t.loan_amount != null ? Number(t.loan_amount).toLocaleString('ko-KR') : ''; $('fColl').value = t ? (t.collateral || '') : '';
     $('fScope').value = t ? (t.scope || '') : '';
@@ -1769,8 +1778,8 @@
       const self = m.email === me;
       return `<div class="arow" data-email="${esc(m.email)}">
         <div class="nm" style="display:flex;align-items:center;gap:12px">${avHtml(m.email, '', 'margin:0;width:38px;height:38px;font-size:15px;border-width:0')}<div style="min-width:0">${esc(m.name)}${self ? ' <span class="muted">(나)</span>' : ''}<div class="muted">${esc(m.email)}</div></div></div>
-        <label class="chk"><input type="checkbox" data-p="perm_credit" ${m.perm_credit ? 'checked' : ''}/> 여신</label>
-        <label class="chk"><input type="checkbox" data-p="perm_deposit" ${m.perm_deposit ? 'checked' : ''}/> 수신/기타</label>
+        <label class="chk"><input type="checkbox" data-p="perm_credit" ${m.perm_credit ? 'checked' : ''}/> 대출</label>
+        <label class="chk"><input type="checkbox" data-p="perm_deposit" ${m.perm_deposit ? 'checked' : ''}/> 공통</label>
         <label class="chk"><input type="checkbox" data-p="perm_appraisal" ${m.perm_appraisal ? 'checked' : ''}/> 담보심사</label>
         <label class="chk"><input type="checkbox" data-p="perm_debt" ${m.perm_debt ? 'checked' : ''}/> 사후관리</label>
         <label class="chk"><input type="checkbox" data-p="is_admin" ${m.is_admin ? 'checked' : ''} ${self ? 'disabled title="본인의 관리자 권한은 해제할 수 없어요"' : ''}/> 관리자</label>

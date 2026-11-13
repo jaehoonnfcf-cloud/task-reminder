@@ -146,7 +146,7 @@ async function handle(req: Request): Promise<Response> {
     if (mode === "announce") return ok(await announce(Number(cronBody.id)));
     if (mode === "perf") return ok({ perfMissing: await perfCheck(today) });
     const dueTag = (d: string | null) => !d ? "" : d < today ? ` 🔴기한초과(${d})` : d === today ? " 🟠오늘마감" : ` (~${d})`;
-    const SECTIONS = ["수신/기타", "여신", "개인"];   // 메뉴 순서(수신/기타 → 여신 → 감정평가 → 채권관리 → 개인업무)와 같게. 일정은 맨 위
+    const SECTIONS = ["공통업무", "대출취급", "개인"];   // 메뉴 순서(수신/기타 → 여신 → 감정평가 → 채권관리 → 개인업무)와 같게. 일정은 맨 위
     const byUser = new Map<string, Record<string, string[]>>();
     const add = (email: string, sec: string, line: string) => {
       const u = byUser.get(email) ?? {};
@@ -158,7 +158,7 @@ async function handle(req: Request): Promise<Response> {
       .select("email, work_tasks!inner(title, due_date, task_type, division, scope)").is("done_at", null).eq("work_tasks.task_type", "general");
     for (const r of data ?? []) {
       const t = (r as any).work_tasks;
-      add(r.email, t.division === "deposit" ? "수신/기타" : "여신", `• ${sc(t.scope)} ${t.title}${dueTag(t.due_date)}`);
+      add(r.email, "공통업무", `• ${sc(t.scope)} ${t.title}${dueTag(t.due_date)}`);
     }
     // 대출진행: 현재 단계 안내 (담당자 전원에게)
     const { data: loans } = await db.from("work_tasks")
@@ -167,7 +167,7 @@ async function handle(req: Request): Promise<Response> {
       const steps = [...(t as any).work_task_steps].sort((a: any, b: any) => a.seq - b.seq);
       const cur = steps.find((x: any) => !x.done_at);
       if (!cur) continue;
-      for (const a of (t as any).work_task_assignees) add(a.email, "여신", `• [대출]${sc(t.scope)} ${t.title} — ${cur.name} 진행중 (${cur.seq}/${steps.length})${dueTag(t.due_date)}`);
+      for (const a of (t as any).work_task_assignees) add(a.email, "대출취급", `• [대출]${sc(t.scope)} ${t.title} — ${cur.name} 진행중 (${cur.seq}/${steps.length})${dueTag(t.due_date)}`);
     }
     // 개인업무 (본인에게만): 고정업무 다음 회차를 먼저 만들고, 미완료 개인 할 일은 매일(고정업무 회차는 알림 시작일부터) 안내
     await db.rpc("gen_personal_occurrences");
@@ -264,18 +264,18 @@ async function handle(req: Request): Promise<Response> {
   if (!task || !asg) return new Response("not found", { status: 404 });
   const names = await nameMap();
   const who = (e: string) => names.get(e) ?? e;
-  const division = task.division === "deposit" ? "deposit" : "credit";
-  const dv = division === "deposit" ? "수신/기타" : "여신";
+  const division = task.task_type === "loan" ? "credit" : "deposit";   // 대출진행 = 대출취급, 단건 업무 = 공통업무
+  const dv = division === "deposit" ? "공통업무" : "대출취급";
   const sg = sc(task.scope);
   const { data: perm } = await db.from("team_members").select("perm_credit, perm_deposit, is_admin").eq("email", me).maybeSingle();
-  const okDiv = !!perm && (perm.is_admin || (division === "credit" ? perm.perm_credit : perm.perm_deposit));
+  const okDiv = !!perm && (perm.is_admin || (division === "credit" ? perm.perm_credit : (perm.perm_deposit || perm.perm_credit)));
   const involved = task.created_by === me || asg.some((a) => a.email === me) || okDiv;
 
   const due = task.due_date ? `\n기한: ${task.due_date}` : "";
   const by = task.directed_by ? `\n요청: ${task.directed_by}` : "";
   const cur = steps.find((x) => !x.done_at);
   const everyone = [task.created_by, ...asg.map((a) => a.email)];   // 누른 사람 본인 포함
-  const newHead = task.task_type === "loan" ? `📌 [여신]${sg} 새 대출 업무가 도착했어요\n${task.title}${cur ? `\n현재 단계: ${cur.name}` : ""}` : `📌 [${dv}]${sg} 새 할 일이 도착했어요\n${task.title}`;
+  const newHead = task.task_type === "loan" ? `📌 [대출]${sg} 새 대출 업무가 도착했어요\n${task.title}${cur ? `\n현재 단계: ${cur.name}` : ""}` : `📌 [${dv}]${sg} 새 할 일이 도착했어요\n${task.title}`;
 
   if (event === "created" && task.created_by === me) {
     await notify(everyone, `${newHead}${by}${due}`);
@@ -310,7 +310,7 @@ async function handle(req: Request): Promise<Response> {
     const { data: cm } = await db.from("work_task_comments").select("author_email, body").eq("id", body.comment_id).eq("task_id", task_id).maybeSingle();
     if (!cm || cm.author_email !== me) return new Response("bad request", { status: 400 });
     const txt = String(cm.body).replace(/\s+/g, " ").trim();
-    await notify(everyone.filter((e) => e && e !== me), `💬 [${task.task_type === "loan" ? "여신" : dv}]${sg} ${task.title}\n${who(me)}님: ${txt.length > 200 ? txt.slice(0, 200) + "…" : txt}`);
+    await notify(everyone.filter((e) => e && e !== me), `💬 [${task.task_type === "loan" ? "대출" : dv}]${sg} ${task.title}\n${who(me)}님: ${txt.length > 200 ? txt.slice(0, 200) + "…" : txt}`);
   } else return new Response("bad request", { status: 400 });
   return ok();
 }
