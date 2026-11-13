@@ -580,6 +580,13 @@
     .sbLogout{ display:flex; align-items:center; gap:12px; width:100%; margin-top:2px; padding:12px 14px; border:0; border-radius:12px; background:transparent; font-size:14.5px; font-weight:600; color:#b3412c; cursor:pointer; }
     .sbLogout:hover{ background:#fdf0ec; } .sbLogout .mi{ width:20px; height:20px; }
   }
+  /* 접속 중·사용자 정보는 좌하단(사이드바)으로만 — 오른쪽 열의 내 정보 카드는 쓰지 않는다 */
+  html body #meCard{ display:none !important; }
+  #onlineBox{ display:none; }
+  @media (min-width:1360px){
+    #onlineBox:not(:empty){ display:block; margin:6px 0 2px; padding:10px 12px 12px; border-radius:14px; background:var(--shell); }
+    #onlineBox .ol-list{ margin-top:8px; gap:4px; } #onlineBox .ol-c{ background:#fff; }
+  }
   /* 모바일: 하단 탭바 */
   @media (max-width:760px){
     #tabBar{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:60; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #e9e3d6; }
@@ -923,6 +930,7 @@
     else { $('whoPh').after(who); $('clockPh').after(clock); }
   }
   mqSide.addEventListener ? mqSide.addEventListener('change', placeMe) : mqSide.addListener(placeMe); placeMe();
+  { const ob = $('onlineBox'), wh = $('who'); if (ob && wh) wh.parentNode.insertBefore(ob, wh); }   // 접속 중 표시: 오른쪽 열 → 사이드바 좌하단(프로필 위)
   { const rc = $('rcCard'), mn = $('main'); if (rc && mn) mn.appendChild(rc); }   // 최근 댓글 카드: 오른쪽 열이 현황판 전용이 되어 본문 맨 아래로
   // 지금 접속 중인 사람 (Supabase Realtime Presence — 저장되지 않고 접속이 끊기면 자동으로 사라짐)
   let presChan = null, onlineKeys = [];
