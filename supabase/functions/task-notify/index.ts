@@ -167,7 +167,7 @@ async function handle(req: Request): Promise<Response> {
       const steps = [...(t as any).work_task_steps].sort((a: any, b: any) => a.seq - b.seq);
       const cur = steps.find((x: any) => !x.done_at);
       if (!cur) continue;
-      for (const a of (t as any).work_task_assignees) add(a.email, "대출취급", `• [대출]${sc(t.scope)} ${t.title} — ${cur.name} 진행중 (${cur.seq}/${steps.length})${dueTag(t.due_date)}`);
+      for (const a of (t as any).work_task_assignees) add(a.email, "대출취급", `• [대출]${sc(t.scope)} ${t.title} — ${cur.name} 진행중 (${cur.seq}/${steps.length})`);   // 대출은 기한 없음
     }
     // 개인업무 (본인에게만): 고정업무 다음 회차를 먼저 만들고, 미완료 개인 할 일은 매일(고정업무 회차는 알림 시작일부터) 안내
     await db.rpc("gen_personal_occurrences");
@@ -271,7 +271,7 @@ async function handle(req: Request): Promise<Response> {
   const okDiv = !!perm && (perm.is_admin || (division === "credit" ? perm.perm_credit : (perm.perm_deposit || perm.perm_credit)));
   const involved = task.created_by === me || asg.some((a) => a.email === me) || okDiv;
 
-  const due = task.due_date ? `\n기한: ${task.due_date}` : "";
+  const due = task.due_date && task.task_type !== "loan" ? `\n기한: ${task.due_date}` : "";
   const by = task.directed_by ? `\n요청: ${task.directed_by}` : "";
   const cur = steps.find((x) => !x.done_at);
   const everyone = [task.created_by, ...asg.map((a) => a.email)];   // 누른 사람 본인 포함

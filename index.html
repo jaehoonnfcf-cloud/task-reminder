@@ -905,7 +905,7 @@
   const isDropped = (t) => !!t.dropped_at;                       // 대출 미진행 (중간에 닫힘)
   const isOpen = (t) => !isDone(t) && !isDropped(t);
   const statusOk = (t, st) => st === 'all' ? true : st === 'closed' ? !isOpen(t) : st === 'drop' ? isDropped(t) : st === 'done' ? (isDone(t) && !isDropped(t)) : isOpen(t);
-  const dueGrp = (t, today) => isDropped(t) ? 'drop' : isDone(t) ? 'done' : (t.due_date && t.due_date < today) ? 'over' : (t.due_date === today) ? 'today' : 'prog';
+  const dueGrp = (t, today) => isDropped(t) ? 'drop' : isDone(t) ? 'done' : t.task_type === 'loan' ? 'prog' : (t.due_date && t.due_date < today) ? 'over' : (t.due_date === today) ? 'today' : 'prog';
   const canAct = (t) => canWrite(taskDiv(t));                       // 등록·수정·단계수정 권한
   const ownerOrAdmin = (t) => t.created_by === me || isAdmin();     // 담당자 구성 변경 / 삭제
   const isMine = (t) => t.work_task_assignees.some(a => a.email === me);
@@ -952,9 +952,10 @@
     const open = divTasks.filter(isOpen);
     const cnt = (g) => open.filter(t => dueGrp(t, today) === g).length;
     const tiles = [
-      ['over', cnt('over'), '기한초과', 'grp:over'], ['today', cnt('today'), '오늘마감', 'grp:today'],
+      ...(divn === 'credit' ? [] : [['over', cnt('over'), '기한초과', 'grp:over'], ['today', cnt('today'), '오늘마감', 'grp:today']]),
       ['loan', open.filter(isMine).length, '내 미완료', 'mine:'], ['', open.length, '미완료 전체', 'grp:'],
     ];
+    $('tiles').style.gridTemplateColumns = divn === 'credit' ? 'repeat(2,1fr)' : '';
     $('tiles').innerHTML = tiles.map(([c, n, l, act]) => {
       const sel = act === 'grp:' ? (!fGrp && !mine && effType === 'all') : act === 'mine:' ? (mine && !fGrp) : fGrp === act.slice(4);
       return `<button class="tile ${c} ${sel ? 'sel' : ''}" data-tile="${act}"><div class="n">${n}</div><div class="l">${l}</div></button>`;
@@ -967,10 +968,10 @@
     document.querySelectorAll('#stSeg button').forEach(b => b.classList.toggle('on', b.dataset.st === (status === 'closed' ? 'closed' : 'open')));
     const closedView = status === 'closed';
     $('tiles').style.display = closedView ? 'none' : '';
-    const thSpans = document.querySelectorAll('#shared .thead span'); if (thSpans[4]) thSpans[4].textContent = closedView ? '완료일' : '기한';
+    const thSpans = document.querySelectorAll('#shared .thead span'); if (thSpans[4]) thSpans[4].textContent = closedView ? '완료일' : divn === 'credit' ? '' : '기한';
     if (closedView){
       const rows = divTasks.filter(t => !isOpen(t) && (effType === 'all' || (effType === 'loan') === (t.task_type === 'loan')) && (fScope === 'all' || t.scope === fScope) && (!mine || isMine(t))
-        && (!q || [t.title, t.detail, t.directed_by].some(v => (v || '').toLowerCase().includes(q)))).sort((a, b) => doneAtOf(b).localeCompare(doneAtOf(a)) || b.id - a.id);
+        && (!q || [t.title, t.detail, t.directed_by, t.collateral].some(v => (v || '').toLowerCase().includes(q)))).sort((a, b) => doneAtOf(b).localeCompare(doneAtOf(a)) || b.id - a.id);
       const view = closedAll ? rows : rows.slice(0, 100);
       let cur = '', html = '';
       view.forEach(t => { const d = kstDay(doneAtOf(t)), m = d ? `${d.slice(0, 4)}년 ${+d.slice(5, 7)}월` : '완료일 없음'; if (m !== cur){ cur = m; html += `<div class="sec-h done">📅 ${m}<span class="n">${rows.filter(r => { const x = kstDay(doneAtOf(r)); return (x ? `${x.slice(0, 4)}년 ${+x.slice(5, 7)}월` : '완료일 없음') === m; }).length}</span></div>`; } html += rowHtml(t, true); });
@@ -986,11 +987,11 @@
       && (!mine || isMine(t))
       && statusOk(t, status)
       && (!fGrp || dueGrp(t, today) === fGrp)
-      && (!q || [t.title, t.detail, t.directed_by].some(v => (v || '').toLowerCase().includes(q))));
+      && (!q || [t.title, t.detail, t.directed_by, t.collateral].some(v => (v || '').toLowerCase().includes(q))));
 
     const groups = (arr) => GROUPS.map(([k, label]) => {
       const items = arr.filter(t => dueGrp(t, today) === k);
-      return items.length ? `<div class="sec-h ${k}">${label}<span class="n">${items.length}</span></div>${items.map(rowHtml).join('')}` : '';
+      return items.length ? `<div class="sec-h ${k}">${label}<span class="n">${items.length}</span></div>${items.map(t => rowHtml(t)).join('')}` : '';
     }).join('');
     const mineRows = shown.filter(isMine), otherRows = shown.filter(t => !isMine(t));
     let html = `<div class="blk-h">★ 내 업무<span class="n">${mineRows.length}</span></div>`
@@ -1005,6 +1006,8 @@
   // ---------- 대출진행 대시보드 (여신업무 상단): 단계별 3구분 집계 ----------
   // 1단계 = 협의 / 2~4단계 = 진행 / 5단계(대출실행) = 실행. 미진행 처리된 건은 제외.
   // 실행 = 5단계 진행 중 + 실행 완료(전 단계 완료)한 건 중 올해 완료분
+  // 대출 건 한 줄 요약: 고객명 / 000백만원 / 담보요약
+  const loanLine = (t) => [t.title, t.loan_amount != null && `${Number(t.loan_amount).toLocaleString('ko-KR')}백만원`, t.collateral].filter(Boolean).join(' / ');
   const fmtAmt = (m) => { const n = Number(m) || 0; return `${n.toLocaleString('ko-KR')}백만원${n >= 100 ? ` (${(n / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}억)` : ''}`; };
   function renderLoanDash(list){
     const el = $('loanDash'); if (!el) return;
@@ -1043,7 +1046,7 @@
   let closedAll = false;
   function rowHtml(t, doneMode){
     const today = kstToday(), g = dueGrp(t, today), loan = t.task_type === 'loan', steps = stepsOf(t), asg = t.work_task_assignees;
-    const sub = [t.task_type === 'loan' && t.loan_amount != null && `${fmtAmt(t.loan_amount)}`, t.task_type === 'loan' && t.collateral, t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
+    const sub = [t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
     let prog, act = '';
     if (loan && isDropped(t)){
       const ds = steps.find(s => s.seq === t.dropped_step);
@@ -1060,11 +1063,11 @@
       if (canAct(t) && asg.some(a => a.email === me && !a.done_at)) act = `<button class="go" data-go="mine:${t.id}">✔ 내 일 완료</button>`;
     }
     const dd = doneMode ? kstDay(doneAtOf(t)) : '';
-    const due = doneMode ? (dd ? `<span class="chip ok">${isDropped(t) ? '⛔' : '✅'} ${fmtMD(dd)}</span>${t.due_date ? `<div class="ts" style="margin-top:3px">기한 ${fmtMD(t.due_date)}</div>` : ''}` : '<span class="muted">-</span>') : t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '<span class="muted">-</span>';
+    const due = doneMode ? (dd ? `<span class="chip ok">${isDropped(t) ? '⛔' : '✅'} ${fmtMD(dd)}</span>${t.due_date && !loan ? `<div class="ts" style="margin-top:3px">기한 ${fmtMD(t.due_date)}</div>` : ''}` : '<span class="muted">-</span>') : loan ? '' : t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '<span class="muted">-</span>';
     const avs = `<div class="avs">${asg.map(a => avHtml(a.email, !loan && a.done_at ? 'done' : '')).join('')}</div>`;
     return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}" data-id="${t.id}">
       <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}">${esc(t.scope)}</span>` : ''}</div>
-      <div class="c-title"><div class="tt">${esc(t.title)}${(t.work_task_comments || []).length ? ` <span class="cmtc">💬 ${t.work_task_comments.length}</span>` : ''}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
+      <div class="c-title"><div class="tt">${esc(loan ? loanLine(t) : t.title)}${(t.work_task_comments || []).length ? ` <span class="cmtc">💬 ${t.work_task_comments.length}</span>` : ''}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
       <div class="c-prog prog">${prog}</div><div class="c-who">${avs}</div><div class="c-due">${due}</div><div class="c-act">${act}</div></div>`;
   }
 
@@ -1283,7 +1286,7 @@
     const cur = steps[curIdx(t)];
     let body = '';
     if (t.detail) body += `<div class="kv"><div class="k">상세</div><div class="v">${esc(t.detail)}</div></div>`;
-    const info = [loan && t.loan_amount != null && `대출금액: ${fmtAmt(t.loan_amount)}`, loan && t.collateral && `담보: ${t.collateral}`, t.directed_by && `요청: ${t.directed_by}`, t.due_date && `기한: ${t.due_date}`].filter(Boolean).join('  ·  ');
+    const info = [loan && t.loan_amount != null && `대출금액: ${fmtAmt(t.loan_amount)}`, loan && t.collateral && `담보: ${t.collateral}`, t.directed_by && `요청: ${t.directed_by}`, !loan && t.due_date && `기한: ${t.due_date}`].filter(Boolean).join('  ·  ');
     if (info) body += `<div class="kv"><div class="k">정보</div><div class="v">${esc(info)}</div></div>`;
     if (loan){
       const lastDone = [...steps].reverse().find(s => s.done_at), dropped = isDropped(t);
@@ -1400,7 +1403,7 @@
     $('fStageRow').style.display = loan ? 'block' : 'none';
     $('fTitleLabel').textContent = loan ? '고객명' : '업무 내용';
     $('fTitle').placeholder = loan ? '예: 홍길동' : '예: 3분기 연체 현황 보고서 작성';
-    $('fLoanRow').style.display = loan ? 'block' : 'none';
+    $('fLoanRow').style.display = loan ? 'block' : 'none'; $('fDue').parentElement.style.display = loan ? 'none' : '';
   }
   $('fType').onchange = syncType;
   function fillRequesters(current){
@@ -1416,7 +1419,7 @@
     $('fHead').textContent = mode === 'edit' ? '업무 수정' : `새 업무 등록 · ${DIVS[fdiv]}`;
     $('fTypeRow').style.display = mode === 'new' && fdiv === 'credit' ? 'block' : 'none';     // 대출취급 신규 등록일 때만 '현재 진행 단계' 선택
     if (mode === 'new'){ $('fType').value = fdiv === 'credit' ? 'loan' : 'general'; $('fStage').value = '0'; syncType(); }
-    else { const lo = t.task_type === 'loan'; $('fTitleLabel').textContent = lo ? '고객명' : '업무 내용'; $('fTitle').placeholder = lo ? '예: 홍길동' : ''; $('fLoanRow').style.display = lo ? 'block' : 'none'; }
+    else { const lo = t.task_type === 'loan'; $('fTitleLabel').textContent = lo ? '고객명' : '업무 내용'; $('fTitle').placeholder = lo ? '예: 홍길동' : ''; $('fLoanRow').style.display = lo ? 'block' : 'none'; $('fDue').parentElement.style.display = lo ? 'none' : ''; }
     $('fAmt').value = t && t.loan_amount != null ? Number(t.loan_amount).toLocaleString('ko-KR') : ''; $('fColl').value = t ? (t.collateral || '') : '';
     $('fScope').value = t ? (t.scope || '') : '';
     $('fTitle').value = t ? t.title : ''; $('fDetail').value = t ? (t.detail || '') : ''; fillRequesters(t ? t.directed_by : ''); $('fDue').value = t ? (t.due_date || '') : '';
@@ -1442,6 +1445,7 @@
     const patch = { title, detail: $('fDetail').value.trim() || null, scope, directed_by: $('fBy').value || null, due_date: $('fDue').value || null };
     const isLoanForm = formMode === 'edit' ? byId(editId) && byId(editId).task_type === 'loan' : $('fType').value === 'loan';
     if (isLoanForm){
+      delete patch.due_date;   // 대출 업무에는 기한이 없음
       const raw = $('fAmt').value.replace(/[,\s]/g, '');
       if (raw && !/^\d+$/.test(raw)) return alert('대출금액은 백만원 단위의 숫자(정수)로 입력해주세요. 예: 300 (= 3억원)');
       patch.loan_amount = raw ? +raw : null; patch.collateral = $('fColl').value.trim() || null;
