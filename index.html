@@ -538,6 +538,21 @@
     html body #app[style*="flex"] #main{ grid-column:2; grid-row:2; padding:22px 20px 48px 28px; }
     html body #app[style*="flex"] #side{ grid-column:3; grid-row:1 / -1; align-self:start; margin:26px 26px 26px 0; position:sticky; top:46px; }
   }
+  /* 웹(1440px 이상): 업무 상세를 팝업 대신 오른쪽에 붙는 패널로. 열려 있는 동안 앱 틀이 왼쪽으로 줄고, 시세·뉴스 열은 잠시 가린다 */
+  .trow.sel{ box-shadow:0 0 0 2px var(--accent), var(--sh); }
+  @media (min-width:1440px){
+    body.dock-open #detailOv{ position:fixed; inset:auto; top:20px; right:20px; bottom:20px; width:400px; padding:0; background:transparent; overflow:visible; z-index:50; }
+    body.dock-open #detailOv .panel{ max-width:none; width:100%; height:100%; margin:0; overflow-y:auto; border-radius:26px; padding:24px 22px; box-shadow:0 10px 40px rgba(80,50,180,.16); }
+    html body.dock-open #app[style*="flex"]{ width:calc(100% - 460px); max-width:none; margin:20px 0 20px 20px; grid-template-columns:250px minmax(0,1fr); }
+    html body.dock-open #app[style*="flex"] #side{ display:none; }
+    /* 본문이 좁아지므로 목록 줄은 좁은 화면용 배치(제목 위, 진행·담당·버튼 아래)를 쓴다 */
+    body.dock-open .thead{ display:none; }
+    body.dock-open .trow{ grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"type title due" ". prog prog" ". who act"; gap:8px 14px; padding:14px 20px; align-items:center; }
+    body.dock-open .c-type{ grid-area:type; flex-direction:row; align-items:center; } body.dock-open .c-title{ grid-area:title; } body.dock-open .c-due{ grid-area:due; justify-self:end; }
+    body.dock-open .c-prog{ grid-area:prog; } body.dock-open .c-who{ grid-area:who; } body.dock-open .c-act{ grid-area:act; justify-self:end; }
+    body.dock-open #detailPanel .steps{ flex-direction:column; flex-wrap:nowrap; gap:8px; }
+    body.dock-open #detailPanel .step{ width:100%; border-radius:14px; }
+  }
   /* 모바일: 하단 탭바 */
   @media (max-width:760px){
     #tabBar{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:60; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #e9e7f3; }
@@ -1202,7 +1217,7 @@
     const dd = doneMode ? kstDay(doneAtOf(t)) : '';
     const due = doneMode ? (dd ? `<span class="chip ok">${isDropped(t) ? '⛔' : '✅'} ${fmtMD(dd)}</span>${t.due_date && !loan ? `<div class="ts" style="margin-top:3px">기한 ${fmtMD(t.due_date)}</div>` : ''}` : '<span class="muted">-</span>') : loan ? '' : t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '<span class="muted">-</span>';
     const avs = `<div class="avs">${asg.map(a => avHtml(a.email, !loan && a.done_at ? 'done' : '')).join('')}</div>`;
-    return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}" data-id="${t.id}">
+    return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}${openId === t.id ? ' sel' : ''}" data-id="${t.id}">
       <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}">${esc(t.scope)}</span>` : ''}</div>
       <div class="c-title"><div class="tt">${esc(loan ? loanLine(t) : t.title)}${(t.work_task_comments || []).length ? ` <span class="cmtc">💬 ${t.work_task_comments.length}</span>` : ''}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
       <div class="c-prog prog">${prog}</div><div class="c-who">${avs}</div><div class="c-due">${due}</div><div class="c-act">${act}</div></div>`;
@@ -1437,8 +1452,12 @@
   });
 
   // ---------- 상세 ----------
-  function openDetail(id){ openId = id; renderDetail(byId(id)); $('detailOv').style.display = 'block'; document.body.style.overflow = 'hidden'; }
-  function closeDetail(){ openId = null; $('detailOv').style.display = 'none'; document.body.style.overflow = ''; }
+  // 넓은 화면(1440px 이상)에서는 상세를 팝업 대신 오른쪽에 붙는 패널로 보여준다(같은 패널·같은 동작, 배치만 CSS로 다름). 그보다 좁으면 기존 팝업
+  const dockOn = () => window.matchMedia('(min-width:1440px)').matches;
+  const markSel = () => document.querySelectorAll('#list .trow').forEach(r => r.classList.toggle('sel', openId != null && +r.dataset.id === openId));
+  function openDetail(id){ openId = id; renderDetail(byId(id)); $('detailOv').style.display = 'block'; const d = dockOn(); document.body.classList.toggle('dock-open', d); document.body.style.overflow = d ? '' : 'hidden'; markSel(); }
+  function closeDetail(){ openId = null; $('detailOv').style.display = 'none'; document.body.classList.remove('dock-open'); document.body.style.overflow = ''; markSel(); }
+  window.addEventListener('resize', () => { if (openId != null){ const d = dockOn(); document.body.classList.toggle('dock-open', d); document.body.style.overflow = d ? '' : 'hidden'; } });
   $('detailOv').addEventListener('click', (e) => { if (e.target === $('detailOv')) closeDetail(); });
 
   function renderDetail(t){
@@ -1598,7 +1617,7 @@
     $('formOv').style.display = 'block'; document.body.style.overflow = 'hidden';
     setTimeout(() => { try { $('fTitle').focus(); } catch (e) {} }, 50);
   }
-  function closeForm(){ $('formOv').style.display = 'none'; editId = null; document.body.style.overflow = $('detailOv').style.display === 'block' ? 'hidden' : ''; }
+  function closeForm(){ $('formOv').style.display = 'none'; editId = null; document.body.style.overflow = $('detailOv').style.display === 'block' && !dockOn() ? 'hidden' : ''; }
   $('fClose').onclick = closeForm; $('fCancel').onclick = closeForm;
   $('formOv').addEventListener('click', (e) => { if (e.target === $('formOv')) closeForm(); });
   $('newBtn').onclick = () => divn === 'personal' ? openPf(null) : divn === 'debt' ? (dbTab === 'survey' ? svOpenForm(null) : dbOpenForm(null)) : divn === 'appraisal' ? (apTab === 'rti' ? rtiNew() : apTab === 'dep' ? depNew() : apOpenForm(null)) : openForm('new', null);
