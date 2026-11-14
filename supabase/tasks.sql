@@ -860,3 +860,7 @@ alter table public.appraisal_comments add column if not exists edited_at timesta
 drop policy if exists acm_upd on public.appraisal_comments;
 create policy acm_upd on public.appraisal_comments for update to authenticated using (has_appraisal() and author_email = auth.email()) with check (has_appraisal() and author_email = auth.email());
 grant update (body, created_at, edited_at) on public.appraisal_comments to authenticated;
+
+-- 대출취급 3단계 '감정평가': 감정 방식에 '기존감정서 습용'(reuse) 추가 (외부감정/자체감정/기존감정서 습용/감정 불요)
+alter table public.work_tasks drop constraint if exists work_tasks_appraisal_mode_check;
+alter table public.work_tasks add constraint work_tasks_appraisal_mode_check check (appraisal_mode is null or appraisal_mode in ('external','own','reuse','none'));
