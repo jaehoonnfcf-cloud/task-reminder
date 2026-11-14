@@ -63,6 +63,7 @@ const apM2Py = (m2) => { const p = apPy(m2); return `${Number(m2).toLocaleString
   .apcmt .bd{ flex:1; min-width:0; } .apcmt .hd{ font-size:12.5px; color:var(--muted); display:flex; gap:4px; align-items:center; } .apcmt .hd b{ color:var(--ink); }
   .apcmt .tx{ font-size:14.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; margin-top:2px; }
   .apce{ display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; } .apce label{ margin:0; display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:var(--muted); } .apce input[type=date]{ width:auto; min-height:36px; padding:4px 10px; font-size:13.5px; }
+  .apcmt .del.edt{ margin-left:auto; } .apcmt .del.edt + .del{ margin-left:0; }
   .apcmt .del{ margin-left:auto; border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:14px; }
   #apCmtInput{ width:100%; margin-top:10px; }
   .pyh{ font-size:12.5px; font-weight:700; color:var(--accent); margin-top:4px; min-height:16px; }
@@ -277,7 +278,31 @@ const apCmtTs = (iso) => apKst(iso).slice(0, 16).replace('T', ' ');
 const apNowKst = () => new Date((typeof nowMs === 'function' ? nowMs() : Date.now()) + 9 * 3600e3).toISOString();
 // 고른 날짜가 오늘이면 지금 시각(서버 기본값), 다른 날이면 그 날짜 + 지금 시각(같은 날 여러 건이 입력 순서대로 정렬되도록)
 const apCmtAt = (date) => { const n = apNowKst(); return date && date !== n.slice(0, 10) ? new Date(`${date}T${n.slice(11, 19)}+09:00`).toISOString() : null; };
+let apCmtEdit = null;   // 수정 중인 의견 id (본인 의견만)
 const apCmts = (c) => [...(c.appraisal_comments || [])].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.id - b.id);
+// 의견 한 줄: 보기 / 수정 중 (수정은 본인 의견만, 삭제는 본인 또는 관리자)
+function apCmtHtml(m, edBody, edDate){
+  const av = avHtml(m.author_email, '', 'margin:0;width:32px;height:32px;font-size:13px;border-width:0;flex:none'), own = m.author_email === me;
+  if (own && apCmtEdit === m.id){
+    return `<div class="apcmt">${av}<div class="bd"><div class="hd"><b>${esc(nameOf(m.author_email))}</b> · 의견 수정 중</div>
+      <textarea id="apCmtEditBody" rows="3" maxlength="1000" style="width:100%;margin-top:6px">${esc(edBody !== null ? edBody : m.body)}</textarea>
+      <div class="apce"><label>의견 날짜 <input type="date" id="apCmtEditDate" value="${esc(edDate || apKst(m.created_at).slice(0, 10))}" /></label><span style="flex:1"></span><button class="btn small" data-act="cmtcancel">취소</button><button class="btn primary small" data-act="cmtsave" data-cid="${m.id}">저장</button></div></div></div>`;
+  }
+  return `<div class="apcmt">${av}<div class="bd"><div class="hd"><b>${esc(nameOf(m.author_email))}</b> · ${esc(apCmtTs(m.created_at))}${m.edited_at ? ' · 수정됨' : ''}${own ? `<button class="del edt" data-cedit="${m.id}" title="수정">✎</button>` : ''}${own || isAdmin() ? `<button class="del" data-cdel="${m.id}" title="삭제">✕</button>` : ''}</div><div class="tx">${esc(m.body)}</div></div></div>`;
+}
+async function apSaveCommentEdit(id){
+  const c = apCases.find(x => x.id === apOpenId), m = c && apCmts(c).find(x => x.id === id); if (!m) return;
+  const body = (($('apCmtEditBody') || {}).value || '').trim(); if (!body) return alert('의견 내용을 입력해주세요.');
+  const date = ($('apCmtEditDate') || {}).value, kst = apKst(m.created_at), patch = { body, edited_at: new Date().toISOString() };
+  if (date && date !== kst.slice(0, 10)) patch.created_at = new Date(`${date}T${kst.slice(11, 19)}+09:00`).toISOString();   // 날짜만 바꾸고 시각은 그대로
+  if (body === m.body && !patch.created_at){ apCmtEdit = null; return renderApDetail(); }   // 바뀐 게 없음
+  const btn = document.querySelector('[data-act=cmtsave]'); if (btn) btn.disabled = true;
+  const { data, error } = await sb.from('appraisal_comments').update(patch).eq('id', id).select('id');
+  if (btn) btn.disabled = false;
+  if (error) return alert(error.message);
+  if (!data || !data.length) return alert('의견을 수정하지 못했어요. 본인이 쓴 의견만 수정할 수 있어요.');
+  apCmtEdit = null; await loadAppraisal();
+}
 async function apSendComment(){
   const c = apCases.find(x => x.id === apOpenId), t = $('apCmtInput'); if (!c || !t) return;
   const body = t.value.trim(); if (!body) return;
@@ -291,13 +316,14 @@ async function apSendComment(){
   await loadAppraisal();
   const w = $('apCmtWrap'); if (w) w.scrollIntoView({ block: 'nearest' });
 }
-function apOpenDetail(id){ apOpenId = id; renderApDetail(); $('apDetailOv').style.display = 'block'; document.body.style.overflow = 'hidden'; }
+function apOpenDetail(id){ apOpenId = id; apCmtEdit = null; renderApDetail(); $('apDetailOv').style.display = 'block'; document.body.style.overflow = 'hidden'; }
 function apCloseDetail(){ apOpenId = null; $('apDetailOv').style.display = 'none'; document.body.style.overflow = $('apFormOv').style.display === 'block' ? 'hidden' : ''; }
 function renderApDetail(){
   const c = apCases.find(x => x.id === apOpenId);
   if (!c){ if (apOpenId) apCloseDetail(); return; }
   const props = apProps(c), reqs = apReqs(c), can = apCan();
   // 다시 그리기 전에, 아직 저장하지 않고 입력 중인 금액(다른 기관 칸)을 보존한다
+  const edBody = $('apCmtEditBody') ? $('apCmtEditBody').value : null, edDate = $('apCmtEditDate') ? $('apCmtEditDate').value : null;   // 수정 중인 내용도 다시 그려도 유지
   const cdraft = ($('apCmtInput') || {}).value || '', cdate = ($('apCmtDate') || {}).value || '';   // 작성 중인 의견·날짜는 다시 그려도 유지
   const draft = [...$('apDetailPanel').querySelectorAll('[data-k]')].filter(i => i.value !== i.dataset.orig).map(i => [i.dataset.k, i.value]);
   const unit = (p) => p.kind === '토지' ? '토지' : p.kind === '건물' ? '연면적' : '전용';
@@ -342,7 +368,7 @@ function renderApDetail(){
       ${can && c.chosen_firm_id ? '<div style="margin-top:8px"><button class="btn small" data-act="unchoose">채택 해제 (가격만 조회)</button></div>' : ''}
     </div>
     <div class="apsec" id="apCmtWrap"><div class="k">💬 담당자 의견 · 대출가능액 <span class="muted" style="font-weight:500">(${apCmts(c).length}건)</span></div>
-      <div class="apcmts">${apCmts(c).map(m => `<div class="apcmt">${avHtml(m.author_email, '', 'margin:0;width:32px;height:32px;font-size:13px;border-width:0;flex:none')}<div class="bd"><div class="hd"><b>${esc(nameOf(m.author_email))}</b> · ${esc(apCmtTs(m.created_at))}${m.author_email === me || isAdmin() ? `<button class="del" data-cdel="${m.id}" title="삭제">✕</button>` : ''}</div><div class="tx">${esc(m.body)}</div></div></div>`).join('') || '<div class="muted" style="padding:4px 2px 8px">아직 의견이 없어요. 감정평가 내역으로 책정한 대출가능액을 남겨주세요.</div>'}</div>
+      <div class="apcmts">${apCmts(c).map(m => apCmtHtml(m, edBody, edDate)).join('') || '<div class="muted" style="padding:4px 2px 8px">아직 의견이 없어요. 감정평가 내역으로 책정한 대출가능액을 남겨주세요.</div>'}</div>
       ${can ? `<textarea id="apCmtInput" rows="3" maxlength="1000" placeholder="예: 감정평가 결과를 검토해 대출가능액을 2억 5천만원으로 책정 (담보인정비율 70%)">${esc(cdraft)}</textarea><div class="apce"><label>의견 날짜 <input type="date" id="apCmtDate" value="${esc(cdate || apNowKst().slice(0, 10))}" /></label><span style="flex:1"></span><button class="btn primary small" data-act="cmtsend" id="apCmtSend">등록</button></div>` : '<div class="muted" style="font-size:13px">감정평가 권한이 있는 담당자만 의견을 남길 수 있어요.</div>'}</div>
     <div class="foot" style="margin-top:22px"><button class="btn" data-act="map">🗺 지도에서 보기</button><button class="btn" data-act="print">🖨 보고서 인쇄</button><button class="btn" data-act="fax">📠 감정평가 의뢰서 (팩스)</button>${can ? `<button class="btn" data-act="edit">✏ 수정</button><button class="btn" data-act="${c.archived_at ? 'unarchive' : 'archive'}">${c.archived_at ? '↩ 보관함에서 꺼내기' : '📦 보관함으로 이동'}</button>${(c.created_by === me || isAdmin()) ? '<button class="btn danger" data-act="del">삭제</button>' : ''}` : '<span class="muted">👀 감정평가 권한이 없어 보기만 할 수 있어요.</span>'}</div>`;
   draft.sort((a, b) => (a[0][0] === 't') - (b[0][0] === 't')).forEach(([k, val]) => {
@@ -384,6 +410,9 @@ $('apDetailPanel').addEventListener('click', async (e) => {
     if (error) return alert(error.message);
     return loadAppraisal();
   }
+  const ce = e.target.closest('[data-cedit]'); if (ce){ apCmtEdit = +ce.dataset.cedit; return renderApDetail(); }
+  if (e.target.closest('[data-act=cmtcancel]')){ apCmtEdit = null; return renderApDetail(); }
+  const cs = e.target.closest('[data-act=cmtsave]'); if (cs) return apSaveCommentEdit(+cs.dataset.cid);
   if (e.target.closest('[data-act=cmtsend]')) return apSendComment();
   const b = e.target.closest('[data-act]'); if (!b || b.tagName === 'INPUT') return;
   const c = apCases.find(x => x.id === apOpenId); if (!c) return;

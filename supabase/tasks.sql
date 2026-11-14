@@ -854,3 +854,9 @@ alter table public.work_tasks
   add column if not exists appraisal_set_at timestamptz;
 grant update (appraisal_mode, own_appraisal_amount, appraisal_reason, appraisal_set_by, appraisal_set_at) on public.work_tasks to authenticated;
 alter table public.appraisal_cases add column if not exists loan_task_id bigint references public.work_tasks(id) on delete set null;
+
+-- 감정평가 담당자 의견: 본인이 쓴 의견의 내용·날짜를 수정할 수 있게 함 (수정 표시용 edited_at 추가). 작성자·소속 사건은 바꿀 수 없도록 컬럼 단위로만 허용
+alter table public.appraisal_comments add column if not exists edited_at timestamptz;
+drop policy if exists acm_upd on public.appraisal_comments;
+create policy acm_upd on public.appraisal_comments for update to authenticated using (has_appraisal() and author_email = auth.email()) with check (has_appraisal() and author_email = auth.email());
+grant update (body, created_at, edited_at) on public.appraisal_comments to authenticated;
