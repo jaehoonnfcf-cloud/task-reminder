@@ -62,6 +62,7 @@ const apM2Py = (m2) => { const p = apPy(m2); return `${Number(m2).toLocaleString
   .apcmt{ display:flex; gap:10px; padding:10px 2px; border-bottom:1px solid var(--line); }
   .apcmt .bd{ flex:1; min-width:0; } .apcmt .hd{ font-size:12.5px; color:var(--muted); display:flex; gap:4px; align-items:center; } .apcmt .hd b{ color:var(--ink); }
   .apcmt .tx{ font-size:14.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; margin-top:2px; }
+  .apce{ display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; } .apce label{ margin:0; display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:var(--muted); } .apce input[type=date]{ width:auto; min-height:36px; padding:4px 10px; font-size:13.5px; }
   .apcmt .del{ margin-left:auto; border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:14px; }
   #apCmtInput{ width:100%; margin-top:10px; }
   .pyh{ font-size:12.5px; font-weight:700; color:var(--accent); margin-top:4px; min-height:16px; }
@@ -270,15 +271,22 @@ function apRowHtml(c){
 }
 
 // ---------- 상세 ----------
+// 담당자 의견 날짜: 한국시간 기준으로 표시하고, 작성할 때 날짜를 고를 수 있다
+const apKst = (iso) => new Date(new Date(iso).getTime() + 9 * 3600e3).toISOString();   // 한국시간을 UTC 표기처럼 만든 값 (앞 10자리 = 날짜, 11~19자리 = 시각)
+const apCmtTs = (iso) => apKst(iso).slice(0, 16).replace('T', ' ');
+const apNowKst = () => new Date((typeof nowMs === 'function' ? nowMs() : Date.now()) + 9 * 3600e3).toISOString();
+// 고른 날짜가 오늘이면 지금 시각(서버 기본값), 다른 날이면 그 날짜 + 지금 시각(같은 날 여러 건이 입력 순서대로 정렬되도록)
+const apCmtAt = (date) => { const n = apNowKst(); return date && date !== n.slice(0, 10) ? new Date(`${date}T${n.slice(11, 19)}+09:00`).toISOString() : null; };
 const apCmts = (c) => [...(c.appraisal_comments || [])].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.id - b.id);
 async function apSendComment(){
   const c = apCases.find(x => x.id === apOpenId), t = $('apCmtInput'); if (!c || !t) return;
   const body = t.value.trim(); if (!body) return;
   $('apCmtSend').disabled = true;
-  const { data, error } = await sb.from('appraisal_comments').insert({ case_id: c.id, body }).select('id');
+  const row = { case_id: c.id, body }, at = apCmtAt(($('apCmtDate') || {}).value); if (at) row.created_at = at;
+  const { data, error } = await sb.from('appraisal_comments').insert(row).select('id');
   if ($('apCmtSend')) $('apCmtSend').disabled = false;
   if (error) return alert(error.message);
-  t.value = '';
+  t.value = ''; { const d = $('apCmtDate'); if (d) d.value = ''; }   // 등록하면 날짜는 다시 오늘로 (다음 의견이 엉뚱한 날짜에 쌓이지 않게)
   if (data && data[0]) sb.functions.invoke('task-notify', { body: { event: 'appraisal_comment', case_id: c.id, comment_id: data[0].id } });   // 알림 받는 사람에게 (실패해도 등록은 유지)
   await loadAppraisal();
   const w = $('apCmtWrap'); if (w) w.scrollIntoView({ block: 'nearest' });
@@ -290,7 +298,7 @@ function renderApDetail(){
   if (!c){ if (apOpenId) apCloseDetail(); return; }
   const props = apProps(c), reqs = apReqs(c), can = apCan();
   // 다시 그리기 전에, 아직 저장하지 않고 입력 중인 금액(다른 기관 칸)을 보존한다
-  const cdraft = ($('apCmtInput') || {}).value || '';   // 작성 중인 의견은 다시 그려도 유지
+  const cdraft = ($('apCmtInput') || {}).value || '', cdate = ($('apCmtDate') || {}).value || '';   // 작성 중인 의견·날짜는 다시 그려도 유지
   const draft = [...$('apDetailPanel').querySelectorAll('[data-k]')].filter(i => i.value !== i.dataset.orig).map(i => [i.dataset.k, i.value]);
   const unit = (p) => p.kind === '토지' ? '토지' : p.kind === '건물' ? '연면적' : '전용';
   const propRows = props.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.kind)}</td><td>${esc(p.address)}${p.owner ? `<div class="muted">소유자 ${esc(p.owner)}</div>` : ''}${p.detail ? `<div class="muted">${esc(p.detail)}</div>` : ''}</td><td>${esc(p.jimok || '-')}</td><td style="text-align:right">${p.kind === '건물' ? `대지 ${p.land_area !== null && p.land_area !== undefined ? apM2Py(p.land_area) : '-'}<div>건물 ${p.area !== null ? apM2Py(p.area) : '-'}</div>` : `${p.area !== null ? apM2Py(p.area) : '-'}<div class="muted">${unit(p)}</div>`}</td></tr>`).join('');
@@ -334,8 +342,8 @@ function renderApDetail(){
       ${can && c.chosen_firm_id ? '<div style="margin-top:8px"><button class="btn small" data-act="unchoose">채택 해제 (가격만 조회)</button></div>' : ''}
     </div>
     <div class="apsec" id="apCmtWrap"><div class="k">💬 담당자 의견 · 대출가능액 <span class="muted" style="font-weight:500">(${apCmts(c).length}건)</span></div>
-      <div class="apcmts">${apCmts(c).map(m => `<div class="apcmt">${avHtml(m.author_email, '', 'margin:0;width:32px;height:32px;font-size:13px;border-width:0;flex:none')}<div class="bd"><div class="hd"><b>${esc(nameOf(m.author_email))}</b> · ${esc(String(m.created_at).slice(0, 16).replace('T', ' '))}${m.author_email === me || isAdmin() ? `<button class="del" data-cdel="${m.id}" title="삭제">✕</button>` : ''}</div><div class="tx">${esc(m.body)}</div></div></div>`).join('') || '<div class="muted" style="padding:4px 2px 8px">아직 의견이 없어요. 감정평가 내역으로 책정한 대출가능액을 남겨주세요.</div>'}</div>
-      ${can ? `<textarea id="apCmtInput" rows="3" maxlength="1000" placeholder="예: 감정평가 결과를 검토해 대출가능액을 2억 5천만원으로 책정 (담보인정비율 70%)">${esc(cdraft)}</textarea><div class="acts" style="margin-top:8px;justify-content:flex-end"><button class="btn primary small" data-act="cmtsend" id="apCmtSend">등록</button></div>` : '<div class="muted" style="font-size:13px">감정평가 권한이 있는 담당자만 의견을 남길 수 있어요.</div>'}</div>
+      <div class="apcmts">${apCmts(c).map(m => `<div class="apcmt">${avHtml(m.author_email, '', 'margin:0;width:32px;height:32px;font-size:13px;border-width:0;flex:none')}<div class="bd"><div class="hd"><b>${esc(nameOf(m.author_email))}</b> · ${esc(apCmtTs(m.created_at))}${m.author_email === me || isAdmin() ? `<button class="del" data-cdel="${m.id}" title="삭제">✕</button>` : ''}</div><div class="tx">${esc(m.body)}</div></div></div>`).join('') || '<div class="muted" style="padding:4px 2px 8px">아직 의견이 없어요. 감정평가 내역으로 책정한 대출가능액을 남겨주세요.</div>'}</div>
+      ${can ? `<textarea id="apCmtInput" rows="3" maxlength="1000" placeholder="예: 감정평가 결과를 검토해 대출가능액을 2억 5천만원으로 책정 (담보인정비율 70%)">${esc(cdraft)}</textarea><div class="apce"><label>의견 날짜 <input type="date" id="apCmtDate" value="${esc(cdate || apNowKst().slice(0, 10))}" /></label><span style="flex:1"></span><button class="btn primary small" data-act="cmtsend" id="apCmtSend">등록</button></div>` : '<div class="muted" style="font-size:13px">감정평가 권한이 있는 담당자만 의견을 남길 수 있어요.</div>'}</div>
     <div class="foot" style="margin-top:22px"><button class="btn" data-act="map">🗺 지도에서 보기</button><button class="btn" data-act="print">🖨 보고서 인쇄</button><button class="btn" data-act="fax">📠 감정평가 의뢰서 (팩스)</button>${can ? `<button class="btn" data-act="edit">✏ 수정</button><button class="btn" data-act="${c.archived_at ? 'unarchive' : 'archive'}">${c.archived_at ? '↩ 보관함에서 꺼내기' : '📦 보관함으로 이동'}</button>${(c.created_by === me || isAdmin()) ? '<button class="btn danger" data-act="del">삭제</button>' : ''}` : '<span class="muted">👀 감정평가 권한이 없어 보기만 할 수 있어요.</span>'}</div>`;
   draft.sort((a, b) => (a[0][0] === 't') - (b[0][0] === 't')).forEach(([k, val]) => {
     const inp = $('apDetailPanel').querySelector(`[data-k="${k}"]`);
