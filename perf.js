@@ -49,11 +49,11 @@ function pfPrevBizDay(from = kstToday()){
   .pfkpis .pflqg{ grid-template-columns:1fr; gap:6px; } .pfkpis .pflqg .col + .col{ margin-top:6px; }
   @media (max-width:1100px){ .pfkpis{ grid-template-columns:repeat(2,minmax(0,1fr)); } .pfkpis .pfk{ padding:16px 18px; } .pfkpis .pfk .big{ font-size:30px; } .pfkpis .pfk .big small{ display:inline-block; margin-left:6px; font-size:13px; } }
   .pfcht{ margin-top:auto; padding-top:12px; } .pfcht .ct{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:12.5px; font-weight:800; margin:12px 0 2px; padding-top:10px; border-top:1px dashed rgba(60,70,110,.22); } .pfcht .ct em{ font-style:normal; font-weight:600; color:var(--muted); font-size:12px; }
-  .pfk{ border-radius:22px; padding:16px 18px; min-width:0; } .pfk.b{ background:#eef3ff; } .pfk.p{ background:#f3efff; } .pfk.r{ background:#fff1f0; }
+  .pfk{ border-radius:22px; padding:16px 18px; min-width:0; } .pfk.b{ background:#eef3ff; } .pfk.p{ background:#fff3d6; } .pfk.r{ background:#fff1f0; }
   .pfk .t{ font-size:13px; font-weight:800; display:flex; justify-content:space-between; align-items:center; gap:8px; }
-  .pfk.b .t > span:first-child{ color:#2f55c8; } .pfk.p .t > span:first-child{ color:#5b3fc4; } .pfk.r .t > span:first-child{ color:#b42318; }
+  .pfk.b .t > span:first-child{ color:#2f55c8; } .pfk.p .t > span:first-child{ color:#8a5200; } .pfk.r .t > span:first-child{ color:#b42318; }
   .pfk .pill{ font-size:12px; font-weight:800; padding:3px 9px; border-radius:99px; background:#fff; white-space:nowrap; }
-  .pfk.b .pill{ color:#2f55c8; } .pfk.p .pill{ color:#5b3fc4; } .pfk.r .pill{ color:#b42318; } .pfk .pill.ok{ color:var(--green) !important; }
+  .pfk.b .pill{ color:#2f55c8; } .pfk.p .pill{ color:#8a5200; } .pfk.r .pill{ color:#b42318; } .pfk .pill.ok{ color:var(--green) !important; }
   .pfk .big{ font-size:32px; font-weight:800; letter-spacing:-.04em; margin-top:6px; font-variant-numeric:tabular-nums; line-height:1.15; }
   .pfk .big small{ font-size:13px; font-weight:700; color:var(--muted); margin-left:6px; letter-spacing:0; white-space:nowrap; display:inline-block; }
   .pfk.l{ background:#e9f8f1; } .pfk.l .t > span:first-child{ color:#0e7a4f; } .pfk.l .pill{ color:#0e7a4f; background:#fff; } .pfk.l .pill.bad{ color:#b42318 !important; }
@@ -83,9 +83,9 @@ function pfPrevBizDay(from = kstToday()){
   .pft-sp{ position:relative; height:34px; margin-top:2px; } .pfspk{ width:100%; height:34px; display:block; } .pfspd{ position:absolute; width:10px; height:10px; border-radius:50%; border:2px solid #fff; box-sizing:border-box; transform:translateY(-50%); }
   .pfd-focus{ display:block; margin-top:16px; }
   .pfchips{ display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; } .pfchip{ background:#fff; border-radius:14px; padding:8px 14px; display:flex; flex-direction:column; gap:2px; min-width:104px; box-shadow:0 1px 2px rgba(20,24,40,.06); } .pfchip > span{ font-size:12px; color:#5a6172; font-weight:600; } .pfchip b{ font-size:15px; font-weight:800; letter-spacing:-.02em; } .pfchip .gd{ color:#0a7a2a; } .pfchip .bd{ color:#c23030; } .pfchip .tg{ color:var(--accent); } .pfchip .fl{ color:var(--muted); font-weight:700; }
-  .pfd-main{ background:#f9fafc; border-radius:22px; padding:16px 18px 14px; min-width:0; } .pfd-side{ background:#f6f7fb; border-radius:22px; padding:18px 18px 16px; min-width:0; }
+  .pfd-main{ background:#faf8f3; border-radius:22px; padding:16px 18px 14px; min-width:0; } .pfd-side{ background:#f8f6f1; border-radius:22px; padding:18px 18px 16px; min-width:0; }
   .pfd-h{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; } .pfd-h b{ font-size:16px; letter-spacing:-.02em; }
-  .pfd-chart{ position:relative; margin-top:10px; min-height:230px; } .pftip{ position:absolute; pointer-events:none; background:#16181d; color:#fff; border-radius:10px; padding:7px 11px; font-size:12px; white-space:nowrap; box-shadow:0 8px 20px rgba(0,0,0,.25); z-index:2; }
+  .pfd-chart{ position:relative; margin-top:10px; min-height:230px; } .pftip{ position:absolute; pointer-events:none; background:#2b2118; color:#fff; border-radius:10px; padding:7px 11px; font-size:12px; white-space:nowrap; box-shadow:0 8px 20px rgba(0,0,0,.25); z-index:2; }
   .pftd{ opacity:.7; } .pftv{ font-size:15px; font-weight:800; display:flex; align-items:center; gap:7px; margin-top:1px; } .pftv i{ width:12px; height:3px; border-radius:2px; display:inline-block; } .pftd2{ font-size:11.5px; margin-top:2px; } .pftd2.gd{ color:#7be0a0; } .pftd2.bd{ color:#ff9a9a; } .pftd2.fl{ color:#bbb; }
   .pfs-t{ font-size:14.5px; font-weight:800; display:flex; align-items:center; gap:8px; margin-bottom:6px; } .pfs-t i{ width:10px; height:10px; border-radius:50%; display:inline-block; }
   .pfkv{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:9px 0; border-bottom:1px solid #e6e9f0; font-size:13.5px; } .pfkv > span{ color:#5a6172; } .pfkv b{ font-weight:800; text-align:right; } .pfkv .gd{ color:#0a7a2a; font-weight:800; } .pfkv .bd{ color:#c23030; font-weight:800; } .pfkv .tg{ color:var(--accent); font-weight:800; } .pfkv .fl{ color:var(--muted); }
@@ -106,7 +106,7 @@ function pfPrevBizDay(from = kstToday()){
   .pftabs button{ border:0; background:transparent; padding:5px 13px; border-radius:99px; font-size:12.5px; font-weight:800; color:#6a7185; cursor:pointer; } .pftabs button.on{ background:#fff; color:var(--accent); box-shadow:0 1px 3px rgba(20,24,40,.12); }
   .pfm{ overflow-x:auto; margin-top:10px; } table.pft{ width:100%; min-width:640px; border-collapse:separate; border-spacing:0; font-size:14px; font-variant-numeric:tabular-nums; }
   table.pft th{ background:#f3f5fa; padding:8px 10px; font-size:12px; color:#5a6172; font-weight:800; text-align:center; border-bottom:1px solid #e8ebf3; }
-  table.pft th.g1{ background:#e9efff; color:#2f55c8; } table.pft th.g2{ background:#efeaff; color:#5b3fc4; } table.pft th.g3{ background:#fff1e0; color:#a54800; }
+  table.pft th.g1{ background:#e9efff; color:#2f55c8; } table.pft th.g2{ background:#efeaff; color:#8a5200; } table.pft th.g3{ background:#fff1e0; color:#a54800; }
   table.pft td{ padding:9px 10px; text-align:right; border-bottom:1px solid #eef0f5; } table.pft td.l{ text-align:center; font-weight:800; background:#fafbfd; }
   table.pft tr.sum td{ background:#fff6d6; font-weight:800; } table.pft td.d{ color:#e5484d; font-weight:700; } table.pft td.g{ color:var(--green); font-weight:700; }
   .pfnote{ margin-top:10px; color:var(--muted); font-size:12.5px; line-height:1.5; }
@@ -169,8 +169,8 @@ const lqQuarterEnd = (iso) => new Date(Date.UTC(+iso.slice(0, 4), Math.floor((+i
 const lqM = (n) => Number(n).toLocaleString('ko-KR') + '백만원';
 // 규제유동성비율 추이: 입력된 값(최근 20건) + 기준 100% 선
 // ================= 새 대시보드 (타일 4개 + 선택한 지표의 큰 추이 + 상세) =================
-// 색은 지표(개체)에 고정: 수신 파랑 · 여신 청록 · 연체율 주황 · 규제유동성비율 보라 (validate_palette 통과 순서). 상태색(초록/빨강)은 ✓·⚠ 아이콘+글자와 함께만 쓴다.
-const PF_COL = { dep: '#2a78d6', loan: '#1baf7a', delinq: '#eb6834', liq: '#6250d6' };
+// 색은 지표(개체)에 고정: 수신 파랑 · 여신 청록 · 연체율 주황 · 규제유동성비율 앰버 (validate_palette 통과 순서). 상태색(초록/빨강)은 ✓·⚠ 아이콘+글자와 함께만 쓴다.
+const PF_COL = { dep: '#3b82c4', loan: '#2f9e8f', delinq: '#e8856f', liq: '#e0a030' };
 const PF_NAME = { dep: '수신', loan: '여신', delinq: '연체율', liq: '규제유동성비율' };
 let perfRaw = false;
 const pfAlpha = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
@@ -277,18 +277,19 @@ function pfFocusDraw(){
   lo -= span * .15; hi += span * .15; const nt = pfNice(lo, hi, 4); lo = Math.min(lo, nt.a); hi = Math.max(hi, nt.b);
   const x = (i) => rows.length === 1 ? (l + W - r) / 2 : l + (W - l - r) * i / (rows.length - 1), y = (a) => t + (H - t - b) * (1 - (a - lo) / (hi - lo));
   const tdec = m.k === 'dep' || m.k === 'loan' ? (nt.st < 1 ? 1 : 0) : (nt.st < .1 ? 2 : 1), fmtT = (a) => pfNm(a, tdec) + (m.unit === '%' ? '%' : '');
-  let g = '';
-  nt.t.forEach(a => { g += `<line x1="${l}" x2="${W - r}" y1="${y(a).toFixed(1)}" y2="${y(a).toFixed(1)}" stroke="#edeff4" stroke-width="1"/><text x="${l - 8}" y="${(y(a) + 4).toFixed(1)}" font-size="11.5" fill="#8a90a0" text-anchor="end">${fmtT(a)}</text>`; });
+  let g = `<defs><linearGradient id="pfg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".26"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>`;
+  nt.t.forEach(a => { g += `<line x1="${l}" x2="${W - r}" y1="${y(a).toFixed(1)}" y2="${y(a).toFixed(1)}" stroke="#eee8dc" stroke-width="1"/><text x="${l - 8}" y="${(y(a) + 4).toFixed(1)}" font-size="11.5" fill="#8a8478" text-anchor="end">${fmtT(a)}</text>`; });
   const xi = rows.length > 2 ? [0, Math.floor((rows.length - 1) / 2), rows.length - 1] : rows.map((_, i) => i);
-  xi.forEach((i, k) => { g += `<text x="${x(i).toFixed(1)}" y="${H - 8}" font-size="11.5" fill="#8a90a0" text-anchor="${i === 0 && rows.length > 1 ? 'start' : i === rows.length - 1 && rows.length > 1 ? 'end' : 'middle'}">${pfMd(rows[i].d).replace(' ', '')}</text>`; });
-  if (near){ const ty = y(m.tgt); g += `<line x1="${l}" x2="${W - r}" y1="${ty.toFixed(1)}" y2="${ty.toFixed(1)}" stroke="#16181d" stroke-opacity=".5" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W - r}" y="${(ty - 6).toFixed(1)}" font-size="12" font-weight="700" fill="#44546f" text-anchor="end">${m.tgtLabel} ${pfNm(m.tgt, m.dec)}${m.unit === '%' ? '%' : '억원'}${m.k === 'liq' ? ' 이상' : ''}</text>`; }
+  xi.forEach((i, k) => { g += `<text x="${x(i).toFixed(1)}" y="${H - 8}" font-size="11.5" fill="#8a8478" text-anchor="${i === 0 && rows.length > 1 ? 'start' : i === rows.length - 1 && rows.length > 1 ? 'end' : 'middle'}">${pfMd(rows[i].d).replace(' ', '')}</text>`; });
+  if (near){ const ty = y(m.tgt); g += `<line x1="${l}" x2="${W - r}" y1="${ty.toFixed(1)}" y2="${ty.toFixed(1)}" stroke="#6b665c" stroke-opacity=".6" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W - r}" y="${(ty - 6).toFixed(1)}" font-size="12" font-weight="700" fill="#6b665c" text-anchor="end">${m.tgtLabel} ${pfNm(m.tgt, m.dec)}${m.unit === '%' ? '%' : '억원'}${m.k === 'liq' ? ' 이상' : ''}</text>`; }
   const pts = rows.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
-  if (rows.length > 1) g += `<polygon points="${x(0).toFixed(1)},${y(lo).toFixed(1)} ${pts} ${x(rows.length - 1).toFixed(1)},${y(lo).toFixed(1)}" fill="${col}" fill-opacity=".1"/><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  if (rows.length > 1) g += `<polygon points="${x(0).toFixed(1)},${y(lo).toFixed(1)} ${pts} ${x(rows.length - 1).toFixed(1)},${y(lo).toFixed(1)}" fill="url(#pfg)"/><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  if (rows.length > 1 && rows.length <= 24) rows.slice(0, -1).forEach((p, i) => { g += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="2.6" fill="#fff" stroke="${col}" stroke-width="1.6"/>`; });   // 값이 찍힌 날
   const ex = x(rows.length - 1), ey = y(vals[vals.length - 1]);
   g += `<circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="6.5" fill="#fff"/><circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="4.5" fill="${col}"/>`;
   const lab = `${pfNm(vals[vals.length - 1], m.dec)}${m.unit === '%' ? '%' : '억원'}`, anchor = ex > W - 90 ? 'end' : 'middle';
-  g += `<text x="${(anchor === 'end' ? ex + 4 : ex).toFixed(1)}" y="${(ey - 13).toFixed(1)}" font-size="13" font-weight="800" fill="#16181d" text-anchor="${anchor}">${lab}</text>`;
-  g += `<g id="pfXh" style="display:none"><line id="pfXhL" y1="${t}" y2="${H - b}" stroke="#16181d" stroke-opacity=".25"/><circle id="pfXhD" r="4.5" fill="${col}" stroke="#fff" stroke-width="2"/></g><rect id="pfHit" x="${l}" y="0" width="${W - l - r + 10}" height="${H - b + 6}" fill="transparent" tabindex="0" role="img" aria-label="${m.name} 추이 차트 — 좌우 방향키로 값을 확인해요" style="outline:none;cursor:crosshair"/>`;
+  g += `<text x="${(anchor === 'end' ? ex + 4 : ex).toFixed(1)}" y="${(ey - 13).toFixed(1)}" font-size="13" font-weight="800" fill="#2b2118" text-anchor="${anchor}">${lab}</text>`;
+  g += `<g id="pfXh" style="display:none"><line id="pfXhL" y1="${t}" y2="${H - b}" stroke="#2b2118" stroke-opacity=".22"/><circle id="pfXhD" r="4.5" fill="${col}" stroke="#fff" stroke-width="2"/></g><rect id="pfHit" x="${l}" y="0" width="${W - l - r + 10}" height="${H - b + 6}" fill="transparent" tabindex="0" role="img" aria-label="${m.name} 추이 차트 — 좌우 방향키로 값을 확인해요" style="outline:none;cursor:crosshair"/>`;
   box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">${g}</svg><div id="pfTip" class="pftip" style="display:none"></div>`;
   const hit = $('pfHit'), tip = $('pfTip'), show = (i) => {
     i = Math.max(0, Math.min(rows.length - 1, i)); const p = rows[i], px = x(i), py = y(p.v), pv = i > 0 ? p.v - rows[i - 1].v : null;

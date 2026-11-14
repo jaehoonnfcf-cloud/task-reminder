@@ -7,7 +7,7 @@ let lmReports = [], lmLiqRows = [], lmP = null, lmSavedP = null, lmTimer = null,
 const LM_DEF = { target: 100, depNet: 0, loanNet: 0, overdue: 0, t3: 0, t6: 20, t10: 30, t12: 40, t13: 10, ext1: 50 };
 const LM_KIND = { daily_ratio: '일별 규제유동성비율 보고서', daily_cf: '일별 현금흐름분석(규제유동성)', monthly_cf: '현금흐름분석(규제유동성) · 월', monthly_ratio: '규제유동성비율 보고서 · 월', book_dep: '수신 계좌 목록(저축성예수금 전체)', book_loan: '대출 계좌 목록(대출잔액장)' };
 const LM_TERMS = [[3, '3개월 이하', 't3'], [6, '6개월', 't6'], [10, '10개월', 't10'], [12, '12개월', 't12'], [13, '13개월 이상', 't13']];
-const LM_C = { dep: '#2a78d6', loan: '#eb6834', proj: '#8a90a0', bad: '#e5484d' };   // 예금 파랑 · 대출 주황 (validate_palette 통과 조합)
+const LM_C = { dep: '#3b82c4', loan: '#e8856f', proj: '#8a8478', bad: '#d9503f' };   // 예금 파랑 · 대출 주황 (validate_palette 통과 조합)
 
 const lmYM = (y, m) => y * 12 + m - 1, lmY = (k) => Math.floor(k / 12), lmM = (k) => k % 12 + 1;
 const lmLab = (k) => `'${String(lmY(k)).slice(2)}.${lmM(k)}`;
@@ -38,7 +38,7 @@ const lmLast = (a) => a.slice().sort((x, y) => x.d < y.d ? -1 : 1).pop() || null
   .lmtw{ overflow-x:auto; } .lmtb{ width:100%; border-collapse:collapse; font-size:13.5px; } .lmtb th,.lmtb td{ padding:8px 8px; border-top:1px solid var(--line); text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .lmtb th{ border-top:0; color:var(--muted); font-size:12px; font-weight:700; } .lmtb th:first-child,.lmtb td:first-child{ text-align:left; } .lmtb tr.q td{ font-weight:800; background:var(--field); }
   .lmleg{ display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12.5px; font-weight:600; color:var(--muted); margin-bottom:4px; } .lmleg i{ display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
-  .lmc svg{ display:block; width:100%; height:auto; } .lmc svg text{ font-family:inherit; fill:var(--muted); font-size:11px; }
+  .lmc svg{ display:block; width:100%; height:auto; } .lmc svg text{ font-family:inherit; fill:#8a8478; font-size:11px; }
   .lmctrl{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 22px; }
   .lmctrl label{ margin:0 0 2px; font-size:12.5px; } .lmctrl .r{ display:flex; align-items:center; gap:10px; }
   .lmctrl input[type=range]{ flex:1; min-height:0; padding:0; border:0; background:transparent; accent-color:var(--accent); -webkit-appearance:auto; appearance:auto; }
@@ -48,7 +48,7 @@ const lmLast = (a) => a.slice().sort((x, y) => x.d < y.d ? -1 : 1).pop() || null
   .lmdrop{ border:2px dashed #d5d9e4; border-radius:16px; padding:18px 14px; text-align:center; color:var(--muted); background:var(--field); font-size:14px; font-weight:600; cursor:pointer; }
   .lmdrop.on{ border-color:var(--accent); background:var(--accent-soft); } .lmdrop b{ color:var(--accent); }
   .lmempty{ text-align:center; padding:46px 16px; color:var(--muted); font-weight:600; line-height:1.7; }
-  .lmtip{ position:fixed; pointer-events:none; background:#16181d; color:#fff; border-radius:10px; padding:7px 11px; font-size:12.5px; line-height:1.45; z-index:30; display:none; white-space:nowrap; }
+  .lmtip{ position:fixed; pointer-events:none; background:#2b2118; color:#fff; border-radius:10px; padding:7px 11px; font-size:12.5px; line-height:1.45; z-index:30; display:none; white-space:nowrap; }
   .lmx{ border:0; background:var(--chipbg); border-radius:8px; width:26px; height:26px; cursor:pointer; color:var(--muted); font-weight:800; }
   @media (max-width:1100px){ .lmtiles{ grid-template-columns:repeat(3,minmax(0,1fr)); } .lmtwo{ grid-template-columns:minmax(0,1fr); } }
   @media (max-width:760px){ .lmtiles{ grid-template-columns:repeat(2,minmax(0,1fr)); } .lmt .v{ font-size:23px; } .lmctrl{ grid-template-columns:minmax(0,1fr); } .lmc{ padding:16px 14px; border-radius:20px; } .lmc svg{ min-width:640px; } }
@@ -306,32 +306,33 @@ function lmChartRatio(st, rows){
   const t0 = Math.min(...all.map(p => p.t)), t1 = Math.max(...all.map(p => p.t));
   const lo = Math.min(0.85, ...all.map(p => p.r)) - 0.05, hi = Math.max(1.15, ...all.map(p => p.r)) + 0.05;
   const x = (t) => m.l + (t - t0) / (t1 - t0) * (W - m.l - m.r), y = (r) => m.t + (hi - r) / (hi - lo) * (Hh - m.t - m.b);
-  let s = `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="규제유동성비율 추이와 전망">`;
-  const stp = hi - lo > 0.8 ? 0.2 : 0.1; for (let v = Math.ceil(lo / stp) * stp; v <= hi; v += stp) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="#eceef3"/><text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${Math.round(v * 100)}%</text>`;
+  let s = `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="규제유동성비율 추이와 전망"><defs><linearGradient id="lmg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${LM_C.dep}" stop-opacity=".26"/><stop offset="1" stop-color="${LM_C.dep}" stop-opacity="0"/></linearGradient></defs>`;
+  const stp = hi - lo > 0.8 ? 0.2 : 0.1; for (let v = Math.ceil(lo / stp) * stp; v <= hi; v += stp) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="#eee8dc"/><text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${Math.round(v * 100)}%</text>`;
   s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(1)}" y2="${y(1)}" stroke="${LM_C.bad}" stroke-width="1.5" stroke-dasharray="5 4"/>`;
   const d0 = new Date(t0), span = (t1 - t0) / 864e5, every = span > 500 ? 3 : span > 200 ? 2 : 1;
   for (let k = lmYM(d0.getFullYear(), d0.getMonth() + 1); ; k++){ const tt = +new Date(lmY(k), lmM(k) - 1, 1); if (tt > t1) break; if (tt < t0) continue; if (lmM(k) % every === 0 || every === 1) s += `<text x="${x(tt)}" y="${Hh - 8}" text-anchor="middle">${lmLab(k)}</text>`; }
   const path = (a) => a.map((p, i) => (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.r).toFixed(1)).join(' ');
-  if (act.length) s += `<path d="${path(act)}" fill="none" stroke="${LM_C.dep}" stroke-width="2"/>`;
-  if (pr.length) s += `<path d="${path((act.length ? [act[act.length - 1]] : []).concat(pr))}" fill="none" stroke="${LM_C.proj}" stroke-width="2" stroke-dasharray="6 4"/>`;
+  if (act.length > 1) s += `<path d="${path(act)} L${x(act[act.length - 1].t).toFixed(1)} ${y(lo).toFixed(1)} L${x(act[0].t).toFixed(1)} ${y(lo).toFixed(1)} Z" fill="url(#lmg)"/>`;
+  if (act.length) s += `<path d="${path(act)}" fill="none" stroke="${LM_C.dep}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  if (pr.length) s += `<path d="${path((act.length ? [act[act.length - 1]] : []).concat(pr))}" fill="none" stroke="${LM_C.proj}" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="6 5"/>`;
   act.forEach(p => s += `<circle cx="${x(p.t)}" cy="${y(p.r)}" r="4" fill="${LM_C.dep}" stroke="#fff" stroke-width="2" data-tip="${p.lab}<br>비율 ${lmPct(p.r, 2)}<br>자산 ${lmU(p.A)} / 부채 ${lmU(p.B)}"/>`);
   pr.forEach(p => { const c = p.r < 1 ? LM_C.bad : LM_C.proj; s += `<circle cx="${x(p.t)}" cy="${y(p.r)}" r="${p.q ? 5 : 3.5}" fill="${p.q ? c : '#fff'}" stroke="${c}" stroke-width="2" data-tip="${p.lab}<br>비율 ${lmPct(p.r)}<br>자산 ${lmU(p.A)} / 부채 ${lmU(p.B)}"/>`;
-    if (p.q) s += `<text x="${x(p.t)}" y="${y(p.r) - 10}" text-anchor="middle" style="fill:#16181d;font-weight:700">${lmPct(p.r)}</text>`; });
-  if (act.length){ const la = act[act.length - 1]; s += `<text x="${x(la.t)}" y="${y(la.r) + 18}" text-anchor="middle" style="fill:#16181d;font-weight:700">${lmPct(la.r)}</text>`; }
+    if (p.q) s += `<text x="${x(p.t)}" y="${y(p.r) - 10}" text-anchor="middle" style="fill:#2b2118;font-weight:700">${lmPct(p.r)}</text>`; });
+  if (act.length){ const la = act[act.length - 1]; s += `<text x="${x(la.t)}" y="${y(la.r) + 18}" text-anchor="middle" style="fill:#2b2118;font-weight:700">${lmPct(la.r)}</text>`; }
   return s + '</svg>';
 }
 function lmChartMat(rows){
   const W = 1100, Hh = 280, m = { l: 52, r: 12, t: 16, b: 30 }, rs = rows.slice(0, 14); if (!rs.length) return '';
   const mx = Math.max(1, ...rs.map(r => Math.max(r.mat, r.loanMat))) * 1.1, bw = (W - m.l - m.r) / rs.length, y = (v) => m.t + (1 - v / mx) * (Hh - m.t - m.b);
   let s = `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="월별 만기 구조">`;
-  const stp = mx > 40000 ? 10000 : mx > 15000 ? 5000 : 2000; for (let v = 0; v <= mx; v += stp) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="#eceef3"/><text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${(v / 100).toLocaleString('ko-KR')}억</text>`;
+  const stp = mx > 40000 ? 10000 : mx > 15000 ? 5000 : 2000; for (let v = 0; v <= mx; v += stp) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="#eee8dc"/><text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${(v / 100).toLocaleString('ko-KR')}억</text>`;
   const bar = (xx, w, v, c) => { const yy = y(v), hh = Hh - m.b - yy, rr = Math.max(0, Math.min(4, hh)); return hh <= 0 ? '' : `<path d="M${xx} ${Hh - m.b}V${yy + rr}q0 -${rr} ${rr} -${rr}H${xx + w - rr}q${rr} 0 ${rr} ${rr}V${Hh - m.b}Z" fill="${c}"/>`; };
   rs.forEach((r, i) => { const x0 = m.l + i * bw, w = Math.min(26, bw * 0.34), cx = x0 + bw / 2;
     s += bar(cx - w - 1, w, r.mat, LM_C.dep) + bar(cx + 1, w, r.loanMat, LM_C.loan);
     s += `<text x="${cx}" y="${Hh - 10}" text-anchor="middle" style="${lmIsQ(r.k) ? 'fill:#16181d;font-weight:800' : ''}">${lmLab(r.k)}</text>`;
     s += `<rect x="${x0}" y="${m.t}" width="${bw}" height="${Hh - m.t - m.b}" fill="transparent" data-tip="${lmLab(r.k)}월 만기<br>예금 ${lmU(r.mat)}<br>대출 ${lmU(r.loanMat)}<br>차이 ${lmU(r.mat - r.loanMat)}"/>`; });
   const top = rs.slice().sort((a, c) => c.mat - a.mat)[0], ti = rs.indexOf(top);
-  s += `<text x="${m.l + ti * bw + bw / 2}" y="${Math.max(11, y(top.mat) - 5)}" text-anchor="middle" style="fill:#16181d;font-weight:700">${lmU(top.mat)}</text>`;
+  s += `<text x="${m.l + ti * bw + bw / 2}" y="${Math.max(11, y(top.mat) - 5)}" text-anchor="middle" style="fill:#2b2118;font-weight:700">${lmU(top.mat)}</text>`;
   return s + '</svg>';
 }
 
