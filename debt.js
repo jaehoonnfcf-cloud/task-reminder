@@ -263,7 +263,7 @@ function dbSummaryHtml(){
   const cls = smWidget('건전성 분포', `일반채권 ${regular.length}건${spc ? ` · 특수 ${spc}건` : ''}`, smBars(rows.map(x => ({ l: x.k, r: `${x.n}건${x.p ? ' · ' + dbWon(x.p) : ''}`, p: x.n / mx * 100, c: CL[x.k] || '#c9c2b4' })), '진행중인 채권이 없어요.'));
   const nxt = act.filter(c => c.next_action_date).sort((a, b) => a.next_action_date.localeCompare(b.next_action_date)).slice(0, 5);
   const nx = smWidget('다음 조치 임박', '예정일 빠른 순', smList(nxt.map(c => { const d = dbDiff(c.next_action_date); return { c: d < 0 ? '#e5674f' : d === 0 ? '#f2b44d' : '#6a9fd0', t: `${c.debtor_name}`, m: d < 0 ? `${-d}일 지연` : d === 0 ? '오늘' : `D-${d}` }; }), '예정된 조치가 없어요.'));
-  return `<div class="smx"><div class="smx-cards">${cards}</div><div class="smx-grid">${cls}${nx}</div></div>`;
+  return `<div class="smx">${smSection('연체채권 현황', cards)}<div class="smx-grid">${cls}${nx}</div></div>`;
 }
 function renderDebtMain(){
   const el = $('debtMain');

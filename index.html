@@ -175,17 +175,6 @@
   .pfold{ cursor:pointer; user-select:none; }
 
   /* 요약 타일 */
-  #loanDash{ margin-bottom:14px; }
-  #loanDash .ldg{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-  #loanDash .ld{ background:rgba(255,255,255,.96); border-radius:16px; padding:12px 16px 10px; box-shadow:0 1px 3px rgba(9,30,66,.18); border-top:5px solid var(--lc); }
-  #loanDash .ld.kc{ --lc:#f0a020; } #loanDash .ld.kp{ --lc:#2f6fed; } #loanDash .ld.kx{ --lc:#1f9d55; } #loanDash .ld.kt{ --lc:#1c2b4a; background:#1c2b4a; color:#fff; }
-  #loanDash .lh{ display:flex; justify-content:space-between; align-items:baseline; font-weight:800; font-size:14px; } #loanDash .lh small{ font-weight:500; font-size:11.5px; opacity:.65; }
-  #loanDash .lm{ display:flex; align-items:baseline; gap:8px; margin:4px 0 6px; } #loanDash .lm b{ font-size:30px; font-weight:800; letter-spacing:-.02em; line-height:1.1; } #loanDash u{ text-decoration:none; } #loanDash .lm b u{ font-size:15px; font-weight:700; margin-left:1px; }
-  #loanDash .lm span{ font-size:14px; font-weight:700; opacity:.7; }
-  #loanDash .lr{ display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0; border-top:1px solid rgba(120,130,150,.22); } #loanDash .lr span:first-child{ font-weight:700; } #loanDash .lr .z{ opacity:.4; }
-  #loanDash .ldw{ margin-top:10px; font-size:13px; background:rgba(255,255,255,.96); border-radius:12px; padding:9px 14px; box-shadow:0 1px 3px rgba(9,30,66,.18); } #loanDash .ldw span{ opacity:.65; } #loanDash .ldw u{ text-decoration:none; }
-  #loanDash .lw{ font-size:11px; opacity:.6; margin-top:2px; }
-  @media (max-width:900px){ #loanDash .ldg{ grid-template-columns:repeat(2,1fr); gap:10px; } #loanDash .lm b{ font-size:24px; } }
   .apmsum{ margin-bottom:8px; } .apmseg{ display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; } .apmseg button{ border:1px solid var(--line); background:#fff; border-radius:999px; padding:6px 14px; font-weight:700; cursor:pointer; font-family:inherit; } .apmseg button.on{ background:#1c2b4a; color:#fff; border-color:#1c2b4a; }
   .apmf{ display:grid; gap:8px; margin:8px 0; } .aplinks{ display:flex; flex-direction:column; gap:6px; margin:8px 0; } .aplk{ text-align:left; border:1px solid var(--line); background:#f7f9fc; border-radius:10px; padding:8px 12px; cursor:pointer; font-family:inherit; font-size:13.5px; }
   .segs i.na{ background:repeating-linear-gradient(45deg,#d5d9e2,#d5d9e2 3px,#eef0f5 3px,#eef0f5 6px); }
@@ -497,16 +486,6 @@
   .seg button.on{ background:var(--amber); color:var(--amber-ink); }
   .divs button.on{ background:var(--accent-soft); color:#7a4500; }
   .divs button.on .n{ background:#fff; color:#7a4500; }
-  /* 대출 단계 요약 카드: 단계별 파스텔 */
-  #loanDash{ background:#fff; border-radius:24px; padding:14px; }
-  #loanDash .ld{ border-top:0; border-radius:20px; padding:16px 18px 12px; box-shadow:none; background:#f1f3f7; }
-  #loanDash .ld.kc{ background:#fbf3e1; color:#4a3300; }
-  #loanDash .ld.kp{ background:#fceadb; color:#4a2600; }
-  #loanDash .ld.kx{ background:#eaf3e3; color:#1d3d1d; }
-  #loanDash .ld.kt{ background:#efeadf; color:#2b2118; }
-  #loanDash .ld .lh small,#loanDash .ld .lm span,#loanDash .ld .lw{ opacity:.8; }
-  #loanDash .ld .lr{ border-top-color:rgba(0,0,0,.14); }
-    #loanDash .ldw{ background:var(--shell); border-radius:16px; box-shadow:none; }
   /* 목록: 현재 단계 막대 색을 단계별로 */
   .segs i:nth-child(1).cur{ background:#b5afa3; } .segs i:nth-child(2).cur{ background:#6a9fd0; } .segs i:nth-child(3).cur{ background:#f2b44d; }
   .segs i:nth-child(4).cur{ background:#e8856f; } .segs i:nth-child(5).cur{ background:#6fbf88; }
@@ -605,15 +584,18 @@
   /* 화면별 요약 위젯 (대시보드형): 상단 카드 줄 + 위젯 카드 */
   #smBand:empty{ display:none; }
   .smx{ display:flex; flex-direction:column; gap:14px; }
-  .smx-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; background:#fff; border-radius:22px; padding:14px; box-shadow:var(--sh); }
+  .smx-sec,#loanDash{ background:#fff; border-radius:22px; padding:14px; box-shadow:var(--sh); } .smx-t{ font-size:13.5px; font-weight:800; margin:2px 4px 10px; }
+  .smx-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
   .smx-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
   .smc{ border-radius:18px; padding:14px 16px 12px; background:#f1ede4; color:var(--ink); min-width:0; }
-  .smc.t1{ background:#f1ede4; } .smc.t2{ background:#e6f0fa; } .smc.t3{ background:#fdecc8; } .smc.t4{ background:#fbe3dc; } .smc.t5{ background:#e1f1e3; }
+  .smc.tt{ background:#ebe5d8; } .smc.t1{ background:#f1ede4; } .smc.t2{ background:#e6f0fa; } .smc.t3{ background:#fdecc8; } .smc.t4{ background:#fbe3dc; } .smc.t5{ background:#e1f1e3; }
   .smc-h{ display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:800; min-width:0; } .smc-h span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .smc-h i{ font-style:normal; width:22px; height:22px; border-radius:50%; background:rgba(255,255,255,.7); display:grid; place-items:center; font-size:11.5px; font-weight:800; flex:none; }
   .smc-l{ margin-top:10px; font-size:12px; font-weight:600; color:#6b665c; }
   .smc-v{ font-size:30px; font-weight:800; letter-spacing:-.03em; line-height:1.15; } .smc-v small{ font-size:14px; font-weight:700; margin-left:2px; color:#6b665c; }
   .smc-s{ margin-top:3px; font-size:12.5px; font-weight:600; color:#6b665c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .smc-rows{ margin-top:8px; } .smc-rows > div{ display:flex; justify-content:space-between; gap:8px; padding:5px 0; font-size:12.5px; border-top:1px solid rgba(60,45,20,.09); } .smc-rows > div span:first-child{ font-weight:700; } .smc-rows > div span:last-child{ color:#6b665c; white-space:nowrap; }
+  .smc-note{ margin-top:4px; font-size:11.5px; font-weight:600; color:#7b766b; }
   .smw{ background:#fff; border-radius:22px; padding:18px 20px; box-shadow:var(--sh); min-width:0; }
   .smw h3{ margin:0 0 12px; font-size:14.5px; font-weight:800; display:flex; align-items:baseline; justify-content:space-between; gap:8px; } .smw h3 small{ font-size:12px; font-weight:600; color:var(--muted); white-space:nowrap; }
   .smw-empty{ color:var(--muted); font-size:13px; padding:18px 0; text-align:center; }
@@ -1252,27 +1234,23 @@
       else if (ci === 0) G.c.push(t); else if (ci < n - 1) G.p.push(t); else G.x.push(t);
     });
     const sum = (a) => a.reduce((s, t) => s + (Number(t.loan_amount) || 0), 0);
-    const big = (m) => m >= 100 ? `${(m / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}<u>억</u>` : `${m.toLocaleString('ko-KR')}<u>백만</u>`;
+    const num = (m) => m >= 100 ? [(m / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 }), '억'] : [m.toLocaleString('ko-KR'), '백만'], amt = (m) => num(m).join('');
     const scs = ['본점', '지점'].concat(loans.some(t => t.scope !== '본점' && t.scope !== '지점') ? ['통합'] : []);
     const inSc = (a, k) => a.filter(t => k === '통합' ? t.scope !== '본점' && t.scope !== '지점' : t.scope === k);
-    const card = (cls, name, def, a, warn) => `<div class="ld ${cls}"><div class="lh">${name}<small>${def}</small></div>
-      <div class="lm"><b>${big(sum(a))}</b><span>${a.length}건</span></div>
-      ${scs.map(k => { const b = inSc(a, k); return `<div class="lr"><span>${k}</span>${b.length ? `<span>${b.length}건 · ${big(sum(b))}</span>` : '<span class="z">-</span>'}</div>`; }).join('')}
-      <div class="lw">${warn || ''}${a.some(t => t.loan_amount == null) ? `금액 미입력 ${a.filter(t => t.loan_amount == null).length}건 제외` : ''}</div></div>`;
+    const card = (tone, name, def, a, warn) => {
+      const [n, u] = num(sum(a)), notes = [warn, a.some(t => t.loan_amount == null) ? `금액 미입력 ${a.filter(t => t.loan_amount == null).length}건 제외` : ''].filter(Boolean);
+      return `<div class="smc ${tone}"><div class="smc-h"><span>${name}</span></div><div class="smc-l">${def}</div><div class="smc-v">${n}<small>${u}</small></div><div class="smc-s">${a.length}건</div>
+        <div class="smc-rows">${scs.map(k => { const b = inSc(a, k); return `<div><span>${k}</span><span>${b.length ? `${b.length}건 · ${amt(sum(b))}` : '-'}</span></div>`; }).join('')}</div>${notes.length ? `<div class="smc-note">${notes.join(' · ')}</div>` : ''}</div>`;
+    };
     const all = G.c.concat(G.p, G.x);
     el.style.display = '';
-    el.innerHTML = `<div class="ldg">` + card('kc', '협의', '1단계', G.c) + card('kp', '진행', '2~4단계', G.p)
-      + card('kx', '실행', '5단계', G.x, `대기 ${G.x.length - xd.length} · 올해 완료 ${xd.length}<br>`) + card('kt', '합계', '미진행 제외', all) + `</div>`
-      + (() => {
-        const w = loans.filter(t => curIdx(t) === 2 && t.appraisal_mode !== 'none');
-        if (!w.length) return '';
-        const n = (m) => w.filter(t => (t.appraisal_mode || 'x') === m).length;
-        return `<div class="ldw">⏳ 감정평가 단계 대기 <b>${w.length}건 · ${big(sum(w))}</b> <span>(외부 ${n('external')} · 자체 ${n('own')} · 습용 ${n('reuse')} · 방식 미정 ${n('x')})</span></div>`;
-      })();
+    el.innerHTML = `<div class="smx-t">대출 금액 현황</div><div class="smx-cards">` + card('t1', '협의', '1단계', G.c) + card('t3', '진행', '2~4단계', G.p)
+      + card('t5', '실행', '5단계', G.x, `대기 ${G.x.length - xd.length} · 올해 완료 ${xd.length}`) + card('tt', '합계', '미진행 제외', all) + `</div>`;
   }
   // ---------- 화면별 요약 위젯 (대시보드형 공용 부품) ----------
   const smAmt = (m) => { const n = Number(m) || 0; return n >= 100 ? `${(n / 100).toLocaleString('ko-KR', { maximumFractionDigits: 1 })}억` : `${n.toLocaleString('ko-KR')}백만`; };
   const smCard = (tone, no, label, cap, val, sub) => `<div class="smc ${tone}"><div class="smc-h">${no ? `<i>${no}</i>` : ''}<span>${esc(label)}</span></div><div class="smc-l">${esc(cap)}</div><div class="smc-v">${val}<small>건</small></div><div class="smc-s">${sub ? esc(sub) : '&nbsp;'}</div></div>`;
+  const smSection = (title, cards) => `<div class="smx-sec"><div class="smx-t">${esc(title)}</div><div class="smx-cards">${cards}</div></div>`;
   const smWidget = (title, sub, body) => `<div class="smw"><h3><span>${esc(title)}</span>${sub ? `<small>${esc(sub)}</small>` : ''}</h3>${body}</div>`;
   const smBars = (rows, empty) => rows.length ? `<div class="smb">${rows.map(r => `<div class="smb-r"><div class="smb-t"><span>${esc(r.l)}</span><span>${esc(r.r)}</span></div><div class="smb-bar"><i style="width:${Math.max(r.p > 0 ? 3 : 0, Math.min(100, r.p)).toFixed(1)}%;background:${r.c}"></i></div></div>`).join('')}</div>` : `<div class="smw-empty">${esc(empty)}</div>`;
   const smList = (rows, empty) => rows.length ? `<div class="sml">${rows.map(r => `<div class="sml-r"><i style="background:${r.c}"></i><span class="tx">${esc(r.t)}</span><span class="tm">${esc(r.m)}</span></div>`).join('')}</div>` : `<div class="smw-empty">${esc(empty)}</div>`;
@@ -1299,10 +1277,10 @@
     const trend = smWidget('접수 추이', '최근 8주 · 신규 대출 건', smChart(wk, '#e8950f', 'smg1') + smNums([['이번 주', wk[wk.length - 1].n + '건'], ['지난 주', wk[wk.length - 2].n + '건'], ['이번 달', loans.filter(t => t.created_at && kstDay(t.created_at).slice(0, 7) === mo).length + '건']]));
     const grp = open.filter(t => curIdx(t) >= 2), MODES = [['external', '외부감정', '#3b82c4'], ['own', '자체감정', '#f2b44d'], ['reuse', '기존감정서 습용', '#6fbf88'], ['none', '감정 불요', '#9a9488'], ['x', '방식 미정', '#d6d0c3']];
     const mc = (m) => grp.filter(t => (t.appraisal_mode || 'x') === m).length, own = grp.filter(t => t.appraisal_mode === 'own').reduce((s, t) => s + (Number(t.own_appraisal_amount) || 0), 0);
-    const ap = smWidget('감정평가 현황', '3단계 이후 진행 건', grp.length ? smBars(MODES.map(([k, l, c]) => ({ l, r: mc(k) + '건', p: mc(k) / grp.length * 100, c })), '') + smNums([['감정 대기', by[2].length + '건'], ['자체감정 합계', smAmt(own)]]) : '<div class="smw-empty">감정평가 단계에 있는 건이 없어요.</div>');
+    const ap = smWidget('감정평가 현황', '3단계 이후 진행 건', grp.length ? smBars(MODES.map(([k, l, c]) => ({ l, r: mc(k) + '건', p: mc(k) / grp.length * 100, c })), '') + smNums([['감정 대기', by[2].length ? `${by[2].length}건 · ${smAmt(sumA(by[2]))}` : '0건'], ['자체감정 합계', smAmt(own)]]) : '<div class="smw-empty">감정평가 단계에 있는 건이 없어요.</div>');
     const evs = loans.flatMap(t => stepsOf(t).filter(x => x.done_at).map(x => ({ t, x }))).sort((a, b) => String(b.x.done_at).localeCompare(String(a.x.done_at))).slice(0, 5);
     const act = smWidget('최근 활동', '단계 완료 기록', smList(evs.map(({ t, x }) => ({ c: SM_COL[x.seq - 1] || '#9a9488', t: `${t.title} · ${x.name} 완료`, m: `${x.done_by ? nameOf(x.done_by) + ' · ' : ''}${fmtTs(x.done_at)}` })), '아직 완료된 단계가 없어요.'));
-    return `<div class="smx"><div class="smx-cards">${cards}</div><div class="smx-grid">${trend}${ap}${act}</div></div>`;
+    return `<div class="smx">${smSection('단계별 진행 현황', cards)}<div class="smx-grid">${trend}${ap}${act}</div></div>`;
   }
   function smDeposit(list){   // 공통업무: 기한 현황 + 구분별 + 담당자별 + 최근 완료
     const open = list.filter(t => t.task_type !== 'loan' && isOpen(t)), today = kstToday();

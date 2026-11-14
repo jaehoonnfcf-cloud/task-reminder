@@ -198,7 +198,7 @@ function apSummaryHtml(){
   const firm = smWidget('평가기관별', '의뢰 · 채택', smBars(fc.map(x => ({ l: x.f.name, r: `${x.n}건 · 채택 ${x.sel}`, p: x.n / fm * 100, c: '#3b82c4' })), '진행중 의뢰가 없어요.'));
   const ty = AP_TYPES.map(k => ({ k, n: act.filter(c => c.handling_type === k).length })).filter(x => x.n), tm = Math.max(1, ...ty.map(x => x.n));
   const typ = smWidget('취급구분별', '진행중 의뢰', smBars(ty.map(x => ({ l: x.k, r: x.n + '건', p: x.n / tm * 100, c: '#f2b44d' })), '진행중 의뢰가 없어요.'));
-  return `<div class="smx"><div class="smx-cards">${cards}</div><div class="smx-grid">${trend}${firm}${typ}</div></div>`;
+  return `<div class="smx">${smSection('감정평가 진행 현황', cards)}<div class="smx-grid">${trend}${firm}${typ}</div></div>`;
 }
 function renderAppraisal(){
   const el = $('appraisal');
