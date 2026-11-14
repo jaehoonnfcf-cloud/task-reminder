@@ -602,6 +602,10 @@
   .ni{ padding:14px 18px; }
   .ni .nm{ justify-content:space-between; margin-bottom:6px; }
   .ni .nt{ font-size:14px; line-height:1.5; max-height:3em; }
+  /* 감정 방식 선택(4개)·'이 대출 건으로 감정 의뢰' 버튼 */
+  .apreq-btn{ display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:48px; border:0; border-radius:14px; background:#f3b84b; color:#3d2600; font-size:15px; font-weight:800; cursor:pointer; box-shadow:0 2px 8px rgba(243,184,75,.45); }
+  .apreq-btn:hover{ background:#eeac35; } .apreq-btn span{ font-size:18px; line-height:1; }
+  .acts:has(> .apreq-btn){ display:block; margin-top:14px; }
   /* 모바일: 하단 탭바 */
   @media (max-width:760px){
     #tabBar{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:60; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #e9e3d6; }
@@ -1144,8 +1148,8 @@
   }
 
   // ---------- 대출 ↔ 감정평가 연결 / 감정 방식 (3단계 '감정평가') ----------
-  // 감정 방식: 외부감정(담보심사 건과 연결) / 자체감정(금액 기록) / 감정 불요(신용·보증서 등, 3단계 자동 통과)
-  const APM = { external: '외부감정', own: '자체감정', none: '감정 불요' };
+  // 감정 방식: 외부감정(담보심사 건과 연결) / 자체감정(금액 기록) / 기존감정서 습용(이미 있는 감정서를 그대로 사용, 새 의뢰 없음) / 감정 불요(신용·보증서 등, 3단계 자동 통과)
+  const APM = { external: '외부감정', own: '자체감정', reuse: '기존감정서 습용', none: '감정 불요' };
   const APM_REASONS = ['신용대출', '보증서대출', '기타'];
   let apDraft = null;   // { id, mode }: 저장 전에 고른 방식
   const linkedAppr = (t) => (typeof apCases !== 'undefined' ? apCases : []).filter(c => c.loan_task_id === t.id);
@@ -1157,7 +1161,7 @@
     const done = reqs.filter(r => apReqSum(r, props).done).length;
     return done === reqs.length ? '가격 회신 완료' : `회신 ${done}/${reqs.length}`;
   }
-  const apmLine = (t) => !t.appraisal_mode ? '' : t.appraisal_mode === 'own' ? `자체감정${t.own_appraisal_amount != null ? ' ' + Number(t.own_appraisal_amount).toLocaleString('ko-KR') + '백만원' : ''}` : t.appraisal_mode === 'none' ? `감정 불요${t.appraisal_reason ? '(' + t.appraisal_reason + ')' : ''}` : '외부감정';
+  const apmLine = (t) => !t.appraisal_mode ? '' : t.appraisal_mode === 'own' ? `자체감정${t.own_appraisal_amount != null ? ' ' + Number(t.own_appraisal_amount).toLocaleString('ko-KR') + '백만원' : ''}` : t.appraisal_mode === 'none' ? `감정 불요${t.appraisal_reason ? '(' + t.appraisal_reason + ')' : ''}` : t.appraisal_mode === 'reuse' ? `기존감정서 습용${t.appraisal_reason ? '(' + t.appraisal_reason + ')' : ''}` : '외부감정';
   function apprHtml(t, dropped){
     const mode = apDraft && apDraft.id === t.id ? apDraft.mode : t.appraisal_mode, can = canAct(t) && !dropped;
     const keepAmt = $('apAmt') && openId === t.id ? $('apAmt').value : null, keepNote = $('apNote') && openId === t.id ? $('apNote').value : null;
@@ -1167,10 +1171,11 @@
     const saved = t.appraisal_mode ? `<div class="apmsum"><b>${esc(apmLine(t))}</b>${t.appraisal_reason && t.appraisal_mode === 'own' ? ` · ${esc(t.appraisal_reason)}` : ''}${t.appraisal_set_by ? `<span class="muted"> · ${esc(nameOf(t.appraisal_set_by))} ${fmtTs(t.appraisal_set_at)} 기록</span>` : ''}</div>` : `<div class="muted" style="margin-bottom:6px">감정 방식이 아직 정해지지 않았어요.</div>`;
     const ctl = can ? `<div class="apmseg">${Object.keys(APM).map(k => `<button type="button" class="${mode === k ? 'on' : ''}" data-d="apm:${k}">${APM[k]}</button>`).join('')}</div>`
       + (mode === 'own' ? `<div class="apmf"><input id="apAmt" inputmode="numeric" placeholder="자체감정 금액 (백만원)" value="${esc(amt0)}" autocomplete="off" /><input id="apNote" maxlength="100" placeholder="사유·메모 (예: 외부 감정가는 참고만 함)" value="${esc(note0)}" /></div>` : '')
+      + (mode === 'reuse' ? `<div class="apmf"><input id="apNote" maxlength="100" placeholder="습용하는 감정서 정보 (선택) 예: 2025.08 ○○감정평가법인, 450백만원" value="${esc(note0)}" /></div>` : '')
       + (mode === 'none' ? `<div class="apmf"><div class="reasons">${APM_REASONS.map(r => `<button type="button" class="btn small" data-d="apr:${r}">${r}</button>`).join('')}</div><input id="apNote" maxlength="100" placeholder="불요 사유 (필수)" value="${esc(note0)}" /></div>` : '')
       + (mode ? `<div class="acts"><button class="btn primary" data-d="apsave">💾 감정 방식 저장</button></div>` : '') : '';
     const lk = links.length ? `<div class="aplinks">${links.map(c => `<button type="button" class="aplk" data-d="apgo:${c.id}">🏛 ${esc(typeof apCaseNo === 'function' ? apCaseNo(c) : '감정평가')} · <b>${esc(apprStatus(c))}</b> ›</button>`).join('')}</div>` : '';
-    const req = can && mode !== 'none' && (typeof apCan !== 'function' || apCan()) ? `<div class="acts"><button class="btn" data-d="apreq">＋ 이 대출 건으로 감정 의뢰</button></div>` : '';
+    const req = can && mode !== 'none' && mode !== 'reuse' && (typeof apCan !== 'function' || apCan()) ? `<div class="acts"><button class="apreq-btn" data-d="apreq"><span aria-hidden="true">＋</span> 이 대출 건으로 감정 의뢰</button></div>` : '';
     return `<div class="kv"><div class="k">감정 방식</div><div class="v">${saved}${ctl}${lk}${req}</div></div>`;
   }
   function goAppraisal(fn){
@@ -1191,6 +1196,8 @@
       const raw = ($('apAmt') ? $('apAmt').value : '').replace(/[,\s]/g, '');
       if (!/^\d+$/.test(raw) || +raw <= 0) return alert('자체감정 금액을 백만원 단위의 숫자로 입력해주세요. 예: 450 (= 4억 5천만원)');
       patch.own_appraisal_amount = +raw; patch.appraisal_reason = note || null;
+    } else if (mode === 'reuse'){
+      patch.appraisal_reason = note || null;   // 습용하는 감정서 정보는 선택 입력
     } else if (mode === 'none'){
       if (!note) return alert('감정이 필요 없는 사유를 입력하거나 아래 버튼에서 골라주세요.');
       patch.appraisal_reason = note;
@@ -1238,7 +1245,7 @@
         const w = loans.filter(t => curIdx(t) === 2 && t.appraisal_mode !== 'none');
         if (!w.length) return '';
         const n = (m) => w.filter(t => (t.appraisal_mode || 'x') === m).length;
-        return `<div class="ldw">⏳ 감정평가 단계 대기 <b>${w.length}건 · ${big(sum(w))}</b> <span>(외부 ${n('external')} · 자체 ${n('own')} · 방식 미정 ${n('x')})</span></div>`;
+        return `<div class="ldw">⏳ 감정평가 단계 대기 <b>${w.length}건 · ${big(sum(w))}</b> <span>(외부 ${n('external')} · 자체 ${n('own')} · 습용 ${n('reuse')} · 방식 미정 ${n('x')})</span></div>`;
       })();
   }
   // 대출금액 입력칸: 숫자만, 천단위 쉼표
@@ -1400,7 +1407,7 @@
   // ---------- 동작 (공통) ----------
   async function completeStep(tid, seq){
     const tk = byId(tid);
-    if (seq === 3 && tk && tk.task_type === 'loan' && !tk.appraisal_mode && !confirm('감정 방식(외부감정 / 자체감정 / 감정 불요)이 아직 기록되지 않았어요.\n그래도 감정평가 단계를 완료할까요?')) return false;
+    if (seq === 3 && tk && tk.task_type === 'loan' && !tk.appraisal_mode && !confirm('감정 방식(외부감정 / 자체감정 / 기존감정서 습용 / 감정 불요)이 아직 기록되지 않았어요.\n그래도 감정평가 단계를 완료할까요?')) return false;
     const { error } = await sb.from('work_task_steps').update({ done_at: new Date().toISOString() }).eq('task_id', tid).eq('seq', seq);
     if (error){ alert(error.message); return false; }
     await sb.functions.invoke('task-notify', { body: { event: 'step_done', task_id: tid, seq } });

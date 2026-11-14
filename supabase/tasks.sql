@@ -854,3 +854,7 @@ alter table public.work_tasks
   add column if not exists appraisal_set_at timestamptz;
 grant update (appraisal_mode, own_appraisal_amount, appraisal_reason, appraisal_set_by, appraisal_set_at) on public.work_tasks to authenticated;
 alter table public.appraisal_cases add column if not exists loan_task_id bigint references public.work_tasks(id) on delete set null;
+
+-- 대출취급 3단계 '감정평가': 감정 방식에 '기존감정서 습용'(reuse) 추가 (외부감정/자체감정/기존감정서 습용/감정 불요)
+alter table public.work_tasks drop constraint if exists work_tasks_appraisal_mode_check;
+alter table public.work_tasks add constraint work_tasks_appraisal_mode_check check (appraisal_mode is null or appraisal_mode in ('external','own','reuse','none'));
