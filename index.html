@@ -518,15 +518,15 @@
   #navList button.on{ background:var(--accent-soft); color:#7a4500; } #navList button.on .nb{ background:#fff; color:#7a4500; }   /* 건수 로드 전·0건일 때 빈 알약이 보이지 않게 */
   /* =====================================================================
      웹 레이아웃 (1360px 이상 사이드바 틀 / 1200px 이상 서랍·컨트롤) — 모든 화면 공통
-     · 앱 틀: 사이드바(250) | 본문. 현황판을 뺀 모든 화면의 본문 폭·여백·메뉴 크기가 같다 (1360px 미만은 기존 상단 메뉴 방식)
+     · 앱 틀: 사이드바(250) | 본문. 창 전체를 꽉 채운다(좌우 바깥 여백 없음). 현황판을 뺀 모든 화면의 본문 폭·여백·메뉴 크기가 같다 (1360px 미만은 기존 상단 메뉴 방식)
      · 오른쪽 열(접속자·시세·뉴스)은 현황판에서만 (1500px 이상)
      · 업무 상세는 오른쪽에서 겹쳐 나오는 서랍 → 열고 닫아도 화면 크기·배치가 바뀌지 않는다
      ===================================================================== */
   .trow.sel{ box-shadow:0 0 0 2px #ecc57a, var(--sh); }
   @media (min-width:1360px){
-    html body #app[style*="flex"]{ display:grid !important; grid-template-columns:250px minmax(0,1fr); grid-template-rows:auto 1fr; column-gap:0; width:calc(100% - 40px); max-width:1560px; min-height:calc(100vh - 40px); min-height:calc(100dvh - 40px); margin:20px auto; padding:0; align-content:stretch; border-radius:26px; overflow:clip; box-shadow:0 10px 40px rgba(90,70,30,.10); background:linear-gradient(to right,#fff 250px,var(--shell) 250px) !important; }
-    html body #app[style*="flex"] .bar{ grid-column:1; grid-row:1 / -1; position:sticky; top:20px; align-self:start; height:calc(100vh - 40px); height:calc(100dvh - 40px); width:auto; max-width:none; margin:0; padding:26px 16px 18px; flex-direction:column; align-items:stretch; flex-wrap:nowrap; gap:6px; background:transparent; overflow-y:auto; color:var(--ink); }
-    html body #app[style*="flex"] #wrap{ grid-column:2; grid-row:1 / -1; max-width:none; margin:0; padding:26px 32px 48px; display:flex; flex-direction:column; align-items:stretch; }
+    html body #app[style*="flex"]{ display:grid !important; grid-template-columns:250px minmax(0,1fr); grid-template-rows:auto 1fr; column-gap:0; width:100%; max-width:none; min-height:100vh; min-height:100dvh; margin:0; padding:0; align-content:stretch; border-radius:0; overflow:clip; box-shadow:none; background:linear-gradient(to right,#fff 250px,var(--shell) 250px) !important; }
+    html body #app[style*="flex"] .bar{ grid-column:1; grid-row:1 / -1; position:sticky; top:0; align-self:start; height:100vh; height:100dvh; width:auto; max-width:none; margin:0; padding:26px 16px 18px; flex-direction:column; align-items:stretch; flex-wrap:nowrap; gap:6px; background:transparent; overflow-y:auto; color:var(--ink); }
+    html body #app[style*="flex"] #wrap{ grid-column:2; grid-row:1 / -1; max-width:none; margin:0; padding:28px 36px 56px; display:flex; flex-direction:column; align-items:stretch; }
     html body #app[style*="flex"] #side{ display:none; }
     .bar .logo{ font-size:21px; padding:2px 10px 18px; }
     .divs{ display:flex; flex-direction:column; align-items:stretch; background:transparent; box-shadow:none; padding:0; margin:0; border-radius:0; gap:6px; }
@@ -549,9 +549,9 @@
   @media (min-width:1500px){
     html body #app[style*="flex"][data-div="home"]{ grid-template-columns:250px minmax(0,1fr) 350px; }
     html body #app[style*="flex"][data-div="home"] #wrap{ display:contents; }
-    html body #app[style*="flex"][data-div="home"] #tgBanner{ grid-column:2; grid-row:1; margin:26px 24px 0 32px; }
-    html body #app[style*="flex"][data-div="home"] #main{ grid-column:2; grid-row:2; padding:22px 24px 48px 32px; }
-    html body #app[style*="flex"][data-div="home"] #side{ display:flex; grid-column:3; grid-row:1 / -1; align-self:start; margin:26px 26px 26px 0; position:sticky; top:46px; }
+    html body #app[style*="flex"][data-div="home"] #tgBanner{ grid-column:2; grid-row:1; margin:28px 28px 0 36px; }
+    html body #app[style*="flex"][data-div="home"] #main{ grid-column:2; grid-row:2; padding:22px 28px 56px 36px; }
+    html body #app[style*="flex"][data-div="home"] #side{ display:flex; grid-column:3; grid-row:1 / -1; align-self:start; margin:28px 28px 28px 0; position:sticky; top:28px; }
     html body #meCard:not(:has(.ol-h)){ display:none; }   /* 접속자가 없으면 빈 카드를 숨김 */
   }
   /* 최근 댓글 카드는 1200px 이상에서만 본문 아래에 보인다 (이전에는 넓은 화면의 오른쪽 열에만 있었다) */
@@ -587,6 +587,21 @@
     #onlineBox:not(:empty){ display:block; margin:6px 0 2px; padding:10px 12px 12px; border-radius:14px; background:var(--shell); }
     #onlineBox .ol-list{ margin-top:8px; gap:4px; } #onlineBox .ol-c{ background:#fff; }
   }
+  /* 좌상단 시계 (사이드바, 로고 바로 아래) */
+  #sbClock{ display:none; }
+  @media (min-width:1360px){
+    #sbClock{ display:block; }
+    .bar .logo{ padding-bottom:12px; }
+    #sbClock #clock{ min-width:0; width:100%; margin:0 0 14px; padding:12px 14px 12px; border-radius:16px; background:var(--shell); box-shadow:none; grid-template-columns:1fr; row-gap:1px; }
+    #sbClock #clock .cdt{ grid-row:auto; grid-column:1; font-size:32px; }
+    #sbClock #clock .cdd{ grid-column:1; text-align:left; align-self:auto; font-size:12.5px; }
+    #sbClock #clock .cd2{ grid-column:1; justify-self:start; margin-top:6px; white-space:normal; }
+  }
+  /* 경제뉴스: 안쪽 스크롤로 잘려 보이던 것을 없애고, 출처·시간 줄 + 제목(최대 2줄)로 정리 */
+  #news{ overflow:visible; max-height:none; }
+  .ni{ padding:14px 18px; }
+  .ni .nm{ justify-content:space-between; margin-bottom:6px; }
+  .ni .nt{ font-size:14px; line-height:1.5; max-height:3em; }
   /* 모바일: 하단 탭바 */
   @media (max-width:760px){
     #tabBar{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:60; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #e9e3d6; }
@@ -614,6 +629,7 @@
   <div class="bar">
     <button class="burger" id="navBurger" type="button" aria-label="메뉴 열기" aria-expanded="false" aria-controls="navOv"><span class="bg">☰</span><i class="bd"></i></button>
     <span class="logo">🧚<span class="lt"> 할일요정</span></span><span class="curDiv" id="curDiv"></span>
+    <div id="sbClock"></div>
     <div class="divs" id="divBtns">
       <button data-div="home"><span class="lf">📊 현황판</span><span class="ls">현황</span></button>
       <button data-div="liq"><span class="lf">💧 유동성관리</span><span class="ls">유동성</span></button>
@@ -923,11 +939,10 @@
     renderOnline();
   }
   // 넓은 화면(사이드 영역이 보일 때)에서는 내 프로필·시계를 시세정보 위 카드로 옮기고, 좁은 화면에서는 원래 자리로 돌려놓는다
-  const mqSide = window.matchMedia('(min-width:99999px)');   // 프로필·시계는 이제 옮기지 않는다 (프로필=사이드바 아래, 시계=화면 제목 옆)
+  const mqSide = window.matchMedia('(min-width:1360px)');   // 사이드바 틀에서는 시계를 좌상단(로고 아래) 한 곳에만 둔다. 그보다 좁으면 화면 제목 옆(원래 자리)
   function placeMe(){
-    const who = $('who'), clock = $('clock'); if (!who || !clock) return;
-    if (mqSide.matches){ document.querySelector('#meCard .mc-who').appendChild(who); document.querySelector('#meCard .mc-clock').appendChild(clock); }
-    else { $('whoPh').after(who); $('clockPh').after(clock); }
+    const clock = $('clock'); if (!clock) return;
+    if (mqSide.matches) $('sbClock').appendChild(clock); else $('clockPh').after(clock);
   }
   mqSide.addEventListener ? mqSide.addEventListener('change', placeMe) : mqSide.addListener(placeMe); placeMe();
   { const ob = $('onlineBox'), wh = $('who'); if (ob && wh) wh.parentNode.insertBefore(ob, wh); }   // 접속 중 표시: 오른쪽 열 → 사이드바 좌하단(프로필 위)

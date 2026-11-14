@@ -69,7 +69,7 @@ function pfPrevBizDay(from = kstToday()){
   .pft-s{ margin-left:auto; font-size:11.5px; font-weight:800; border-radius:99px; padding:3px 9px; white-space:nowrap; } .pft-s.ok{ color:#0a7a2a; background:#e4f6ea; } .pft-s.bad{ color:#b42318; background:#fdecec; } .pft-s.neu{ color:#5a6172; background:#eceff5; }
   /* 타일이 좁으면(내용폭 300px 이하) 네 타일 모두 상태 배지를 이름 아래 줄로 내린다 — 배지가 카드 밖으로 넘치지 않게. 컨테이너 쿼리 미지원 브라우저는 기본 줄바꿈 */
   .pft{ container-type:inline-size; } .pft-h{ flex-wrap:wrap; row-gap:6px; } .pft-s{ max-width:100%; }
-  @container (max-width:300px){ .pft-h{ display:grid; grid-template-columns:auto 1fr; align-items:center; gap:6px 8px; } .pft-s{ margin-left:0; grid-column:1 / -1; justify-self:start; } }
+  @container (max-width:300px){ .pft-h{ display:grid; grid-template-columns:auto 1fr; align-items:center; gap:6px 8px; } .pft-s{ margin-left:0; grid-column:1 / -1; justify-self:start; } .pft-br .pfem{ display:block; margin-top:1px; } .pft-r{ flex-wrap:wrap; } .pft-r > span:first-child{ white-space:normal; min-width:0; } }
   .pft-v{ font-size:32px; font-weight:800; letter-spacing:-.04em; line-height:1.1; margin-top:2px; } .pft-v small{ font-size:15px; font-weight:700; color:var(--muted); margin-left:3px; letter-spacing:0; }
   .pft-m{ position:relative; height:6px; border-radius:99px; background:var(--ct); } .pft-m i{ display:block; height:100%; border-radius:99px; background:var(--c); } .pft-m u{ position:absolute; top:-3px; bottom:-3px; width:2px; background:#16181d; opacity:.65; border-radius:2px; text-decoration:none; }
   .pft-t{ font-size:12.5px; color:var(--muted); font-weight:600; min-height:17px; } .pft-d{ display:flex; flex-wrap:wrap; gap:2px 14px; font-size:12.5px; color:#5a6172; min-height:18px; } .pft-d b{ font-weight:800; }
