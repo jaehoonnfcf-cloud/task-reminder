@@ -602,6 +602,26 @@
   .ni{ padding:14px 18px; }
   .ni .nm{ justify-content:space-between; margin-bottom:6px; }
   .ni .nt{ font-size:14px; line-height:1.5; max-height:3em; }
+  /* 화면별 요약 위젯 (대시보드형): 상단 카드 줄 + 위젯 카드 */
+  #smBand:empty{ display:none; }
+  .smx{ display:flex; flex-direction:column; gap:14px; }
+  .smx-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; background:#fff; border-radius:22px; padding:14px; box-shadow:var(--sh); }
+  .smx-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
+  .smc{ border-radius:18px; padding:14px 16px 12px; background:#f1ede4; color:var(--ink); min-width:0; }
+  .smc.t1{ background:#f1ede4; } .smc.t2{ background:#e6f0fa; } .smc.t3{ background:#fdecc8; } .smc.t4{ background:#fbe3dc; } .smc.t5{ background:#e1f1e3; }
+  .smc-h{ display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:800; min-width:0; } .smc-h span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .smc-h i{ font-style:normal; width:22px; height:22px; border-radius:50%; background:rgba(255,255,255,.7); display:grid; place-items:center; font-size:11.5px; font-weight:800; flex:none; }
+  .smc-l{ margin-top:10px; font-size:12px; font-weight:600; color:#6b665c; }
+  .smc-v{ font-size:30px; font-weight:800; letter-spacing:-.03em; line-height:1.15; } .smc-v small{ font-size:14px; font-weight:700; margin-left:2px; color:#6b665c; }
+  .smc-s{ margin-top:3px; font-size:12.5px; font-weight:600; color:#6b665c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .smw{ background:#fff; border-radius:22px; padding:18px 20px; box-shadow:var(--sh); min-width:0; }
+  .smw h3{ margin:0 0 12px; font-size:14.5px; font-weight:800; display:flex; align-items:baseline; justify-content:space-between; gap:8px; } .smw h3 small{ font-size:12px; font-weight:600; color:var(--muted); white-space:nowrap; }
+  .smw-empty{ color:var(--muted); font-size:13px; padding:18px 0; text-align:center; }
+  .smb{ display:flex; flex-direction:column; gap:11px; } .smb-t{ display:flex; justify-content:space-between; gap:8px; font-size:13px; font-weight:700; } .smb-t span:last-child{ color:var(--muted); white-space:nowrap; } .smb-t span:first-child{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .smb-bar{ height:7px; border-radius:99px; background:#f1eee7; margin-top:5px; overflow:hidden; } .smb-bar i{ display:block; height:100%; border-radius:99px; }
+  .sml{ display:flex; flex-direction:column; } .sml-r{ display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid #f1eee7; font-size:13px; } .sml-r:first-child{ border-top:0; padding-top:2px; }
+  .sml-r i{ width:8px; height:8px; border-radius:50%; flex:none; } .sml-r .tx{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; } .sml-r .tm{ color:var(--muted); font-size:12px; white-space:nowrap; }
+  .smn{ display:flex; flex-wrap:wrap; gap:10px 26px; margin-top:12px; padding-top:12px; border-top:1px solid #f1eee7; } .smn span{ display:block; font-size:12px; color:var(--muted); font-weight:600; } .smn b{ font-size:17px; font-weight:800; }
   /* 모바일: 하단 탭바 */
   @media (max-width:760px){
     #tabBar{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:60; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #e9e3d6; }
@@ -659,6 +679,7 @@
     <div id="home"><div id="cal"></div><div id="perf"></div></div>
     <div id="shared">
     <div id="loanDash"></div>
+    <div id="smBand"></div>
     <div id="tiles"></div>
     <div class="list-panel">
       <div class="toolbar">
@@ -1088,6 +1109,7 @@
     const divTasks = tasks.filter(t => taskDiv(t) === divn);
 
     renderLoanDash(divn === 'credit' ? divTasks : null);
+    renderSummary(divn, divTasks);
     // 요약 타일 (이 업무구분 전체 기준)
     const open = divTasks.filter(isOpen);
     const cnt = (g) => open.filter(t => dueGrp(t, today) === g).length;
@@ -1241,6 +1263,56 @@
         return `<div class="ldw">⏳ 감정평가 단계 대기 <b>${w.length}건 · ${big(sum(w))}</b> <span>(외부 ${n('external')} · 자체 ${n('own')} · 방식 미정 ${n('x')})</span></div>`;
       })();
   }
+  // ---------- 화면별 요약 위젯 (대시보드형 공용 부품) ----------
+  const smAmt = (m) => { const n = Number(m) || 0; return n >= 100 ? `${(n / 100).toLocaleString('ko-KR', { maximumFractionDigits: 1 })}억` : `${n.toLocaleString('ko-KR')}백만`; };
+  const smCard = (tone, no, label, cap, val, sub) => `<div class="smc ${tone}"><div class="smc-h">${no ? `<i>${no}</i>` : ''}<span>${esc(label)}</span></div><div class="smc-l">${esc(cap)}</div><div class="smc-v">${val}<small>건</small></div><div class="smc-s">${sub ? esc(sub) : '&nbsp;'}</div></div>`;
+  const smWidget = (title, sub, body) => `<div class="smw"><h3><span>${esc(title)}</span>${sub ? `<small>${esc(sub)}</small>` : ''}</h3>${body}</div>`;
+  const smBars = (rows, empty) => rows.length ? `<div class="smb">${rows.map(r => `<div class="smb-r"><div class="smb-t"><span>${esc(r.l)}</span><span>${esc(r.r)}</span></div><div class="smb-bar"><i style="width:${Math.max(r.p > 0 ? 3 : 0, Math.min(100, r.p)).toFixed(1)}%;background:${r.c}"></i></div></div>`).join('')}</div>` : `<div class="smw-empty">${esc(empty)}</div>`;
+  const smList = (rows, empty) => rows.length ? `<div class="sml">${rows.map(r => `<div class="sml-r"><i style="background:${r.c}"></i><span class="tx">${esc(r.t)}</span><span class="tm">${esc(r.m)}</span></div>`).join('')}</div>` : `<div class="smw-empty">${esc(empty)}</div>`;
+  const smNums = (arr) => `<div class="smn">${arr.map(([l, v]) => `<div><span>${esc(l)}</span><b>${esc(String(v))}</b></div>`).join('')}</div>`;
+  const smMonday = (iso) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7); return d.toISOString().slice(0, 10); };
+  function smWeeks(days, n = 8){   // 'YYYY-MM-DD' 목록 → 최근 n주(월요일 시작)의 주별 건수
+    const mon = smMonday(kstToday()), keys = [];
+    for (let i = n - 1; i >= 0; i--){ const d = new Date(mon + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - 7 * i); keys.push(d.toISOString().slice(0, 10)); }
+    const cnt = Object.fromEntries(keys.map(k => [k, 0])); days.forEach(x => { if (!x) return; const k = smMonday(String(x).slice(0, 10)); if (k in cnt) cnt[k]++; });
+    return keys.map(k => ({ k, n: cnt[k], label: fmtMD(k) }));
+  }
+  function smChart(weeks, color, id){   // 주별 건수 영역 그래프
+    const W = 320, H = 112, pl = 22, pr = 8, pt = 10, pb = 22, mx = Math.max(4, ...weeks.map(w => w.n)), st = (W - pl - pr) / Math.max(1, weeks.length - 1);
+    const pts = weeks.map((w, i) => [pl + i * st, pt + (H - pt - pb) * (1 - w.n / mx)]), line = pts.map(q => q.map(v => v.toFixed(1)).join(',')).join(' ');
+    const grid = [0, .5, 1].map(f => { const y = pt + (H - pt - pb) * (1 - f); return `<line x1="${pl}" y1="${y.toFixed(1)}" x2="${W - pr}" y2="${y.toFixed(1)}" stroke="#eee8dc"/><text x="0" y="${(y + 3.5).toFixed(1)}" font-size="9" fill="#8a8478">${Math.round(mx * f)}</text>`; }).join('');
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="최근 ${weeks.length}주 접수 추이"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".28"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${grid}<polygon points="${pl},${H - pb} ${line} ${pl + (weeks.length - 1) * st},${H - pb}" fill="url(#${id})"/><polyline points="${line}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>${pts.map(q => `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="2.6" fill="#fff" stroke="${color}" stroke-width="1.6"/>`).join('')}${weeks.map((w, i) => i % 2 === (weeks.length - 1) % 2 ? `<text x="${(pl + i * st).toFixed(1)}" y="${H - 6}" font-size="9" fill="#8a8478" text-anchor="middle">${w.label}</text>` : '').join('')}</svg>`;
+  }
+  const SM_COL = ['#9a9488', '#3b82c4', '#f2b44d', '#e8856f', '#6fbf88'];
+  function smCredit(list){   // 대출취급: 단계별 현황 + 접수 추이 + 감정평가 현황 + 최근 활동
+    const loans = list.filter(t => t.task_type === 'loan' && !isDropped(t)), sumA = (a) => a.reduce((s, t) => s + (Number(t.loan_amount) || 0), 0);
+    const open = loans.filter(t => curIdx(t) < stepsOf(t).length), by = LOAN_STEPS.map((_, i) => open.filter(t => curIdx(t) === i));
+    const cards = LOAN_STEPS.map((nm, i) => smCard('t' + (i + 1), i + 1, nm, '진행 건수', by[i].length, by[i].length && sumA(by[i]) ? `금액 ${smAmt(sumA(by[i]))}` : '금액 -')).join('');
+    const wk = smWeeks(loans.map(t => t.created_at ? kstDay(t.created_at) : '')), mo = kstToday().slice(0, 7);
+    const trend = smWidget('접수 추이', '최근 8주 · 신규 대출 건', smChart(wk, '#e8950f', 'smg1') + smNums([['이번 주', wk[wk.length - 1].n + '건'], ['지난 주', wk[wk.length - 2].n + '건'], ['이번 달', loans.filter(t => t.created_at && kstDay(t.created_at).slice(0, 7) === mo).length + '건']]));
+    const grp = open.filter(t => curIdx(t) >= 2), MODES = [['external', '외부감정', '#3b82c4'], ['own', '자체감정', '#f2b44d'], ['reuse', '기존감정서 습용', '#6fbf88'], ['none', '감정 불요', '#9a9488'], ['x', '방식 미정', '#d6d0c3']];
+    const mc = (m) => grp.filter(t => (t.appraisal_mode || 'x') === m).length, own = grp.filter(t => t.appraisal_mode === 'own').reduce((s, t) => s + (Number(t.own_appraisal_amount) || 0), 0);
+    const ap = smWidget('감정평가 현황', '3단계 이후 진행 건', grp.length ? smBars(MODES.map(([k, l, c]) => ({ l, r: mc(k) + '건', p: mc(k) / grp.length * 100, c })), '') + smNums([['감정 대기', by[2].length + '건'], ['자체감정 합계', smAmt(own)]]) : '<div class="smw-empty">감정평가 단계에 있는 건이 없어요.</div>');
+    const evs = loans.flatMap(t => stepsOf(t).filter(x => x.done_at).map(x => ({ t, x }))).sort((a, b) => String(b.x.done_at).localeCompare(String(a.x.done_at))).slice(0, 5);
+    const act = smWidget('최근 활동', '단계 완료 기록', smList(evs.map(({ t, x }) => ({ c: SM_COL[x.seq - 1] || '#9a9488', t: `${t.title} · ${x.name} 완료`, m: `${x.done_by ? nameOf(x.done_by) + ' · ' : ''}${fmtTs(x.done_at)}` })), '아직 완료된 단계가 없어요.'));
+    return `<div class="smx"><div class="smx-cards">${cards}</div><div class="smx-grid">${trend}${ap}${act}</div></div>`;
+  }
+  function smDeposit(list){   // 공통업무: 기한 현황 + 구분별 + 담당자별 + 최근 완료
+    const open = list.filter(t => t.task_type !== 'loan' && isOpen(t)), today = kstToday();
+    const dd = (t) => t.due_date ? Math.round((Date.parse(t.due_date + 'T12:00:00Z') - Date.parse(today + 'T12:00:00Z')) / 864e5) : null;
+    const B = [['기한 초과', '#e5674f', (d) => d !== null && d < 0], ['오늘 마감', '#f2b44d', (d) => d === 0], ['3일 이내', '#e8c86a', (d) => d !== null && d >= 1 && d <= 3], ['7일 이내', '#6a9fd0', (d) => d !== null && d >= 4 && d <= 7], ['그 이후', '#6fbf88', (d) => d !== null && d > 7], ['기한 없음', '#c9c2b4', (d) => d === null]];
+    const due = smWidget('기한 현황', `미완료 ${open.length}건`, smBars(B.map(([l, c, f]) => { const n = open.filter(t => f(dd(t))).length; return { l, r: n + '건', p: open.length ? n / open.length * 100 : 0, c }; }), '미완료 업무가 없어요.'));
+    const SC = [['본점', '#3b82c4', (t) => t.scope === '본점'], ['지점', '#6fbf88', (t) => t.scope === '지점'], ['통합·기타', '#f2b44d', (t) => t.scope !== '본점' && t.scope !== '지점']];
+    const sc = smWidget('구분별 미완료', '본점·지점·통합', smBars(SC.map(([l, c, f]) => { const n = open.filter(f).length; return { l, r: n + '건', p: open.length ? n / open.length * 100 : 0, c }; }), '미완료 업무가 없어요.'));
+    const per = {}; open.forEach(t => t.work_task_assignees.filter(a => !a.done_at).forEach(a => { per[a.email] = (per[a.email] || 0) + 1; }));
+    const top = Object.entries(per).sort((a, b) => b[1] - a[1]).slice(0, 5), mx = top.length ? top[0][1] : 1;
+    const who = smWidget('담당자별 미완료', '많은 순 5명', smBars(top.map(([e, n]) => ({ l: nameOf(e), r: n + '건', p: n / mx * 100, c: '#e8950f' })), '미완료 업무가 없어요.'));
+    const evs = list.filter(t => t.task_type !== 'loan').flatMap(t => t.work_task_assignees.filter(a => a.done_at).map(a => ({ t, a }))).sort((a, b) => String(b.a.done_at).localeCompare(String(a.a.done_at))).slice(0, 5);
+    const rec = smWidget('최근 완료', '담당자가 완료한 기록', smList(evs.map(({ t, a }) => ({ c: '#6fbf88', t: `${nameOf(a.email)}님 · ${t.title}`, m: fmtTs(a.done_at) })), '아직 완료된 업무가 없어요.'));
+    return `<div class="smx"><div class="smx-grid">${due}${sc}${who}${rec}</div></div>`;
+  }
+  function renderSummary(div, list){ const el = $('smBand'); if (el) el.innerHTML = div === 'credit' ? smCredit(list) : div === 'deposit' ? smDeposit(list) : ''; }
+
   // 대출금액 입력칸: 숫자만, 천단위 쉼표
   document.addEventListener('input', (e) => { if (e.target && e.target.id === 'fAmt'){ const d = e.target.value.replace(/[^\d]/g, ''); e.target.value = d ? Number(d).toLocaleString('ko-KR') : ''; } });
 

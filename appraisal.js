@@ -183,11 +183,27 @@ function apBadge(){
 }
 
 // ---------- 목록 ----------
+// 담보심사 요약 위젯: 상태별 건수 + 의뢰 추이 + 평가기관별 + 취급구분별 (가격 대기 / 가격 도착 / 채택 완료 / 보관)
+function apSummaryHtml(){
+  const act = apCases.filter(c => !c.archived_at), arc = apCases.length - act.length;
+  const st = (c) => c.chosen_firm_id ? 'sel' : (!apReqs(c).length || apReqs(c).some(r => !apReqSum(r, apProps(c)).done)) ? 'wait' : 'done';
+  const g = { wait: act.filter(c => st(c) === 'wait'), done: act.filter(c => st(c) === 'done'), sel: act.filter(c => st(c) === 'sel') };
+  const amt = (a) => { const n = a.reduce((s, c) => s + (Number(c.loan_amount) || 0), 0); return n ? `대출신청금액 ${apWon(n)}` : ''; };
+  const cards = [smCard('t3', '', '가격 대기', '평가기관 회신 전', g.wait.length, amt(g.wait)), smCard('t2', '', '가격 도착', '채택 대기', g.done.length, amt(g.done)), smCard('t5', '', '채택 완료', '진행중 의뢰 중', g.sel.length, amt(g.sel)), smCard('t1', '', '보관', '보관함', arc, '')].join('');
+  const wk = smWeeks(apCases.map(c => c.request_date));
+  const trend = smWidget('의뢰 추이', '최근 8주 · 신규 의뢰', smChart(wk, '#e8950f', 'smg2') + smNums([['이번 주', wk[wk.length - 1].n + '건'], ['지난 주', wk[wk.length - 2].n + '건'], ['진행중 전체', act.length + '건']]));
+  const fc = apFirms.map(f => { const rs = act.flatMap(c => apReqs(c)).filter(r => r.firm_id === f.id); return { f, n: rs.length, sel: act.filter(c => c.chosen_firm_id === f.id).length }; }).filter(x => x.n || x.sel), fm = Math.max(1, ...fc.map(x => x.n));
+  const firm = smWidget('평가기관별', '의뢰 · 채택', smBars(fc.map(x => ({ l: x.f.name, r: `${x.n}건 · 채택 ${x.sel}`, p: x.n / fm * 100, c: '#3b82c4' })), '진행중 의뢰가 없어요.'));
+  const ty = AP_TYPES.map(k => ({ k, n: act.filter(c => c.handling_type === k).length })).filter(x => x.n), tm = Math.max(1, ...ty.map(x => x.n));
+  const typ = smWidget('취급구분별', '진행중 의뢰', smBars(ty.map(x => ({ l: x.k, r: x.n + '건', p: x.n / tm * 100, c: '#f2b44d' })), '진행중 의뢰가 없어요.'));
+  return `<div class="smx"><div class="smx-cards">${cards}</div><div class="smx-grid">${trend}${firm}${typ}</div></div>`;
+}
 function renderAppraisal(){
   const el = $('appraisal');
   if (!el.dataset.ready){
     el.dataset.ready = '1';
     el.innerHTML = `<div class="seg" id="apTabs" style="align-self:flex-start"><button data-t="ap">🏛 감정평가</button><button data-t="rti">🧮 임대사업자 RTI 계산</button><button data-t="dep">🏠 임차보증금 차감계산</button></div>
+    <div id="apSum"></div>
     <div class="seg" id="apMain" style="align-self:flex-start;background:#fff;box-shadow:var(--sh)"><button data-m="map">🗺 지도 (기록 찾기)</button><button data-m="list">📋 목록</button></div>
     <div id="apMapWrap" class="list-panel" style="display:none">
       <div class="toolbar" style="position:relative">
@@ -223,6 +239,7 @@ function renderAppraisal(){
     $('apList').addEventListener('click', (e) => { const r = e.target.closest('[data-ap]'); if (r) apOpenDetail(+r.dataset.ap); });
   }
   apSetMain(apMainView, true);
+  { const sm = $('apSum'); if (sm) sm.innerHTML = apTab === 'ap' ? apSummaryHtml() : ''; }
   if (apTab === 'rti' && typeof renderRti === 'function') renderRti();
   if (apTab === 'dep' && typeof renderDep === 'function') renderDep();
   const nb = apCases.filter(c => c.archived_at).length;

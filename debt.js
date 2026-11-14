@@ -251,11 +251,25 @@ function renderDebt(){
   if (dbTab === 'survey') return typeof renderSurvey === 'function' ? renderSurvey() : undefined;
   renderDebtMain();
 }
+// 사후관리 요약 위젯: 진행 현황 카드 + 건전성 분포 + 다음 조치 임박
+function dbSummaryHtml(){
+  const act = debtCases.filter(c => c.status !== '종결'), sum = act.reduce((s, c) => s + Number(c.principal || 0), 0);
+  const late = act.filter(c => c.next_action_date && dbDiff(c.next_action_date) < 0).length, tod = act.filter(c => c.next_action_date && dbDiff(c.next_action_date) === 0).length;
+  const soon = (fn) => act.filter(c => { const a = fn(c); return a && a.d >= 0 && a.d <= 30; }).length;
+  const cards = [smCard('t2', '', '진행 중', '연체채권', act.length, sum ? `원금 합계 ${dbWon(sum)}` : ''), smCard(late ? 't4' : 't1', '', '조치 지연', '다음 조치일 경과', late, ''), smCard('t3', '', '오늘 조치', '오늘 해야 할 조치', tod, ''), smCard('t5', '', '기한이익상실 임박', '30일 이내 상실 예정', soon(dbAccel), `고정이하 분류 임박 ${soon(dbFixed)}건`)].join('');
+  const CL = { '정상': '#6fbf88', '요주의': '#f2b44d', '고정': '#e8950f', '회수의문': '#e8856f', '추정손실': '#b3412c' };
+  const regular = act.filter(c => !dbSpecial(c)), rows = DB_CLASSES.concat(['미분류']).map(k => { const a = regular.filter(c => (c.asset_class || '미분류') === k); return { k, n: a.length, p: a.reduce((s, c) => s + Number(c.principal || 0), 0) }; }).filter(x => x.n);
+  const spc = act.filter(dbSpecial).length, mx = Math.max(1, ...rows.map(x => x.n));
+  const cls = smWidget('건전성 분포', `일반채권 ${regular.length}건${spc ? ` · 특수 ${spc}건` : ''}`, smBars(rows.map(x => ({ l: x.k, r: `${x.n}건${x.p ? ' · ' + dbWon(x.p) : ''}`, p: x.n / mx * 100, c: CL[x.k] || '#c9c2b4' })), '진행중인 채권이 없어요.'));
+  const nxt = act.filter(c => c.next_action_date).sort((a, b) => a.next_action_date.localeCompare(b.next_action_date)).slice(0, 5);
+  const nx = smWidget('다음 조치 임박', '예정일 빠른 순', smList(nxt.map(c => { const d = dbDiff(c.next_action_date); return { c: d < 0 ? '#e5674f' : d === 0 ? '#f2b44d' : '#6a9fd0', t: `${c.debtor_name}`, m: d < 0 ? `${-d}일 지연` : d === 0 ? '오늘' : `D-${d}` }; }), '예정된 조치가 없어요.'));
+  return `<div class="smx"><div class="smx-cards">${cards}</div><div class="smx-grid">${cls}${nx}</div></div>`;
+}
 function renderDebtMain(){
   const el = $('debtMain');
   if (!el.dataset.ready){
     el.dataset.ready = '1';
-    el.innerHTML = `<div class="dbsecT">📞 연체채권관리</div><div class="list-panel">
+    el.innerHTML = `<div class="dbsecT">📞 연체채권관리</div><div id="dbBand"></div><div class="list-panel">
       <div class="toolbar">
         <div class="seg" id="dbViewSeg"><button data-v="active">진행중 <span id="dbNA"></span></button><button data-v="closed">종결 <span id="dbNB"></span></button><button data-v="trash">🗑 보관함 <span id="dbNT"></span></button></div>
         <select id="dbScope"><option value="all">본점·지점</option><option value="본점">본점</option><option value="지점">지점</option></select>
@@ -279,6 +293,7 @@ function renderDebtMain(){
     $('dbRpBtn').onclick = () => dbrOpenDialog();
     $('dbList').addEventListener('click', (e) => { const r = e.target.closest('[data-db]'); if (r) dbOpenDetail(+r.dataset.db); });
   }
+  { const bd = $('dbBand'); if (bd) bd.innerHTML = dbSummaryHtml(); }
   const nEnd = debtCases.filter(c => c.status === '종결').length;
   $('dbNA').textContent = debtCases.length - nEnd; $('dbNB').textContent = nEnd; $('dbNT').textContent = debtArchived.length || '';
   document.querySelectorAll('#dbViewSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === dbView));
