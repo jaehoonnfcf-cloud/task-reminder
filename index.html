@@ -608,6 +608,10 @@
   .apreq-btn{ display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:48px; border:0; border-radius:14px; background:#f3b84b; color:#3d2600; font-size:15px; font-weight:800; cursor:pointer; box-shadow:0 2px 8px rgba(243,184,75,.45); }
   .apreq-btn:hover{ background:#eeac35; } .apreq-btn span{ font-size:18px; line-height:1; }
   .acts:has(> .apreq-btn){ display:block; margin-top:14px; }
+  /* 시세정보 카드 안 금리 구역 */
+  .rt-h{ padding:12px 16px 4px; border-top:1px solid var(--line); font-size:12px; font-weight:800; color:var(--muted); }
+  .rt-row .q-name{ min-width:0; } .rt-sub{ display:block; margin-top:1px; font-size:11px; font-weight:500; color:var(--muted); white-space:normal; line-height:1.35; }
+  .rt-row .q-chg{ min-width:74px; } .rt-row{ align-items:center; }
   /* 모바일: 하단 탭바 */
   @media (max-width:760px){
     #tabBar{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:60; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #e9e3d6; }
@@ -702,7 +706,7 @@
     </div>
     <aside id="side">
       <div class="side-card" id="meCard"><div class="mc-who"></div><div class="mc-clock"></div><div id="onlineBox"></div></div>
-      <div class="side-card" id="quoteCard"><div class="side-h"><span>📈 시세정보 <button class="q-mg" id="qManage" type="button">관리</button></span><span class="muted" id="qTime"></span></div><div id="quotes"><div class="side-empty">불러오는 중...</div></div></div>
+      <div class="side-card" id="quoteCard"><div class="side-h"><span>📈 시세정보 <button class="q-mg" id="qManage" type="button">관리</button></span><span class="muted" id="qTime"></span></div><div id="quotes"><div class="side-empty">불러오는 중...</div></div><div id="rates" style="display:none"></div></div>
       <div class="side-card" id="rcCard" style="display:none"><div class="side-h"><span>💬 최근 댓글</span><span class="muted">눌러서 업무 열기</span></div><div id="rcList"></div></div>
       <div class="side-card" id="newsCard"><div class="side-h"><span>📰 경제뉴스</span><span class="muted" id="nTime"></span></div><div id="news"><div class="side-empty">불러오는 중...</div></div></div>
     </aside>
@@ -1380,6 +1384,16 @@
     c.closest('.q-edit').classList.toggle('off', !c.checked); saveQuotePrefs();
   });
   $('quotes').addEventListener('click', (e) => { if (e.target.id === 'qAll'){ e.preventDefault(); quoteHidden.clear(); saveQuotePrefs(); renderQuotes(); } });
+  // 금리(MOR 3·6개월, COFIX 신규취급액기준): KB국민은행·은행연합회 공시를 info-rates 함수가 읽어 온다. 주·월 단위로만 바뀌므로 30분마다 확인
+  let ratesOk = false;
+  async function loadRates(){
+    const box = $('rates'); if (!box) return;
+    const { data, error } = await sb.functions.invoke('info-rates', { body: {} });
+    if (error || !data || !data.rates || !data.rates.length){ if (!ratesOk) box.style.display = 'none'; return; }
+    ratesOk = true; box.style.display = '';
+    const chg = (c) => c === null || c === undefined ? '<span class="q-chg flat"></span>' : Math.abs(c) < 0.005 ? '<span class="q-chg flat">변동 없음</span>' : `<span class="q-chg ${c > 0 ? 'up' : 'down'}">${c > 0 ? '▲' : '▼'} ${fnum(Math.abs(c), 2)}%p</span>`;
+    box.innerHTML = '<div class="rt-h">금리</div>' + data.rates.map(r => `<div class="q-row rt-row"><span class="q-name">${esc(r.name)}<small class="rt-sub">${esc(r.note)}${r.sub ? ' · ' + esc(r.sub) : ''}</small></span><span class="q-price">${fnum(r.value, 2)}%</span>${chg(r.change)}</div>`).join('');
+  }
   async function loadNews(){
     const { data, error } = await sb.functions.invoke('info-feed', { body: { type: 'news' } });
     if (error || !data || !data.items || !data.items.length){ if (!newsOk) $('news').innerHTML = '<div class="side-empty">뉴스를 불러오지 못했습니다.<br>잠시 후 다시 시도합니다.</div>'; return; }
@@ -1393,10 +1407,12 @@
     if (!wide()) return;
     if (!quotesOk) loadQuotes();
     if (!newsOk) loadNews();
+    if (!ratesOk) loadRates();
     if (!sideTimers){
       sideTimers = true;
       setInterval(() => { if (!document.hidden && wide()) loadQuotes(); }, 60000);     // 시세 1분마다
       setInterval(() => { if (!document.hidden && wide()) loadNews(); }, 300000);       // 뉴스 5분마다
+      setInterval(() => { if (!document.hidden && wide()) loadRates(); }, 1800000);     // 금리 30분마다
     }
   }
   let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(ensureSide, 300); });
