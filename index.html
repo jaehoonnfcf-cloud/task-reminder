@@ -218,6 +218,14 @@
   .pl b{ color:var(--ink); } .pl.ok{ color:var(--green); font-weight:700; } .pl.drop{ color:#7a3b3b; font-weight:700; }
   .avs{ display:flex; padding-left:6px; }
   .av{ width:28px; height:28px; border-radius:50%; color:#fff; font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid #fff; margin-left:-6px; position:relative; flex-shrink:0; }
+  .av.ack::after{ content:'✓'; position:absolute; right:-5px; bottom:-5px; width:14px; height:14px; border-radius:50%; background:#3b82c4; color:#fff; font-size:9px; line-height:14px; text-align:center; border:1.5px solid #fff; }
+  .trow .av.ack::after{ width:16px; height:16px; line-height:16px; font-size:10px; right:-4px; bottom:-4px; }
+  .tile.ack .n{ color:#3b82c4; } .tile.ack::before{ content:'👀'; }
+  @media (min-width:761px){ #app[data-div="deposit"] #tiles{ grid-template-columns:repeat(5,1fr); } }
+  .asg2{ display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid var(--line,#eee); flex-wrap:wrap; } .asg2:first-of-type{ border-top:0; }
+  .asg2i{ flex:1; min-width:150px; display:flex; flex-direction:column; gap:3px; font-size:14px; } .asg2b{ display:flex; gap:6px; flex-wrap:wrap; }
+  .stp{ font-size:12.5px; color:#9a9488; } .stp.on{ color:#2f7d4f; font-weight:700; } .asg2.ack .stp.on:first-of-type{ color:#3b82c4; }
+  .go.ack{ background:#3b82c4; color:#fff; }
   .av.done::after{ content:'✓'; position:absolute; right:-5px; bottom:-5px; width:14px; height:14px; border-radius:50%; background:var(--green); color:#fff; font-size:9px; line-height:14px; text-align:center; border:1.5px solid #fff; }
   .chip{ display:inline-flex; align-items:center; gap:4px; font-size:12.5px; font-weight:700; padding:3px 9px; border-radius:6px; background:#091e420f; color:#44546f; white-space:nowrap; }
   .chip.over{ background:var(--danger); color:#fff; } .chip.today{ background:#f5cd47; color:#533f04; } .chip.ok{ background:var(--green-soft); color:var(--green); }
@@ -1007,7 +1015,7 @@
   // ---------- 데이터 ----------
   async function loadTasks(){
     const { data, error } = await sb.from('work_tasks')
-      .select('*, work_task_assignees(email, done_at), work_task_steps(seq, name, done_at, done_by), work_task_comments(id)')
+      .select('*, work_task_assignees(email, confirmed_at, done_at), work_task_steps(seq, name, done_at, done_by), work_task_comments(id)')
       .order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false });
     if (error){ $('list').innerHTML = `<div class="empty">${esc(error.message)}</div>`; return; }
     tasks = data || [];
@@ -1060,6 +1068,9 @@
   const canAct = (t) => canWrite(taskDiv(t));                       // 등록·수정·단계수정 권한
   const ownerOrAdmin = (t) => t.created_by === me || isAdmin();     // 담당자 구성 변경 / 삭제
   const isMine = (t) => t.work_task_assignees.some(a => a.email === me);
+  // 공통업무는 담당자별로 ① 확인 → ② 완료 두 단계. 0=미확인 1=확인함 2=완료
+  const asgStage = (a) => a.done_at ? 2 : a.confirmed_at ? 1 : 0;
+  const needAck = (t) => t.task_type !== 'loan' && isOpen(t) && t.work_task_assignees.some(a => a.email === me && asgStage(a) === 0);   // 내가 아직 확인 안 한 업무 = 확인목록
   const canUndoStep = (t, s) => canAct(t) && (ownerOrAdmin(t) || s.done_by === me);
 
   // ---------- 목록 렌더 ----------
@@ -1104,7 +1115,7 @@
     const open = divTasks.filter(isOpen);
     const cnt = (g) => open.filter(t => dueGrp(t, today) === g).length;
     const tiles = [
-      ...(divn === 'credit' ? [] : [['over', cnt('over'), '기한초과', 'grp:over'], ['today', cnt('today'), '오늘마감', 'grp:today']]),
+      ...(divn === 'credit' ? [] : [['ack', open.filter(needAck).length, '확인 대기', 'grp:ack'], ['over', cnt('over'), '기한초과', 'grp:over'], ['today', cnt('today'), '오늘마감', 'grp:today']]),
       ['loan', open.filter(isMine).length, '내 미완료', 'mine:'], ['', open.length, '미완료 전체', 'grp:'],
     ];
     $('tiles').style.gridTemplateColumns = divn === 'credit' ? 'repeat(2,1fr)' : '';
@@ -1138,7 +1149,7 @@
       && (fScope === 'all' || t.scope === fScope)
       && (!mine || isMine(t))
       && statusOk(t, status)
-      && (!fGrp || dueGrp(t, today) === fGrp)
+      && (!fGrp || (fGrp === 'ack' ? needAck(t) : dueGrp(t, today) === fGrp))
       && (!q || [t.title, t.detail, t.directed_by, t.collateral].some(v => (v || '').toLowerCase().includes(q))));
 
     const groups = (arr) => GROUPS.map(([k, label]) => {
@@ -1323,13 +1334,16 @@
         + (c ? `<span class="pl"><b>${esc(c.name)}</b> ${ci + 1}/${steps.length}</span>` : `<span class="pl ok">전 단계 완료</span>`);
       if (c && canAct(t)) act = `<button class="go" data-go="step:${t.id}:${c.seq}">✔ ${esc(c.name)} 완료</button>`;
     } else {
-      const pend = asg.filter(a => !a.done_at);
-      prog = pend.length ? `<span class="pl">${asg.length - pend.length}/${asg.length} 완료 · <b>${esc(pend.map(a => nameOf(a.email)).join(', '))}</b> 대기</span>` : `<span class="pl ok">전원 완료</span>`;
-      if (canAct(t) && asg.some(a => a.email === me && !a.done_at)) act = `<button class="go" data-go="mine:${t.id}">✔ 내 일 완료</button>`;
+      const nAck = asg.filter(a => asgStage(a) >= 1).length, nDone = asg.filter(a => a.done_at).length, noAck = asg.filter(a => asgStage(a) === 0), noDone = asg.filter(a => asgStage(a) === 1);
+      prog = nDone === asg.length ? `<span class="pl ok">전원 완료</span>`
+        : `<span class="pl">확인 ${nAck}/${asg.length} · 완료 ${nDone}/${asg.length}${noAck.length ? ` · <b>${esc(noAck.map(a => nameOf(a.email)).join(', '))}</b> 미확인` : noDone.length ? ` · <b>${esc(noDone.map(a => nameOf(a.email)).join(', '))}</b> 진행중` : ''}</span>`;
+      const my = asg.find(a => a.email === me);
+      if (canAct(t) && my && asgStage(my) === 0) act = `<button class="go ack" data-go="ack:${t.id}">👀 확인</button>`;
+      else if (canAct(t) && my && asgStage(my) === 1) act = `<button class="go" data-go="mine:${t.id}">✔ 완료</button>`;
     }
     const dd = doneMode ? kstDay(doneAtOf(t)) : '';
     const due = doneMode ? (dd ? `<span class="chip ok">${isDropped(t) ? '⛔' : '✅'} ${fmtMD(dd)}</span>${t.due_date && !loan ? `<div class="ts" style="margin-top:3px">기한 ${fmtMD(t.due_date)}</div>` : ''}` : '<span class="muted">-</span>') : loan ? '' : t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '<span class="muted">-</span>';
-    const avs = `<div class="avs">${asg.map(a => avHtml(a.email, !loan && a.done_at ? 'done' : '')).join('')}</div>`;
+    const avs = `<div class="avs">${asg.map(a => avHtml(a.email, loan ? '' : a.done_at ? 'done' : a.confirmed_at ? 'ack' : '')).join('')}</div>`;
     return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}${openId === t.id ? ' sel' : ''}" data-id="${t.id}">
       <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}">${esc(t.scope)}</span>` : ''}</div>
       <div class="c-title"><div class="tt">${esc(loan ? loanLine(t) : t.title)}${(t.work_task_comments || []).length ? ` <span class="cmtc">💬 ${t.work_task_comments.length}</span>` : ''}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
@@ -1489,10 +1503,12 @@
     await sb.functions.invoke('task-notify', { body: { event: 'step_undo', task_id: tid, seq } });
     return true;
   }
-  async function toggleAssignee(tid, email, checked){
-    const { error } = await sb.from('work_task_assignees').update({ done_at: checked ? new Date().toISOString() : null }).eq('task_id', tid).eq('email', email);
+  async function setAsgStage(tid, email, stage){   // 0=미확인 1=확인 2=완료 (공통업무 담당자별)
+    const now = new Date().toISOString(), cur = (byId(tid)?.work_task_assignees || []).find(a => a.email === email);
+    const patch = stage === 0 ? { confirmed_at: null, done_at: null } : stage === 1 ? { confirmed_at: (cur && cur.confirmed_at) || now, done_at: null } : { confirmed_at: (cur && cur.confirmed_at) || now, done_at: now };
+    const { error } = await sb.from('work_task_assignees').update(patch).eq('task_id', tid).eq('email', email);
     if (error){ alert(error.message); return; }
-    if (checked) await sb.functions.invoke('task-notify', { body: { event: 'done', task_id: tid } });
+    if (stage === 2) await sb.functions.invoke('task-notify', { body: { event: 'done', task_id: tid } });
   }
 
   // ---------- 이벤트 ----------
@@ -1574,7 +1590,7 @@
     if (go){
       e.stopPropagation(); go.disabled = true;
       const [kind, tid, seq] = go.dataset.go.split(':');
-      if (kind === 'step') await completeStep(+tid, +seq); else await toggleAssignee(+tid, me, true);
+      if (kind === 'step') await completeStep(+tid, +seq); else await setAsgStage(+tid, me, kind === 'ack' ? 1 : 2);
       return loadTasks();
     }
     if (e.target.closest('#foldOther')){ foldOther = !foldOther; return render(); }
@@ -1614,9 +1630,10 @@
       body += apprHtml(t, dropped);
       body += `<div class="kv"><div class="k">담당자</div><div class="v asgs">${t.work_task_assignees.map(a => `<span class="asgc">${avHtml(a.email, '', 'margin:0')}${esc(nameOf(a.email))}</span>`).join('')}</div></div>`;
     } else {
-      body += `<div class="kv"><div class="k">담당자별 진행</div>${t.work_task_assignees.map(a => `<div class="asg ${a.done_at ? 'ok' : ''}">
-        <input type="checkbox" ${a.done_at ? 'checked' : ''} ${a.email === me && canAct(t) ? '' : 'disabled'} data-d="chk:${esc(a.email)}" />
-        ${avHtml(a.email, '', 'margin:0')}${esc(nameOf(a.email))} ${a.done_at ? '✓ 완료' : '미완료'}</div>`).join('')}</div>`;
+      body += `<div class="kv"><div class="k">담당자별 진행</div>${t.work_task_assignees.map(a => { const st = asgStage(a), mineRow = a.email === me && canAct(t);
+        const btns = !mineRow ? '' : st === 0 ? `<button class="btn pri" data-d="ast:${esc(a.email)}:1">👀 확인했어요</button>` : st === 1 ? `<button class="btn pri" data-d="ast:${esc(a.email)}:2">✔ 완료</button><button class="btn" data-d="ast:${esc(a.email)}:0">확인 취소</button>` : `<button class="btn" data-d="ast:${esc(a.email)}:1">↩ 완료 취소</button>`;
+        return `<div class="asg2 ${st === 2 ? 'ok' : st === 1 ? 'ack' : ''}">${avHtml(a.email, st === 2 ? 'done' : st === 1 ? 'ack' : '', 'margin:0')}<div class="asg2i"><b>${esc(nameOf(a.email))}</b>
+          <span class="stp ${st >= 1 ? 'on' : ''}">① 확인${a.confirmed_at ? ' ' + fmtTs(a.confirmed_at) : ''}</span><span class="stp ${st === 2 ? 'on' : ''}">② 완료${a.done_at ? ' ' + fmtTs(a.done_at) : ''}</span></div><div class="asg2b">${btns}</div></div>`; }).join('')}</div>`;
     }
     const lbl = `<span class="chip" style="background:#e9f2ff;color:#0b5cc4;margin-right:4px">${DIVS[taskDiv(t)]}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}" style="margin-right:4px">${esc(t.scope)}</span>` : ''}<span class="tp ${loan ? 'loan' : ''}">${loan ? '대출진행' : '일반업무'}</span> `
       + (g === 'drop' ? '<span class="chip" style="background:#f1e9e9;color:#7a3b3b">미진행</span>' : g === 'over' ? '<span class="chip over">기한초과</span>' : g === 'today' ? '<span class="chip today">오늘마감</span>' : g === 'done' ? '<span class="chip ok">완료</span>' : '');
@@ -1681,14 +1698,10 @@
     if (kind === 'del'){ if (!confirm('이 업무를 삭제할까요?')) return; await sb.from('work_tasks').delete().eq('id', t.id); closeDetail(); return loadTasks(); }
     b.disabled = true;
     if (kind === 'step') await completeStep(t.id, +arg);
+    if (kind === 'ast'){ const [em, stg] = b.dataset.d.slice(4).split(/:(?=[012]$)/); await setAsgStage(t.id, em, +stg); }
     if (kind === 'undo' && confirm('이 단계를 되돌릴까요?')) await undoStep(t.id, +arg);
     loadTasks();
   });
-  $('detailPanel').addEventListener('change', async (e) => {
-    const cb = e.target.closest('input[data-d^="chk:"]'); if (!cb) return;
-    await toggleAssignee(openId, cb.dataset.d.slice(4), cb.checked); loadTasks();
-  });
-
   // ---------- 대출 미진행 처리 ----------
   let dropId = null;
   function openDrop(t){

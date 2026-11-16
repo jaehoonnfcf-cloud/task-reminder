@@ -864,3 +864,16 @@ grant update (body, created_at, edited_at) on public.appraisal_comments to authe
 -- 대출취급 3단계 '감정평가': 감정 방식에 '기존감정서 습용'(reuse) 추가 (외부감정/자체감정/기존감정서 습용/감정 불요)
 alter table public.work_tasks drop constraint if exists work_tasks_appraisal_mode_check;
 alter table public.work_tasks add constraint work_tasks_appraisal_mode_check check (appraisal_mode is null or appraisal_mode in ('external','own','reuse','none'));
+
+-- 공통업무 2단계(① 확인 → ② 완료): 담당자별 확인 시각 confirmed_at. 완료는 확인한 뒤에만 가능, 확인을 취소하면 완료도 함께 풀림.
+alter table public.work_task_assignees add column if not exists confirmed_at timestamptz;
+update public.work_task_assignees set confirmed_at = done_at where done_at is not null and confirmed_at is null;   -- 이미 완료된 건은 확인된 것으로 처리
+create or replace function public.work_task_assignees_confirm_guard() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if new.confirmed_at is null then new.done_at := null; end if;
+  if new.done_at is not null and new.confirmed_at is null then raise exception '먼저 확인해야 완료할 수 있습니다.'; end if;
+  return new;
+end $$;
+drop trigger if exists work_task_assignees_confirm on public.work_task_assignees;
+create trigger work_task_assignees_confirm before update on public.work_task_assignees for each row execute function public.work_task_assignees_confirm_guard();
