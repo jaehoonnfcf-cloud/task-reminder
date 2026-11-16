@@ -338,8 +338,8 @@ function renderPerf(){
       else if (a === 'goliq'){ const nb = document.querySelector('#divBtns [data-div="liq"]'); if (nb) nb.click(); }
     });
   }
-  const adm = isAdmin(), c = pfCalc();
-  const btns = `${adm ? '<button class="btn small primary" data-pf="input">＋ 실적 입력</button><button class="btn small" data-pf="goal">⚙ 목표·전년말</button>' : ''}`;
+  const adm = canPerf(), c = pfCalc();
+  const btns = `${adm ? '<button class="btn small primary" data-pf="input">＋ 실적 입력</button>' : ''}${isAdmin() ? '<button class="btn small" data-pf="goal">⚙ 목표·전년말</button>' : ''}`;
   if (!c){
     el.innerHTML = `<div class="pfcard"><div class="pfh"><b>📊 여수신 현황</b><span class="sp"></span>${btns}</div>
       <div class="pfempty">아직 입력된 실적이 없어요.${adm ? '<br>오른쪽 위 “＋ 실적 입력”으로 전 영업일 실적부터 입력해주세요.' : '<br>관리자가 입력하면 여기에 표시돼요.'}</div></div>${typeof pfOrigHtml === 'function' ? pfOrigHtml() : ''}`;
@@ -376,7 +376,7 @@ function renderPerf(){
 
 // ---------- 실적 입력 (관리자) ----------
 function pfOpenIn(date){
-  if (!isAdmin()) return;
+  if (!canPerf()) return;
   const d = date || pfPrevBizDay();
   $('pfInPanel').innerHTML = `<div class="ph"><h2>여수신 실적 입력</h2><button class="x" data-f="close">✕</button></div>
     <div class="pfsub">단위: 억원 (소수점 없이 정수로, 예: 991) · 같은 날짜를 다시 저장하면 덮어써요</div>
@@ -468,7 +468,7 @@ $('pfTgPanel').addEventListener('click', async (ev) => {
 
 // ---------- 규제유동성비율 입력 (관리자) ----------
 function pfOpenLq(date){
-  if (!isAdmin()) return;
+  if (!canPerf()) return;
   const d = date || pfPrevBizDay(), recent = [...perfLiq].reverse().slice(0, 8);
   $('pfLqPanel').innerHTML = `<div class="ph"><h2>규제유동성비율 입력</h2><button class="x" data-q="close">✕</button></div>
     <div class="pfsub">단위: 백만원 · 같은 날짜를 다시 저장하면 덮어써요 · 전월말·전분기말 값도 그 날짜로 입력해두면 비교에 쓰여요</div>

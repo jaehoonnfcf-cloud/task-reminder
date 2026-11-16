@@ -877,3 +877,29 @@ begin
 end $$;
 drop trigger if exists work_task_assignees_confirm on public.work_task_assignees;
 create trigger work_task_assignees_confirm before update on public.work_task_assignees for each row execute function public.work_task_assignees_confirm_guard();
+
+-- 현황판 실적·유동성 자료 입력 대행 권한 team_members.perm_perf(또는 관리자): 여수신 일별 실적(perf_daily), 규제유동성비율(perf_liq), 신규대출 주간 취급액(perf_orig), 유동성관리 자료 올리기(liq_reports).
+-- 연 목표·전년말(perf_year), 유동성 전망 설정(liq_settings), 담당자 권한 설정은 계속 관리자만.
+alter table public.team_members add column if not exists perm_perf boolean not null default false;
+grant update (perm_perf) on public.team_members to authenticated;
+create or replace function public.has_perf() returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.team_members where email = auth.email() and (is_admin or perm_perf))
+$$;
+revoke execute on function public.has_perf() from public, anon;
+grant execute on function public.has_perf() to authenticated;
+drop policy if exists pd_ins on public.perf_daily; drop policy if exists pd_upd on public.perf_daily; drop policy if exists pd_del on public.perf_daily;
+create policy pd_ins on public.perf_daily for insert to authenticated with check (has_perf() and entered_by = auth.email());
+create policy pd_upd on public.perf_daily for update to authenticated using (has_perf()) with check (has_perf());
+create policy pd_del on public.perf_daily for delete to authenticated using (has_perf());
+drop policy if exists pl_ins on public.perf_liq; drop policy if exists pl_upd on public.perf_liq; drop policy if exists pl_del on public.perf_liq;
+create policy pl_ins on public.perf_liq for insert to authenticated with check (has_perf() and entered_by = auth.email());
+create policy pl_upd on public.perf_liq for update to authenticated using (has_perf()) with check (has_perf());
+create policy pl_del on public.perf_liq for delete to authenticated using (has_perf());
+drop policy if exists po_ins on public.perf_orig; drop policy if exists po_upd on public.perf_orig; drop policy if exists po_del on public.perf_orig;
+create policy po_ins on public.perf_orig for insert to authenticated with check (has_perf());
+create policy po_upd on public.perf_orig for update to authenticated using (has_perf()) with check (has_perf());
+create policy po_del on public.perf_orig for delete to authenticated using (has_perf());
+drop policy if exists lr_ins on public.liq_reports; drop policy if exists lr_upd on public.liq_reports; drop policy if exists lr_del on public.liq_reports;
+create policy lr_ins on public.liq_reports for insert to authenticated with check (has_perf() and uploaded_by = auth.email());
+create policy lr_upd on public.liq_reports for update to authenticated using (has_perf()) with check (has_perf());
+create policy lr_del on public.liq_reports for delete to authenticated using (has_perf());

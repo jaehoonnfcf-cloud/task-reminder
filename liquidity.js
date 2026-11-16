@@ -142,7 +142,7 @@ function renderLiq(live){
   const el = $('liq'); if (!el) return;
   if (!el.dataset.ready){ el.dataset.ready = '1'; lmBind(el); }
   if (!lmLoaded){ el.innerHTML = `<div class="lmc"><div class="lmempty">불러오는 중이에요…</div></div>`; return; }
-  const st = lmState(), p = lmP || { ...LM_DEF }, adm = isAdmin(), sim = lmSim(st, p);
+  const st = lmState(), p = lmP || { ...LM_DEF }, adm = canPerf(), sim = lmSim(st, p), admin = isAdmin();
   const cur = lmLast(st.points), rows = sim ? sim.rows.filter(r => !r.past) : [];
   const upload = `<div class="lmc"><h3>자료 올리기 <small>${adm ? 'ALM 엑셀을 올리면 숫자만 저장돼요 · 일별 규제유동성비율 보고서는 현황판에도 자동 반영' : '관리자가 올린 자료 기준'}</small></h3>
     ${adm ? `<div class="lmdrop" id="lmDrop">ALM 엑셀 또는 계좌 목록(엑셀·CSV)을 끌어다 놓거나 <b>여기를 눌러 선택</b><br><span class="lmsub">일별 규제유동성비율 보고서 · 일별 현금흐름분석(규제유동성) · 현금흐름분석(규제유동성) 월 · 규제유동성비율 보고서 월 · <b>수신 계좌 목록 · 대출 계좌 목록</b></span></div><input type="file" id="lmFile" multiple accept=".xlsx,.csv" hidden />` : ''}
@@ -215,7 +215,7 @@ function renderLiq(live){
     <div class="lmc"><h3>월별 만기 구조 <small>가정 반영 후 · 예금 만기가 대출 회수보다 크게 몰린 달이 위험</small></h3><div class="lmleg"><span><i style="background:${LM_C.dep}"></i>저축성예수금 만기</span><span><i style="background:${LM_C.loan}"></i>대출 회수(3개월 창 산입분)</span></div><div class="lmtw">${lmChartMat(rows)}</div></div>
     <div class="lmc"><h3>분기말 · 월말 전망표</h3><div class="lmtw"><table class="lmtb">${pt}</table></div></div>
     ${lmBookCards(st)}
-    <div class="lmc" id="lmCtrlCard"><h3>가정 조절 <small>바꾸면 맨 위 전망 타일과 표·차트가 바로 다시 계산돼요${adm ? '' : ' · 저장은 관리자만'}</small></h3>
+    <div class="lmc" id="lmCtrlCard"><h3>가정 조절 <small>바꾸면 맨 위 전망 타일과 표·차트가 바로 다시 계산돼요${admin ? '' : ' · 저장은 관리자만'}</small></h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px"><button class="btn small primary" data-lm="opt">권장 재예치 배분 적용</button><button class="btn small" data-lm="reset">기본값으로</button>${adm ? `<button class="btn small" data-lm="save" ${dirty ? '' : 'disabled'}>가정 저장</button>` : ''}${dirty ? `<button class="btn small" data-lm="revert">저장된 가정으로</button>` : ''}<span class="lmsub" id="lmOptMsg">'권장 배분'은 월말 비율의 최저값이 가장 높아지는 재예치 기간 배분이에요(3개월 이하는 10% 이내). 각 항목 옆에 기본값과 권장값을 적어 두었어요.</span></div>
       <div class="lmctrl">${lmCtrlHtml(p, lmRec(st, p, live), !!st.book)}</div>
       <div class="lmnote"><b>가정으로 채운 부분</b> · 재예치 기간 비율은 합계 100%로 환산해요. · ${st.book ? `계좌 목록(기준일 ${st.book.dep.asof}) 이후에 새로 가입·재예치되는 금액의 만기는 위 기간 비율로 나눠요.` : `월별 만기표 이후 재예치·신규된 금액(${past.join(', ') || '없음'})의 만기는 실제 값을 몰라 위 기간 비율로 나눴어요.`} · 요구불예수금 유동부채(${lmU(sim.demand)})는 그대로 둬요. · 신규 대출과 2년 이상 연장분은 전망 기간 안에 만기가 오지 않는 것으로 봐요.</div></div>
@@ -344,7 +344,7 @@ function lmBind(el){
   el.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-lm]'), del = e.target.closest('[data-lmdel]');
     if (e.target.closest('#lmDrop')) return $('lmFile').click();
-    if (del){ if (!isAdmin()) return; const [kind, d] = del.dataset.lmdel.split('|'); const ratio = kind === 'daily_ratio' || kind === 'monthly_ratio';
+    if (del){ if (!canPerf()) return; const [kind, d] = del.dataset.lmdel.split('|'); const ratio = kind === 'daily_ratio' || kind === 'monthly_ratio';
       if (!confirm(`${LM_KIND[kind]} ${d} 자료를 삭제할까요?${ratio ? '\n(현황판의 같은 날짜 규제유동성비율 값도 함께 지워져요)' : ''}`)) return;
       const { error } = await sb.from('liq_reports').delete().eq('kind', kind).eq('base_date', d); if (error) return alert('삭제하지 못했어요: ' + error.message);
       if (ratio && !lmReports.some(r => r.base_date === d && r.kind !== kind && (r.kind === 'daily_ratio' || r.kind === 'monthly_ratio'))) await sb.from('perf_liq').delete().eq('base_date', d);   // 현황판 값의 원본이 이 보고서
@@ -463,7 +463,7 @@ function lmParseList(wb){   // 계좌 목록이면 집계해서 돌려주고, �
   return null;
 }
 async function lmUpload(files){
-  if (!isAdmin()) return toast('자료 올리기는 관리자만 할 수 있어요');
+  if (!canPerf()) return toast('자료 올리기는 관리자 또는 실적입력 담당자만 할 수 있어요');
   files = files.filter(f => /\.(xlsx|csv)$/i.test(f.name)); if (!files.length) return toast('엑셀(.xlsx) 또는 CSV 파일을 올려주세요');
   try { await lmLoadXlsx(); } catch (e) { return alert(e.message); }
   const ok = [], bad = [];

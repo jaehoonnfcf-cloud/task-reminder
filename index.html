@@ -857,6 +857,7 @@
   const permOf = (d, m) => !!m && (d === 'credit' ? m.perm_credit : d === 'appraisal' ? (m.perm_appraisal || m.is_admin) : d === 'debt' ? (m.perm_debt || m.is_admin) : (m.perm_deposit || m.perm_credit));   // 공통업무는 대출·공통 권한 중 하나면 됨
   const canWrite = (d) => permOf(d, meRow);
   const isAdmin = () => !!(meRow && meRow.is_admin);
+  const canPerf = () => !!(meRow && (meRow.is_admin || meRow.perm_perf));   // 현황판 실적·유동성 자료 입력 (관리자 부재 시 대행 담당자)
   // 화면 구분: 대출진행(단계별) = 대출취급, 그 밖의 단건 업무(예전 여신 일반업무 포함) = 공통업무
   const taskDiv = (t) => t.task_type === 'loan' ? 'credit' : 'deposit';
   // 사진(아바타): 비공개 저장소의 임시 주소(서명 URL)로 보여준다
@@ -947,7 +948,7 @@
   }
 
   async function reloadMembers(){
-    const { data } = await sb.from('team_members').select('email,name,perm_credit,perm_deposit,perm_appraisal,perm_debt,is_admin,avatar_v').order('name');
+    const { data } = await sb.from('team_members').select('email,name,perm_credit,perm_deposit,perm_appraisal,perm_debt,perm_perf,is_admin,avatar_v').order('name');
     members = data || [];
     meRow = members.find(m => m.email === me) || meRow;
     await loadAvatars();
@@ -2116,6 +2117,7 @@
         <label class="chk"><input type="checkbox" data-p="perm_deposit" ${m.perm_deposit ? 'checked' : ''}/> 공통</label>
         <label class="chk"><input type="checkbox" data-p="perm_appraisal" ${m.perm_appraisal ? 'checked' : ''}/> 담보심사</label>
         <label class="chk"><input type="checkbox" data-p="perm_debt" ${m.perm_debt ? 'checked' : ''}/> 사후관리</label>
+        <label class="chk" title="현황판 여수신 실적·유동성 자료 입력"><input type="checkbox" data-p="perm_perf" ${m.perm_perf ? 'checked' : ''}/> 실적입력</label>
         <label class="chk"><input type="checkbox" data-p="is_admin" ${m.is_admin ? 'checked' : ''} ${self ? 'disabled title="본인의 관리자 권한은 해제할 수 없어요"' : ''}/> 관리자</label>
         <div class="btns"><button class="btn small" data-act="name">이름 수정</button><button class="btn small" data-act="photo">사진</button>${m.avatar_v ? '<button class="btn small" data-act="rmphoto">사진 삭제</button>' : ''}<button class="btn small" data-act="pw">비밀번호</button>${self ? '' : '<button class="btn small danger" data-act="del">삭제</button>'}</div></div>`;
     }).join('') || '<div class="blk-empty">등록된 담당자가 없어요.</div>';

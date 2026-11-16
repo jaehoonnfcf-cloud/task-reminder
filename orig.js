@@ -34,7 +34,7 @@ const pfoMonthly = (d) => { const m = Array.from({ length: 12 }, () => ({ hq: 0,
 
 function pfOrigHtml(){
   if (!pfoYear) pfoYear = +kstToday().slice(0, 4);
-  const adm = isAdmin(), D = pfoYearData(pfoYear), P = pfoYearData(pfoYear - 1), tot = D.hq + D.br;
+  const adm = canPerf(), D = pfoYearData(pfoYear), P = pfoYearData(pfoYear - 1), tot = D.hq + D.br;
   const chip = (l, v) => `<div class="pfchip"><span>${l}</span><b>${v}</b></div>`;
   let chips = '';
   if (!D.count){
@@ -120,7 +120,7 @@ const pfoClose = (id) => { $(id).style.display = 'none'; document.body.style.ove
 
 // ---------- 주간 입력: 한 주씩 ----------
 function pfoOpenWeek(week){
-  if (!isAdmin()) return;
+  if (!canPerf()) return;
   const y = pfoYear || +kstToday().slice(0, 4), weeks = pfoWeeks(y), map = new Map(perfOrig.map(r => [r.week_start, r]));
   // 기본 선택: 올해라면 아직 입력 안 된 가장 이른 지난 주(없으면 이번 주), 아니면 첫 주
   const thisW = pfoThisWeek(); let def = week || (weeks.find(w => w < thisW && !map.has(w)) || weeks.filter(w => w <= thisW).pop() || weeks[0]);
@@ -154,7 +154,7 @@ $('pfOwPanel').addEventListener('click', async (ev) => {
 
 // ---------- 전체 입력: 한 해 전체를 표로 (엑셀 붙여넣기 지원) ----------
 function pfoOpenAll(){
-  if (!isAdmin()) return;
+  if (!canPerf()) return;
   const y = pfoYear || +kstToday().slice(0, 4), weeks = pfoWeeks(y), map = new Map(perfOrig.map(r => [r.week_start, r])), thisW = pfoThisWeek();
   $('pfOaPanel').innerHTML = `<div class="ph"><h2>📋 ${y}년 취급액 전체 입력</h2><button class="x" data-o="close">✕</button></div>
     <div class="pfsub">단위: 백만원 · 주 시작일(월요일) 기준 ${weeks.length}주. 비워 두면 그 주는 입력 없음으로 둬요 (0을 입력하면 0으로 기록)</div>
