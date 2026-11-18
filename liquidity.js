@@ -130,7 +130,7 @@ function lmSim(st, p){
     else L = (L == null ? b.liquid : L) + net - p.loanNet;
     const wl = loan[i + 1] + loan[i + 2] + loan[i + 3] + amo[i + 1] + amo[i + 2] + amo[i + 3], wd = dep[i + 1] + dep[i + 2] + dep[i + 3];
     const A = L == null ? NaN : L + wl, B = demand + ov + wd;
-    rows.push({ k, mat, loanMat: loan[i] + amo[i], A, B, r: A / B, room: A - B, wd, wl, past: k < lpYm, actualNet: actual ? net : null });
+    rows.push({ k, mat, loanMat: loan[i] + amo[i], A, B, r: A / B, room: A - B, nx: loan[i + 1], lowR: (A - loan[i + 1]) / B, lowRoom: A - loan[i + 1] - B, wd, wl, past: k < lpYm, actualNet: actual ? net : null });
   }
   return { rows, lp, lcf, lpYm, demand, ov };
 }
@@ -155,7 +155,7 @@ function renderLiq(live){
   // 타일
   const qs = rows.filter(r => lmIsQ(r.k)).slice(0, 4), curR = cur ? cur.A / cur.B : NaN, cs = lmStat(curR, p);
   let tiles = cur ? `<div class="lmt"><div class="l">현재 (${+cur.d.slice(5, 7)}/${+cur.d.slice(8, 10)} 기준)</div><div class="v">${lmPct(curR, 2)}</div><div class="n"><span class="lmchip ${cs}">${LM_SL[cs]}</span>GAP ${lmU(cur.A - cur.B)}</div></div>` : '';
-  qs.forEach(q => { const s = lmStat(q.r, p); tiles += `<div class="lmt"><div class="l">${lmLab(q.k)}월말 전망</div><div class="v">${lmPct(q.r)}</div><div class="n"><span class="lmchip ${s}">${LM_SL[s]}</span>${q.room >= 0 ? '여유' : '부족'} ${lmU(Math.abs(q.room))}</div></div>`; });
+  qs.forEach(q => { const s = lmStat(q.r, p); tiles += `<div class="lmt"><div class="l">${lmLab(q.k)}월말 전망</div><div class="v">${lmPct(q.r)}</div><div class="n"><span class="lmchip ${s}">${LM_SL[s]}</span>${q.room >= 0 ? '여유' : '부족'} ${lmU(Math.abs(q.room))}<br><span class="lmsub">다음 달 만기 연장 시 ${lmPct(q.lowR)}</span></div></div>`; });
   if (!sim) tiles += `<div class="lmt" style="grid-column:span 2"><div class="l">분기말 전망</div><div class="n" style="margin-top:8px;line-height:1.6">월별 만기표(현금흐름분석(규제유동성) 월 보고서)를 올리면 분기말 전망과 재예치 가이드가 계산돼요.</div></div>`;
   let body = `<div class="lmsub" style="margin:-6px 2px 0">단위: 백만원 · 목표 ${p.target <= 100 ? '100% 초과 유지' : '내부 목표 ' + p.target + '% 이상'}${cur ? ` · 최근 일별 자료 ${cur.d}` : ''}${st.book ? ` · 계좌 목록 ${st.book.dep.asof} 기준` : st.base ? ` · 월별 만기표 ${lmY(st.base.ym)}년 ${lmM(st.base.ym)}월말 기준` : ''}</div><div class="lmtiles">${tiles}</div>`;
   if (sim){
@@ -175,6 +175,8 @@ function renderLiq(live){
       : `현재 비율이 <b>${lmPct(curR, 2)}</b>로 기준 미달입니다. 유동부채를 <b>${lmU(cur.B - cur.A)}</b> 줄이거나 유동자산을 그만큼 늘려야 해요.`);
     if (worst) t.push(worst.r < 1 ? `가장 위험한 분기말은 <b>${lmLab(worst.k)}월말(${lmPct(worst.r)})</b>입니다. 그 창(${lmLab(worst.k + 1)}~${lmLab(worst.k + 3)}월 만기)에 예금 만기가 <b>${lmU(-worst.room)}</b> 초과해요. 그 달에 만기가 떨어지는 상품을 줄이세요.`
       : `분기말 전망은 모두 100% 이상입니다. 가장 낮은 분기말은 <b>${lmLab(worst.k)}월말(${lmPct(worst.r)})</b>이고 여유는 ${lmU(worst.room)}입니다.`);
+    const lowBad = rows.slice(0, 14).find(r => isFinite(r.lowR) && r.lowR < 1);
+    if (rows[0] && isFinite(rows[0].lowR)) t.push(`${lmLab(rows[0].k)}월말에 다음 달 만기 일시상환 대출(<b>${lmU(rows[0].nx)}</b>)이 만기 1개월 전부터 가능한 연장으로 모두 창 밖으로 밀리면 비율은 <b>${lmPct(rows[0].lowR)}</b>까지 내려가요.${lowBad ? ` 연장 하한이 100% 아래인 달: <b>${lmLab(lowBad.k)}월말(${lmPct(lowBad.lowR)})</b>${lowBad.k !== rows[0].k ? '' : ' — 연장 처리 시기를 월말 이후로 조정하는 방안을 검토하세요.'}` : ''}`);
     const wm = rows.slice(0, 14).filter(r => !lmIsQ(r.k)).sort((a, c) => a.r - c.r)[0];
     if (wm && wm.r < 1) t.push(`분기말이 아닌 달 중에는 <b>${lmLab(wm.k)}월말(${lmPct(wm.r)})</b>이 100% 아래로 내려가요. 조기경보 지표에 반영되므로 ${lmLab(wm.k + 1)}~${lmLab(wm.k + 3)}월 만기를 줄여 두세요.`);
     t.push(advice.length ? `이번 달 만기분 약 <b>${lmU(remDays)}</b>은 <b>${advice.join(', ')}</b> 상품으로 재예치하도록 권유하세요. "피하기" 기간은 줄이고, 3개월 이하는 곧 다시 만기가 오므로 소량만 받으세요.`
@@ -195,8 +197,8 @@ function renderLiq(live){
       t.push(`앞으로 31일 안에 만기가 가장 큰 날은 <b>${dd.getMonth() + 1}/${dd.getDate()}(${lmU(mx.v)})</b>입니다. 그 전에 갱신 의사를 확인하세요.`); }
     const age = nowYm - srcYm; if (st.book){ const ageD = Math.round((Date.parse(kstToday()) - Date.parse(st.book.dep.asof)) / 864e5); if (ageD > 35) t.push(`수신 계좌 목록이 <b>${ageD}일</b> 지났어요. 새 목록을 올려 주세요.`); } else if (age >= 2) t.push(`월별 만기표가 ${lmM(st.base.ym)}월말 기준이라 <b>${age}개월 지났어요.</b> 그 뒤 재예치분의 만기는 가정으로 채워져 있으니 새 월간 보고서를 올려 주세요.`);
     // 전망표 · 큰 만기일
-    let pt = '<tr><th>월말</th><th>유동자산(백만원)</th><th>유동부채(백만원)</th><th>비율</th><th>여유(△부족, 백만원)</th><th>창의 예금 만기(백만원)</th><th>창의 대출 회수(백만원)</th><th>상태</th></tr>';
-    rows.slice(0, 14).forEach(r => { const s = lmStat(r.r, p); pt += `<tr class="${lmIsQ(r.k) ? 'q' : ''}"><td>${lmLab(r.k)}월말${lmIsQ(r.k) ? ' (분기말)' : ''}</td><td>${lmF(r.A)}</td><td>${lmF(r.B)}</td><td>${lmPct(r.r)}</td><td>${lmF(r.room)}</td><td>${lmF(r.wd)}</td><td>${lmF(r.wl)}</td><td><span class="lmchip ${s}">${LM_SL[s]}</span></td></tr>`; });
+    let pt = '<tr><th>월말</th><th>유동자산(백만원)</th><th>유동부채(백만원)</th><th>비율</th><th>여유(△부족, 백만원)</th><th>창의 예금 만기(백만원)</th><th>창의 대출 회수(백만원)</th><th>다음 달 만기 연장 시 비율(하한)</th><th>상태</th></tr>';
+    rows.slice(0, 14).forEach(r => { const s = lmStat(r.r, p); pt += `<tr class="${lmIsQ(r.k) ? 'q' : ''}"><td>${lmLab(r.k)}월말${lmIsQ(r.k) ? ' (분기말)' : ''}</td><td>${lmF(r.A)}</td><td>${lmF(r.B)}</td><td>${lmPct(r.r)}</td><td>${lmF(r.room)}</td><td>${lmF(r.wd)}</td><td>${lmF(r.wl)}</td><td>${lmPct(r.lowR)}${isFinite(r.lowR) && r.lowR < 1 ? ' ⚠' : ''}</td><td><span class="lmchip ${s}">${LM_SL[s]}</span></td></tr>`; });
     let dt = '<tr><th>날짜</th><th>예금 만기(백만원)</th><th>대출 만기(백만원)</th><th style="text-align:left">비고</th></tr>';
     if (st.book && st.book.dep.days){ const b0 = lmD(st.book.dep.asof), ld = (st.book.loan && st.book.loan.days) || [];
       st.book.dep.days.slice(0, 31).map((v, i) => ({ v, i })).sort((x, y) => y.v - x.v).slice(0, 7).sort((x, y) => x.i - y.i).forEach(o => { const dd = new Date(b0); dd.setDate(dd.getDate() + o.i + 1);
@@ -213,7 +215,7 @@ function renderLiq(live){
     </div>
     <div class="lmc"><h3>비율 추이와 전망</h3><div class="lmleg"><span><i style="background:${LM_C.dep}"></i>실적</span><span><i style="background:${LM_C.proj}"></i>전망(월말, 아래 가정 기준)</span><span><i style="background:${LM_C.bad}"></i>기준 100%</span></div><div class="lmtw">${lmChartRatio(st, rows)}</div></div>
     <div class="lmc"><h3>월별 만기 구조 <small>가정 반영 후 · 예금 만기가 대출 회수보다 크게 몰린 달이 위험</small></h3><div class="lmleg"><span><i style="background:${LM_C.dep}"></i>저축성예수금 만기</span><span><i style="background:${LM_C.loan}"></i>대출 회수(3개월 창 산입분)</span></div><div class="lmtw">${lmChartMat(rows)}</div></div>
-    <div class="lmc"><h3>분기말 · 월말 전망표</h3><div class="lmtw"><table class="lmtb">${pt}</table></div></div>
+    <div class="lmc"><h3>분기말 · 월말 전망표</h3><div class="lmtw"><table class="lmtb">${pt}</table></div><div class="lmsub" style="margin-top:8px">연장 하한 = 대출 만기연장은 만기 1개월 전부터만 가능하고 보통 1·2년 단위로 연장되어 3개월 창 밖으로 밀리므로, 월말 시점에 다음 달 만기가 되는 일시상환 대출이 모두 미리 연장됐다고 보고 그 금액을 유동자산에서 뺀 비율입니다. 다다음 달 이후 만기분은 월말까지 연장할 수 없어 그대로 둡니다.</div></div>
     ${lmBookCards(st)}
     <div class="lmc" id="lmCtrlCard"><h3>가정 조절 <small>바꾸면 맨 위 전망 타일과 표·차트가 바로 다시 계산돼요${admin ? '' : ' · 저장은 관리자만'}</small></h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px"><button class="btn small primary" data-lm="opt">권장 재예치 배분 적용</button><button class="btn small" data-lm="reset">기본값으로</button>${adm ? `<button class="btn small" data-lm="save" ${dirty ? '' : 'disabled'}>가정 저장</button>` : ''}${dirty ? `<button class="btn small" data-lm="revert">저장된 가정으로</button>` : ''}<span class="lmsub" id="lmOptMsg">'권장 배분'은 월말 비율의 최저값이 가장 높아지는 재예치 기간 배분이에요(3개월 이하는 10% 이내). 각 항목 옆에 기본값과 권장값을 적어 두었어요.</span></div>
