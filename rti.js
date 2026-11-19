@@ -11,7 +11,8 @@ const rtiPct = (s) => { const n = parseFloat(String(s ?? '').replace(/[^0-9.\-]/
 const rtiW = (n) => Number(n || 0).toLocaleString('ko-KR');
 const rtiComma = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); return d ? Number(d).toLocaleString('ko-KR') : ''; };
 const rtiPctTxt = (n) => `${(Math.round(Number(n) * 100) / 100).toFixed(2)}%`;
-const rtiR2 = (n) => Math.round(n * 100) / 100;
+const rtiTxt = (n) => (Math.floor(Number(n) * 100 + 1e-9) / 100).toFixed(2);   // 표시용: 반올림 없이 소수 둘째 자리까지 버림 (1.499 → 1.49)
+const rtiR2 = (n) => Math.round(n * 100) / 100;   // Stress 금리(%p) 계산 전용 — RTI 에는 쓰지 않음
 
 // ---------- 계산 (화면·저장·인쇄가 모두 이 함수를 쓴다) ----------
 function rtiNewData(){
@@ -40,7 +41,7 @@ function rtiCompute(d, kind){
     return { p, r: rate, s: st, i: Math.round(p * st / 100), refUsed: isEx && p > 0 && !has, fixed }; };
   const ex = (d.existing || []).map(x => row(x, Number(d.stressEx) || 0, true)), nw = (d.news || []).map(x => row(x, Number(d.stressNew) || 0, false));
   const interest = ex.concat(nw).reduce((a, x) => a + x.i, 0), newSum = nw.reduce((a, x) => a + x.p, 0);
-  const hasI = interest > 0, rti = hasI ? rtiR2(income / interest) : null;   // 시트처럼 소수 둘째 자리 반올림 값으로 판정
+  const hasI = interest > 0, rti = hasI ? income / interest : null;   // 반올림 없이 원값 그대로 기준치와 비교
   const th = kind === '주택' ? [s.th_house, s.th_house_ok] : [s.th_non_house, s.th_non_house_ok];
   const small = newSum > 0 && newSum <= s.small_limit;
   let verdict, vcls;
@@ -117,7 +118,7 @@ function renderRti(){
     </div>
     <div class="rtihead"><span>고객명</span><span style="text-align:right">연간 임대소득</span><span style="text-align:right">연간 이자비용</span><span style="text-align:center">RTI</span><span>판정</span><span>작성</span></div>
     <div>${rows.map(r => `<div class="rtirow" data-rid="${r.id}"><div><div class="nm">${esc(r.title)}</div><div class="sub">${esc(r.kind)} 임대업</div></div>
-      <div class="mo">${rtiW(r.income)}원</div><div class="mo">${rtiW(r.interest)}원</div><div class="rt">${r.rti === null ? '-' : Number(r.rti).toFixed(2)}</div>
+      <div class="mo">${rtiW(r.income)}원</div><div class="mo">${rtiW(r.interest)}원</div><div class="rt">${r.rti === null ? '-' : rtiTxt(r.rti)}</div>
       <div><span class="rtiv ${esc((r.data && r.data.vcls) || 'n')}">${esc(r.verdict || '-')}</span></div><div style="font-size:12.5px;color:var(--muted)">${esc(nameOf(r.created_by))}<br>${esc(String(r.updated_at).slice(0, 10))}</div></div>`).join('') || `<div class="blk-empty">${rtiCalcs.length ? '조건에 맞는 계산이 없어요.' : '저장된 RTI 계산이 없어요. “＋ 새 RTI 계산”으로 시작해요.'}</div>`}</div></div>`;
   $('rtiKindSeg').onclick = (e) => { const b = e.target.closest('[data-k]'); if (b){ rtiKind = b.dataset.k; renderRti(); } };
   $('rtiQ').oninput = (e) => { rtiQ = e.target.value.trim().toLowerCase(); const pos = e.target.selectionStart; renderRti(); const q = $('rtiQ'); q.focus(); q.setSelectionRange(pos, pos); };
@@ -207,7 +208,7 @@ function rtiRefresh(){
   set('pSum', rtiW(c.ex.concat(c.nw).reduce((a, x) => a + x.p, 0)));
   const tag = (x) => `${rtiPctTxt(x.s)}${x.fixed ? ' (고정)' : ''}${x.refUsed ? ' (참고금리)' : ''}`;
   c.ex.forEach((x, i) => { set(`exs${i}`, tag(x)); set(`exi${i}`, rtiW(x.i)); }); c.nw.forEach((x, i) => { set(`nws${i}`, tag(x)); set(`nwi${i}`, rtiW(x.i)); });
-  $('rtoInc').textContent = `${rtiW(c.income)}원`; $('rtoInt').textContent = `${rtiW(c.interest)}원`; $('rtoRti').textContent = c.rti === null ? '-' : c.rti.toFixed(2);
+  $('rtoInc').textContent = `${rtiW(c.income)}원`; $('rtoInt').textContent = `${rtiW(c.interest)}원`; $('rtoRti').textContent = c.rti === null ? '-' : rtiTxt(c.rti);
   $('rtoV').textContent = c.verdict; $('rtoV').className = `rtiv ${c.vcls}`;
   $('rtoNote').textContent = c.rti === null ? '' : `기준 ${D.kind} 임대업: 원칙 ${c.th[0].toFixed(2)}배 이상 · 여신위원회 승인 시 ${c.th[1].toFixed(2)}배 이상${c.small ? ' · 신규대출 합계가 소액 기준(' + rtiW(s.small_limit) + '원) 이하라 산정 예외 대상' : ''}`;
   $('rtiInfo').innerHTML = `<h3>적용 기준</h3>
@@ -288,7 +289,7 @@ function rtiPrint(){
   <div class="org">${esc(org)}</div><div class="title"><h1>임대사업자 RTI 계산내역 (${esc(D.title || '')})</h1><div class="sub">작성일 ${esc(today)} · 작성자 ${esc(nameOf(me))}</div></div>
   <h2>계산 결과</h2><table class="t"><tr><th style="width:20%">구분</th><th>${esc(D.kind)} 임대업</th><th style="width:22%">판정</th></tr>
     <tr class="big"><td class="c">임대소득(연간)</td><td class="r">${rtiW(c.income)}원</td><td class="c" rowspan="3"><span class="v">${esc(c.verdict)}</span></td></tr>
-    <tr class="big"><td class="c">이자비용(연간)</td><td class="r">${rtiW(c.interest)}원</td></tr><tr class="big"><td class="c">RTI</td><td class="r">${c.rti === null ? '-' : c.rti.toFixed(2)}</td></tr></table>
+    <tr class="big"><td class="c">이자비용(연간)</td><td class="r">${rtiW(c.interest)}원</td></tr><tr class="big"><td class="c">RTI</td><td class="r">${c.rti === null ? '-' : rtiTxt(c.rti)}</td></tr></table>
   <h2>임대소득 계산</h2><table class="t"><thead><tr><th style="width:20%">구분</th><th>금액</th><th style="width:22%">적용</th><th style="width:24%">연간 임대소득</th></tr></thead><tbody>
     <tr><td>월세</td><td class="r">${rtiW(d.monthly)}</td><td class="c">× 12개월</td><td class="r">${rtiW(c.mInc)}</td></tr>
     <tr><td>전세(보증금)</td><td class="r">${rtiW(d.jeonse)}</td><td class="c">× ${rtiPctTxt(d.baseRate)}</td><td class="r">${rtiW(c.jInc)}</td></tr>

@@ -551,10 +551,11 @@ create table if not exists public.rti_calcs (
   title text not null check (char_length(title) between 1 and 100),
   kind text not null default '비주택' check (kind in ('비주택','주택')),
   data jsonb not null default '{}'::jsonb,
-  income bigint not null default 0, interest bigint not null default 0, rti numeric(8,2), verdict text,
+  income bigint not null default 0, interest bigint not null default 0, rti numeric(14,8), verdict text,
   memo text check (memo is null or char_length(memo) <= 500),
   created_by text not null default auth.email(), created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
+alter table public.rti_calcs alter column rti type numeric(14,8);   -- 기존 DB 적용용: RTI 반올림 없이 저장
 alter table public.rti_settings enable row level security;
 alter table public.rti_calcs enable row level security;
 create policy rs_sel on public.rti_settings for select to authenticated using (is_member());
