@@ -1768,7 +1768,7 @@
   // ---------- 등록/수정 폼 ----------
   $('fStage').innerHTML = LOAN_STEPS.map((n, i) => `<option value="${i}">${n}</option>`).join('');
   // ---------- 대출 등록: 심사구분 · 담보구분 · 담보지역 → 담보요약 자동입력 + 필수 점검 안내 ----------
-  const FREAL = ['임야', '농지', '아파트', '주택', '근린상가', '근린상가주택', '기타'], F_GUAR = ['농신보', '지역신보'];
+  const FREAL = ['임야', '농지', '아파트', '주택', '근린상가', '근린상가주택', '대지', '잡종지', '기타'], F_GUAR = ['농신보', '지역신보'];
   const fCollSummary = (ck, cd, ca) => ck === '신용' ? '신용' : [ca, cd].filter(Boolean).join('-');   // 예: 근화동-아파트
   function fSyncLoan(keepDetail){
     const rev = $('fRev').value, ck = $('fCk').value, cur = keepDetail !== undefined ? keepDetail : $('fCd').value;
@@ -2266,7 +2266,7 @@
 <script src="perf.js?v=33"></script>
 <script src="orig.js?v=2"></script>
 <script src="loanreport.js?v=14"></script>
-<script src="loancheck.js?v=8"></script>
+<script src="loancheck.js?v=9"></script>
 <script src="cover.js?v=1"></script>
 <script src="liquidity.js?v=6"></script>
 </body>
