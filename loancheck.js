@@ -200,7 +200,7 @@ function lcPrintFire(){   // 담보물 화재보험 가입여부 계산내역 �
 (function(){
   const st = document.createElement('style'); st.textContent = `
   .lcv{ display:flex; flex-direction:column; gap:8px; } .lcsub{ font-size:12.5px; color:var(--muted); margin-bottom:2px; }
-  .lcm{ display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; } .lcc{ font-size:11.5px; font-weight:800; padding:1px 8px; border-radius:99px; background:#eef0f5; color:#7a8294; white-space:nowrap; letter-spacing:0; }
+  .lcm{ display:flex; gap:3px; flex:none; } .lcc{ font-size:11px; font-weight:800; padding:1px 6px; border-radius:99px; background:#eef0f5; color:#7a8294; white-space:nowrap; letter-spacing:0; }
   .lcc.done{ background:#d9f0de; color:#1d6b32; } .lcc.todo{ background:#fbd5cc; color:#a33a24; } .lcc.ask{ background:#fde8b8; color:#8a5a00; } .lcc.na{ background:#eef0f5; color:#a4aab8; } .lcc.warn{ box-shadow:inset 0 0 0 1.5px #e8a04a; }
   .lcr{ border:1px solid #e3e6ee; border-radius:12px; padding:10px 12px; background:#fff; } .lcr.ask{ border-color:#f2d48a; background:#fffaf0; } .lcr.todo{ border-color:#f0b8aa; background:#fff6f3; } .lcr.done{ border-color:#bfe3c7; background:#f5fbf6; } .lcr.na{ background:#f6f6f8; } .lcr.warn{ border-color:#e8a04a; }
   .lch{ display:flex; align-items:center; gap:8px; font-size:14px; } .lcst{ font-size:11.5px; font-weight:800; padding:1px 8px; border-radius:999px; background:#eef0f5; color:#5a6172; } .lcr.ask .lcst{ background:#fde8b8; color:#8a5a00; } .lcr.todo .lcst{ background:#fbd5cc; color:#a33a24; } .lcr.done .lcst{ background:#cdeed4; color:#1d6b32; }

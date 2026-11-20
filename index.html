@@ -514,6 +514,8 @@
      · 업무 상세는 오른쪽에서 겹쳐 나오는 서랍 → 열고 닫아도 화면 크기·배치가 바뀌지 않는다
      ===================================================================== */
   .trow.sel{ box-shadow:0 0 0 2px #ecc57a, var(--sh); }
+  @media (min-width:901px){ .thead.lcw,.trow.lcw{ grid-template-columns:58px minmax(200px,1fr) 350px 118px 0 150px; } }   /* 대출취급 진행 목록: 비어 있는 기한 칸 폭을 진행 칸(점검 표시 포함)에 합침 */
+  @media (max-width:900px){ .trow.lcw .prog{ flex-wrap:wrap; } }
   @media (min-width:1360px){
     html body #app[style*="flex"]{ display:grid !important; grid-template-columns:250px minmax(0,1fr); grid-template-rows:auto 1fr; column-gap:0; width:100%; max-width:none; min-height:100vh; min-height:100dvh; margin:0; padding:0; align-content:stretch; border-radius:0; overflow:clip; box-shadow:none; background:linear-gradient(to right,#fff 250px,var(--shell) 250px) !important; }
     html body #app[style*="flex"] .bar{ grid-column:1; grid-row:1 / -1; position:sticky; top:0; align-self:start; height:100vh; height:100dvh; width:auto; max-width:none; margin:0; padding:26px 16px 18px; flex-direction:column; align-items:stretch; flex-wrap:nowrap; gap:6px; background:transparent; overflow-y:auto; color:var(--ink); }
@@ -1137,6 +1139,7 @@
     const closedView = status === 'closed';
     $('tiles').style.display = closedView ? 'none' : '';
     const thSpans = document.querySelectorAll('#shared .thead span'); if (thSpans[4]) thSpans[4].textContent = closedView ? '완료일' : divn === 'credit' ? '' : '기한';
+    { const th = document.querySelector('#shared .thead'); if (th) th.classList.toggle('lcw', divn === 'credit' && !closedView); }
     if (closedView){
       const rows = divTasks.filter(t => !isOpen(t) && (effType === 'all' || (effType === 'loan') === (t.task_type === 'loan')) && (fScope === 'all' || t.scope === fScope) && (!mine || isMine(t))
         && (!q || [t.title, t.detail, t.directed_by, t.collateral].some(v => (v || '').toLowerCase().includes(q)))).sort((a, b) => doneAtOf(b).localeCompare(doneAtOf(a)) || b.id - a.id);
@@ -1363,10 +1366,10 @@
     const dd = doneMode ? kstDay(doneAtOf(t)) : '';
     const due = doneMode ? (dd ? `<span class="chip ok">${isDropped(t) ? '⛔' : '✅'} ${fmtMD(dd)}</span>${t.due_date && !loan ? `<div class="ts" style="margin-top:3px">기한 ${fmtMD(t.due_date)}</div>` : ''}` : '<span class="muted">-</span>') : loan ? '' : t.due_date ? `<span class="chip ${g === 'over' ? 'over' : g === 'today' ? 'today' : g === 'done' ? 'ok' : ''}">🕐 ${fmtMD(t.due_date)}</span>` : '<span class="muted">-</span>';
     const avs = `<div class="avs">${asg.map(a => avHtml(a.email, loan ? '' : a.done_at ? 'done' : a.confirmed_at ? 'ack' : '')).join('')}</div>`;
-    return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}${openId === t.id ? ' sel' : ''}" data-id="${t.id}">
+    return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}${loan && !doneMode ? ' lcw' : ''}${openId === t.id ? ' sel' : ''}" data-id="${t.id}">
       <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}">${esc(t.scope)}</span>` : ''}</div>
-      <div class="c-title"><div class="tt">${esc(loan ? loanLine(t) : t.title)}${(t.work_task_comments || []).length ? ` <span class="cmtc">💬 ${t.work_task_comments.length}</span>` : ''}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}${loan && typeof lcChips === 'function' ? lcChips(t) : ''}</div>
-      <div class="c-prog prog">${prog}</div><div class="c-who">${avs}</div><div class="c-due">${due}</div><div class="c-act">${act}</div></div>`;
+      <div class="c-title"><div class="tt">${esc(loan ? loanLine(t) : t.title)}${(t.work_task_comments || []).length ? ` <span class="cmtc">💬 ${t.work_task_comments.length}</span>` : ''}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
+      <div class="c-prog prog">${prog}${loan && !doneMode && typeof lcChips === 'function' ? lcChips(t) : ''}</div><div class="c-who">${avs}</div><div class="c-due">${due}</div><div class="c-act">${act}</div></div>`;
   }
 
   // ---------- 오른쪽 열: 시세 / 경제뉴스 (넓은 화면에서만) ----------
@@ -2215,7 +2218,7 @@
 <script src="perf.js?v=33"></script>
 <script src="orig.js?v=2"></script>
 <script src="loanreport.js?v=14"></script>
-<script src="loancheck.js?v=2"></script>
+<script src="loancheck.js?v=3"></script>
 <script src="cover.js?v=1"></script>
 <script src="liquidity.js?v=6"></script>
 </body>
