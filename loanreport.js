@@ -19,10 +19,10 @@ function lrSummary(){
 }
 // 2) 본점·지점 × 단계 매트릭스
 function lrMatrix(){
-  const cell = (a) => a.length ? `<b>${a.length}건</b><small>${lrN(lrSum(a))}</small>` : '<i>-</i>';
+  const cell = (a) => `<b>${a.length}건</b><small>${lrN(lrSum(a))}백만원</small>`;   // 0건도 '0건 0백만원'으로 표시
   const scopes = ['본점', '지점'].concat(lrData.some(r => r.scope !== '본점' && r.scope !== '지점') ? ['통합'] : []);
   const rows = scopes.concat(['합계']).map(k => { const base = k === '합계' ? lrData : lrData.filter(r => lrInScope(r, k)); return `<tr class="${k === '합계' ? 'tt' : ''}"><th>${k}</th>${['실행', '진행', '협의'].map(st => `<td>${cell(base.filter(r => r.stage === st))}</td>`).join('')}<td class="sm">${cell(base)}</td></tr>`; }).join('');
-  return `<div class="lrh">본점·지점 현황 <small>금액: 백만원</small></div><div class="lrwrap"><table class="lrm"><thead><tr><th></th><th>${lrBadge('실행')}</th><th>${lrBadge('진행')}</th><th>${lrBadge('협의')}</th><th>합계</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="lrh">본점·지점 현황</div><div class="lrwrap"><table class="lrm"><thead><tr><th></th><th>${lrBadge('실행')}</th><th>${lrBadge('진행')}</th><th>${lrBadge('협의')}</th><th>합계</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 // 3) 이번 주 변동 (지난주 대비)
 function lrWeek(){
