@@ -974,3 +974,7 @@ grant update (review_type, biz_type, coll_kind, coll_detail, coll_area) on publi
 -- 프리뷰 대상 대출(사업자대출 + 대출금액 3억원 이상)의 프리뷰 구분: 프리뷰 / 의견서 / 사후검토 / 해당없음 (대상 여부는 앱이 심사구분·대출금액으로 판단해 표시)
 alter table public.work_tasks add column if not exists preview_type text check (preview_type in ('프리뷰','의견서','사후검토','해당없음'));
 grant update (preview_type) on public.work_tasks to authenticated;
+
+-- 부동산 종류에 '대지', '잡종지' 추가 (기타 앞): coll_detail 허용 값 확장
+alter table public.work_tasks drop constraint if exists work_tasks_coll_detail_check;
+alter table public.work_tasks add constraint work_tasks_coll_detail_check check (coll_detail in ('임야','농지','아파트','주택','근린상가','근린상가주택','대지','잡종지','기타','농신보','지역신보'));
