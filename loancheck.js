@@ -35,6 +35,26 @@ function lcReqOf(o){
 }
 const LC_NOREQ = { rti: 'RTI 산정은 사업자대출 중 임대사업자만 필수예요', dep: '임차보증금 계산은 부동산 담보의 아파트·주택·근린상가·근린상가주택만 필수예요', fire: '화재보험 판단은 부동산 담보의 근린상가·근린상가주택만 필수예요' };
 
+// ---------- 프리뷰 대상 대출: 사업자대출 + 대출금액 3억원(300백만원) 이상. 구분: 프리뷰 / 의견서 / 사후검토 / 해당없음 ----------
+const LC_PV = ['프리뷰', '의견서', '사후검토', '해당없음'];
+const lcPvTarget = (t) => t.task_type === 'loan' && t.review_type === '사업자대출' && Number(t.loan_amount) >= 300;
+function lcPvChip(t){   // 목록용 작은 표시
+  if (!lcPvTarget(t) || isDropped(t)) return '';
+  const v = t.preview_type;
+  return `<span class="lcpv ${v ? (v === '해당없음' ? 'na' : 'on') : 'todo'}" title="사업자대출 3억원 이상 = 프리뷰 대상 대출">${v === '해당없음' ? '프리뷰 해당없음' : '프리뷰대상' + (v ? ' · ' + v : ' ?')}</span>`;
+}
+function lcPvHtml(t, dropped){   // 상세용: 대상 표시 + 구분 선택
+  if (!lcPvTarget(t)) return '';
+  const can = canAct(t) && !dropped, v = t.preview_type;
+  return `<div class="kv"><div class="k">프리뷰 대상 <span class="lcpv ${v ? (v === '해당없음' ? 'na' : 'on') : 'todo'}" style="vertical-align:1px">${v || '구분 미지정'}</span></div><div class="v"><div class="lcsub">사업자대출 3억원 이상이라 프리뷰 대상 대출이에요</div>
+    <div class="apmseg">${LC_PV.map(x => `<button type="button" class="${v === x ? 'on' : ''}" data-d="pv:${x}" ${can ? '' : 'disabled'}>${x}</button>`).join('')}</div></div></div>`;
+}
+async function lcPvSet(t, v){
+  if (!canAct(t) || t.preview_type === v) return;
+  const { error } = await sb.from('work_tasks').update({ preview_type: v }).eq('id', t.id); if (error) return alert(error.message);
+  toast(`프리뷰 구분: ${v}`); await loadTasks();
+}
+
 // ---------- 상태 계산 ----------
 function lcFireCalc(f){
   const D = Math.max(0, (f.net_amount || 0) + (f.senior_amount || 0) - (f.land_amount || 0)), target = f.exempt ? 'EX' : D > LC_FIRE_MIN ? 'Y' : 'N';
@@ -269,6 +289,7 @@ function lcPrintFire(){   // 담보물 화재보험 가입여부 판단 출력 (
 (function(){
   const st = document.createElement('style'); st.textContent = `
   .lcv{ display:flex; flex-direction:column; gap:8px; } .lcsub{ font-size:12.5px; color:var(--muted); margin-bottom:2px; }
+  .lcpv{ display:inline-block; font-size:11px; font-weight:800; padding:1px 8px; margin-left:6px; border-radius:99px; vertical-align:1px; white-space:nowrap; letter-spacing:0; background:#eef0f5; color:#7a8294; } .lcpv.todo{ background:#fde8b8; color:#8a5a00; } .lcpv.on{ background:#172b4d; color:#fff; } .lcpv.na{ background:#eef0f5; color:#a4aab8; }
   .lcm{ display:flex; gap:3px; flex:none; } .lcc{ font-size:11px; font-weight:800; padding:1px 6px; border-radius:99px; background:#eef0f5; color:#7a8294; white-space:nowrap; letter-spacing:0; }
   .lcc.done{ background:#d9f0de; color:#1d6b32; } .lcc.todo{ background:#fbd5cc; color:#a33a24; } .lcc.ask{ background:#fde8b8; color:#8a5a00; } .lcc.na{ background:#eef0f5; color:#a4aab8; } .lcc.warn{ box-shadow:inset 0 0 0 1.5px #e8a04a; }
   .lcr{ border:1px solid #e3e6ee; border-radius:12px; padding:10px 12px; background:#fff; } .lcr.ask{ border-color:#f2d48a; background:#fffaf0; } .lcr.todo{ border-color:#f0b8aa; background:#fff6f3; } .lcr.done{ border-color:#bfe3c7; background:#f5fbf6; } .lcr.na{ background:#f6f6f8; } .lcr.warn{ border-color:#e8a04a; }

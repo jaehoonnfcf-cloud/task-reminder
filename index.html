@@ -830,6 +830,7 @@
   <label>심사구분 <span style="color:var(--danger)">*</span></label>
   <select id="fRev"><option value="">선택하세요 (필수)</option><option value="가계대출">가계대출</option><option value="사업자대출">사업자대출</option><option value="정책자금">정책자금</option></select>
   <div id="fBizRow" style="display:none"><label>사업자 구분 <span style="color:var(--danger)">*</span></label><select id="fBiz"><option value="">선택하세요 (필수)</option><option value="임대사업자">임대사업자</option><option value="임대 外 사업자">임대 外 사업자</option></select></div>
+  <div id="fPvRow" style="display:none"><label>프리뷰 구분 <span style="color:var(--danger)">*</span> <span class="muted" style="font-weight:400">(사업자대출 3억원 이상 = 프리뷰 대상)</span></label><select id="fPv"><option value="">선택하세요 (필수)</option><option value="프리뷰">프리뷰</option><option value="의견서">의견서</option><option value="사후검토">사후검토</option><option value="해당없음">해당없음</option></select></div>
   <label>담보구분 <span style="color:var(--danger)">*</span></label>
   <select id="fCk"><option value="">선택하세요 (필수)</option><option value="부동산">부동산</option><option value="신용">신용</option><option value="보증서">보증서</option></select>
   <div id="fCdRow" style="display:none"><label id="fCdLbl">종류 <span style="color:var(--danger)">*</span></label><select id="fCd"></select></div>
@@ -1378,7 +1379,7 @@
     const avs = `<div class="avs">${asg.map(a => avHtml(a.email, loan ? '' : a.done_at ? 'done' : a.confirmed_at ? 'ack' : '')).join('')}</div>`;
     return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}${loan && !doneMode ? ' lcw' : ''}${openId === t.id ? ' sel' : ''}" data-id="${t.id}">
       <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}">${esc(t.scope)}</span>` : ''}</div>
-      <div class="c-title"><div class="tt">${esc(loan ? loanLine(t) : t.title)}${(t.work_task_comments || []).length ? ` <span class="cmtc">💬 ${t.work_task_comments.length}</span>` : ''}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
+      <div class="c-title"><div class="tt">${esc(loan ? loanLine(t) : t.title)}${loan && typeof lcPvChip === 'function' ? lcPvChip(t) : ''}${(t.work_task_comments || []).length ? ` <span class="cmtc">💬 ${t.work_task_comments.length}</span>` : ''}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
       <div class="c-prog prog">${prog}${loan && !doneMode && typeof lcChips === 'function' ? lcChips(t) : ''}</div><div class="c-who">${avs}</div><div class="c-due">${due}</div><div class="c-act">${act}</div></div>`;
   }
 
@@ -1662,6 +1663,7 @@
         ${lastDone && canUndoStep(t, lastDone) ? `<button class="btn" data-d="undo:${lastDone.seq}">↩ ${esc(lastDone.name)} 되돌리기</button>` : ''}
         ${cur ? `<button class="btn danger" data-d="drop">⛔ 미진행 처리</button>` : ''}</div>` : ''}</div>`;
       body += apprHtml(t, dropped);
+      body += typeof lcPvHtml === 'function' ? lcPvHtml(t, dropped) : '';
       body += typeof lcHtml === 'function' ? lcHtml(t, dropped) : '';   // 취급 점검(RTI·임차보증금 차감·화재보험)
       body += `<div class="kv"><div class="k">담당자</div><div class="v asgs">${t.work_task_assignees.map(a => `<span class="asgc">${avHtml(a.email, '', 'margin:0')}${esc(nameOf(a.email))}</span>`).join('')}</div></div>`;
     } else {
@@ -1719,6 +1721,7 @@
     if (kind === 'drop') return openDrop(t);
     if (kind === 'cover') return typeof loanCoverPrint === 'function' ? loanCoverPrint(t) : undefined;
     if (kind === 'lc') return typeof lcAct === 'function' && lcAct(t, b.dataset.d);
+    if (kind === 'pv') return typeof lcPvSet === 'function' && lcPvSet(t, arg);
     if (kind === 'apm'){ apDraft = { id: t.id, mode: arg }; return renderDetail(t); }
     if (kind === 'apr'){ if ($('apNote')) $('apNote').value = arg === '기타' ? '' : arg; if (arg === '기타' && $('apNote')) $('apNote').focus(); return; }
     if (kind === 'apsave'){ b.disabled = true; try { await saveApprMode(t); } finally { b.disabled = false; } return; }
@@ -1770,6 +1773,7 @@
   function fSyncLoan(keepDetail){
     const rev = $('fRev').value, ck = $('fCk').value, cur = keepDetail !== undefined ? keepDetail : $('fCd').value;
     $('fBizRow').style.display = rev === '사업자대출' ? 'block' : 'none';
+    $('fPvRow').style.display = rev === '사업자대출' && (+String($('fAmt').value).replace(/[^\d]/g, '') || 0) >= 300 ? 'block' : 'none';   // 사업자대출 3억원(300백만원) 이상 → 프리뷰 대상
     const list = ck === '부동산' ? FREAL : ck === '보증서' ? F_GUAR : [];
     $('fCdRow').style.display = list.length ? 'block' : 'none'; $('fCaRow').style.display = ck === '부동산' || ck === '보증서' ? 'block' : 'none';
     $('fCdLbl').innerHTML = `${ck === '보증서' ? '보증서 종류' : '부동산 종류'} <span style="color:var(--danger)">*</span>`;
@@ -1780,7 +1784,7 @@
     $('fReqNote').innerHTML = !req ? '' : names.length ? `필수 점검: <b>${names.join(' · ')}</b>` : '필수 점검 항목이 없어요';
   }
   ['fRev', 'fBiz', 'fCk', 'fCd'].forEach(id => $(id).addEventListener('change', () => fSyncLoan()));
-  $('fCa').addEventListener('input', () => fSyncLoan());
+  $('fCa').addEventListener('input', () => fSyncLoan()); $('fAmt').addEventListener('input', () => fSyncLoan());
   function syncType(){
     const loan = $('fType').value === 'loan';
     $('fStageRow').style.display = loan ? 'block' : 'none';
@@ -1804,7 +1808,7 @@
     if (mode === 'new'){ $('fType').value = fdiv === 'credit' ? 'loan' : 'general'; $('fStage').value = '0'; syncType(); }
     else { const lo = t.task_type === 'loan'; $('fTitleLabel').textContent = lo ? '고객명' : '업무 내용'; $('fTitle').placeholder = lo ? '예: 홍길동' : ''; $('fLoanRow').style.display = lo ? 'block' : 'none'; $('fDue').parentElement.style.display = lo ? 'none' : ''; }
     $('fAmt').value = t && t.loan_amount != null ? Number(t.loan_amount).toLocaleString('ko-KR') : ''; $('fColl').value = t ? (t.collateral || '') : '';
-    $('fRev').value = t ? (t.review_type || '') : ''; $('fBiz').value = t ? (t.biz_type || '') : ''; $('fCk').value = t ? (t.coll_kind || '') : ''; fSyncLoan(t ? t.coll_detail : ''); $('fCa').value = t ? (t.coll_area || '') : ''; fSyncLoan(t ? t.coll_detail : '');
+    $('fRev').value = t ? (t.review_type || '') : ''; $('fBiz').value = t ? (t.biz_type || '') : ''; $('fCk').value = t ? (t.coll_kind || '') : ''; fSyncLoan(t ? t.coll_detail : ''); $('fCa').value = t ? (t.coll_area || '') : ''; $('fPv').value = t ? (t.preview_type || '') : ''; fSyncLoan(t ? t.coll_detail : '');
     $('fScope').value = t ? (t.scope || '') : '';
     $('fTitle').value = t ? t.title : ''; $('fDetail').value = t ? (t.detail || '') : ''; fillRequesters(t ? t.directed_by : ''); $('fDue').value = t ? (t.due_date || '') : '';
     const cur = new Set(t ? t.work_task_assignees.map(a => a.email) : [me]);
@@ -1840,11 +1844,13 @@
         if (!ck) return alert('담보구분을 선택해주세요.');
         if (ck !== '신용' && !cd) return alert(ck === '부동산' ? '부동산 종류를 선택해주세요.' : '보증서 종류(농신보 / 지역신보)를 선택해주세요.');
         if (ck !== '신용' && !ca) return alert('담보지역(ㅇㅇ동 / ㅇㅇ리)을 입력해주세요.');
+        if (rev === '사업자대출' && (patch.loan_amount || 0) >= 300 && !$('fPv').value) return alert('프리뷰 대상 대출이에요. 프리뷰 구분(프리뷰 / 의견서 / 사후검토 / 해당없음)을 선택해주세요.');
       }
       if (rev || ck){   // 구분을 입력한 건은 담보요약을 자동으로 만들어 저장 (기존 건에서 구분을 비워 두면 기존 담보요약은 그대로 둠)
         patch.review_type = rev || null; patch.biz_type = rev === '사업자대출' ? (biz || null) : null; patch.coll_kind = ck || null;
         patch.coll_detail = ck && ck !== '신용' ? (cd || null) : null; patch.coll_area = ck && ck !== '신용' ? (ca || null) : null;
         patch.collateral = fCollSummary(ck, cd, ca) || null;
+        patch.preview_type = rev === '사업자대출' && (patch.loan_amount || 0) >= 300 ? ($('fPv').value || null) : null;
       }
     }
     $('fSave').disabled = true;
@@ -2260,7 +2266,7 @@
 <script src="perf.js?v=33"></script>
 <script src="orig.js?v=2"></script>
 <script src="loanreport.js?v=14"></script>
-<script src="loancheck.js?v=7"></script>
+<script src="loancheck.js?v=8"></script>
 <script src="cover.js?v=1"></script>
 <script src="liquidity.js?v=6"></script>
 </body>
