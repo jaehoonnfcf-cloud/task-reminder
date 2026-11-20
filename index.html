@@ -1264,8 +1264,13 @@
     };
     const all = G.c.concat(G.p, G.x);
     el.style.display = '';
-    el.innerHTML = `<div class="smx-t">대출 금액 현황</div><div class="smx-cards">` + card('t1', '협의', '1단계', G.c) + card('t3', '진행', '2~4단계', G.p)
+    el.innerHTML = `<div class="smx-t" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>대출 금액 현황</span><button type="button" class="btn small" id="loanRptBtn" style="margin-left:auto">📋 현황표 (복사용)</button></div><div class="smx-cards">` + card('t1', '협의', '1단계', G.c) + card('t3', '진행', '2~4단계', G.p)
       + card('t5', '실행', '5단계', G.x, `대기 ${G.x.length - xd.length} · 올해 완료 ${xd.length}`) + card('tt', '합계', '미진행 제외', all) + `</div>`;
+    const rb = $('loanRptBtn'); if (rb) rb.onclick = () => {   // 현황표: 협의·진행·실행(올해 완료 포함) 전체를 본점/지점 표로
+      const stg = (t) => { const ci = curIdx(t), n = stepsOf(t).length; return ci === 0 ? '협의' : ci < n - 1 ? '진행' : '실행'; };
+      const ids = new Set(all.map(t => t.id));
+      openLoanReport(loans.filter(t => ids.has(t.id)).sort((a, b) => a.id - b.id).map(t => ({ name: t.title, scope: t.scope, stage: stg(t), amount: t.loan_amount, coll: t.collateral })));
+    };
   }
   // ---------- 화면별 요약 위젯 (대시보드형 공용 부품) ----------
   const smAmt = (m) => { const n = Number(m) || 0; return n >= 100 ? `${(n / 100).toLocaleString('ko-KR', { maximumFractionDigits: 1 })}억` : `${n.toLocaleString('ko-KR')}백만`; };
@@ -2196,6 +2201,7 @@
 <script src="event.js?v=4"></script>
 <script src="perf.js?v=33"></script>
 <script src="orig.js?v=2"></script>
+<script src="loanreport.js?v=2"></script>
 <script src="cover.js?v=1"></script>
 <script src="liquidity.js?v=6"></script>
 </body>
