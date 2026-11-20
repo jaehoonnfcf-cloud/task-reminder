@@ -1824,7 +1824,8 @@
         const type = $('fType').value;
         const { data: nt, error } = await sb.from('work_tasks').insert({ ...patch, task_type: type, division: divn }).select('id').single();
         if (error) return alert(error.message);
-        await sb.from('work_task_assignees').insert(emails.map(email => ({ task_id: nt.id, email })));
+        const regAt = new Date().toISOString();   // 등록한 사람이 담당자에 포함돼 있으면 등록과 동시에 '확인' 처리 (본인이 직접 낸 업무라 확인이 필요 없음)
+        await sb.from('work_task_assignees').insert(emails.map(email => ({ task_id: nt.id, email, ...(email === me ? { confirmed_at: regAt } : {}) })));
         if (type === 'loan'){
           const startIdx = +$('fStage').value, now = new Date().toISOString();
           const { error: e2 } = await sb.from('work_task_steps').insert(LOAN_STEPS.map((name, i) => ({ task_id: nt.id, seq: i + 1, name, done_at: i < startIdx ? now : null })));
