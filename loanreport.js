@@ -60,7 +60,7 @@ function openLoanReport(loans){
   lrData = loans || [];
   if (!$('lrOv')){
     const st = document.createElement('style'); st.textContent = `
-    .lrbar{ display:flex; gap:6px 16px; flex-wrap:wrap; margin:12px 0; font-size:13.5px; font-weight:600; } .lrbar label{ display:flex; align-items:center; gap:5px; margin:0; font-size:13.5px; cursor:pointer; }
+    .lrbar{ display:flex; gap:6px 16px; flex-wrap:wrap; margin:12px 0; font-size:13.5px; font-weight:600; } .lrbar label{ display:flex; align-items:center; gap:7px; margin:0; font-size:14px; color:var(--ink); white-space:nowrap; cursor:pointer; min-height:34px; } .lrbar input{ width:18px; height:18px; min-height:0; padding:0; flex:none; -webkit-appearance:auto; appearance:auto; }
     .lrwrap{ overflow-x:auto; padding:2px; border:1px dashed #d9d2c2; border-radius:10px; background:#fff; } .lrnote{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.5; }`;
     document.head.appendChild(st);
     const d = document.createElement('div');
