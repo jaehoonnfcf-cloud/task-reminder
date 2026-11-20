@@ -96,6 +96,7 @@ async function loadDep(){
   const c = await sb.from('deposit_calcs').select('*').order('updated_at', { ascending: false });
   if (c.error){ console.warn('차감계산 불러오기 실패', c.error.message); return; }
   depCalcs = c.data || [];
+  if (typeof lcRefresh === 'function') lcRefresh();
   if (typeof divn !== 'undefined' && divn === 'appraisal' && typeof apTab !== 'undefined' && apTab === 'dep' && depMode === 'list') renderDep();
 }
 let depTimer = null; const scheduleDep = () => { clearTimeout(depTimer); depTimer = setTimeout(() => { if (me) loadDep(); }, 400); };
@@ -142,7 +143,7 @@ function depNew(){ if (!depCan()) return; depDraft = { id: null, title: '', memo
 function depOpen(id){
   const r = depCalcs.find(x => x.id === id); if (!r) return;
   const d = { ...depNewData((r.data && r.data.mode) || 'res'), ...(r.data || {}) }; d.parts = ((r.data && r.data.parts) || depNewData().parts).map(p => ({ ...depNewPart(p.kind), ...p }));
-  depDraft = { id: r.id, title: r.title, memo: r.memo || '', d }; depMode = 'edit'; renderDepEditor();
+  depDraft = { id: r.id, title: r.title, memo: r.memo || '', d, loan: r.loan_task_id || null }; depMode = 'edit'; renderDepEditor();
 }
 $('dep').addEventListener('click', async (e) => {
   const a = e.target.closest('[data-p]');
@@ -289,6 +290,7 @@ async function depSave(btn){
   depRead(); const D = depDraft; if (!depCan()) return;
   if (!D.title.trim()) return alert('고객·물건명을 입력해주세요.');
   const c = depCalc(D.d), row = { title: D.title.trim(), data: D.d, appraisal: Math.round(c.A), deduct: Math.round(c.total), loanable: Math.round(c.loanable), memo: D.memo.trim() || null, updated_at: new Date().toISOString() };
+  if (D.loan) row.loan_task_id = D.loan;   // 대출 건에서 시작했거나 이미 연결된 계산이면 연결 유지
   btn.disabled = true;
   const r = D.id ? await sb.from('deposit_calcs').update(row).eq('id', D.id) : await sb.from('deposit_calcs').insert(row).select('id').single();
   btn.disabled = false; if (r.error) return alert(r.error.message);
