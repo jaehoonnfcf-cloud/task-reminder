@@ -54,6 +54,12 @@ function lcSub(t){   // 목록·현황표용 한 줄
   if (t.task_type !== 'loan' || isDropped(t) || curIdx(t) >= stepsOf(t).length) return '';
   const p = lcPending(t); return p.length ? `점검 미완료: ${p.map(i => i.name).join('·')}` : '점검 완료';
 }
+// 목록용 작은 표시: RTI · 차감 · 화재 — ✓ 완료 / ● 필요(미완료) / ? 판단 전 / – 해당 없음 (진행 중인 대출 건에만)
+const LC_SHORT = { rti: 'RTI', dep: '차감', fire: '화재' }, LC_MARK = { done: '✓', todo: '●', ask: '?', na: '–' };
+function lcChips(t){
+  if (t.task_type !== 'loan' || isDropped(t) || curIdx(t) >= stepsOf(t).length) return '';
+  return `<div class="lcm">${lcItems(t).map(i => `<span class="lcc ${i.state}${i.warn ? ' warn' : ''}" title="${esc(i.name + ' — ' + i.text)}">${LC_SHORT[i.k]} ${LC_MARK[i.state]}</span>`).join('')}</div>`;
+}
 function lcGate(t, seq){   // 내부결재(4)·대출실행(5) 단계를 완료하려 할 때 미완료 점검이 있으면 알리고 확인받는다
   if (!t || t.task_type !== 'loan' || (seq !== 4 && seq !== 5)) return true;
   const p = lcPending(t); if (!p.length) return true;
@@ -194,6 +200,8 @@ function lcPrintFire(){   // 담보물 화재보험 가입여부 계산내역 �
 (function(){
   const st = document.createElement('style'); st.textContent = `
   .lcv{ display:flex; flex-direction:column; gap:8px; } .lcsub{ font-size:12.5px; color:var(--muted); margin-bottom:2px; }
+  .lcm{ display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; } .lcc{ font-size:11.5px; font-weight:800; padding:1px 8px; border-radius:99px; background:#eef0f5; color:#7a8294; white-space:nowrap; letter-spacing:0; }
+  .lcc.done{ background:#d9f0de; color:#1d6b32; } .lcc.todo{ background:#fbd5cc; color:#a33a24; } .lcc.ask{ background:#fde8b8; color:#8a5a00; } .lcc.na{ background:#eef0f5; color:#a4aab8; } .lcc.warn{ box-shadow:inset 0 0 0 1.5px #e8a04a; }
   .lcr{ border:1px solid #e3e6ee; border-radius:12px; padding:10px 12px; background:#fff; } .lcr.ask{ border-color:#f2d48a; background:#fffaf0; } .lcr.todo{ border-color:#f0b8aa; background:#fff6f3; } .lcr.done{ border-color:#bfe3c7; background:#f5fbf6; } .lcr.na{ background:#f6f6f8; } .lcr.warn{ border-color:#e8a04a; }
   .lch{ display:flex; align-items:center; gap:8px; font-size:14px; } .lcst{ font-size:11.5px; font-weight:800; padding:1px 8px; border-radius:999px; background:#eef0f5; color:#5a6172; } .lcr.ask .lcst{ background:#fde8b8; color:#8a5a00; } .lcr.todo .lcst{ background:#fbd5cc; color:#a33a24; } .lcr.done .lcst{ background:#cdeed4; color:#1d6b32; }
   .lct{ margin-top:4px; font-size:13px; color:#44546f; word-break:keep-all; } .lcr.warn .lct{ color:#b45f06; font-weight:700; } .lca{ margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
