@@ -9,7 +9,7 @@ const LC_FIRE_MIN = 50000000;                  // 요보험가입금액이 이 �
 const LC_KIND = { rti: { name: 'RTI', mode: 'chk_rti', why: 'chk_rti_reason', ask: '임대사업자 대출이면 RTI 계산이 필요해요', tab: 'rti' },
   dep: { name: '임차보증금 차감', mode: 'chk_dep', why: 'chk_dep_reason', ask: '임차인이 있는 담보물이면 임차보증금 차감계산이 필요해요', tab: 'dep' },
   fire: { name: '화재보험', mode: 'chk_fire', why: 'chk_fire_reason', ask: '건물이 담보물에 포함되면 화재보험 가입여부 판단이 필요해요' } };
-let lcFire = new Map(), lcFireAll = [], lcPick = null, lcFd = null, lcTabQ = '';   // lcPick: { id, kind } 기존 계산 연결 중 / lcFd: 화재보험 입력 중인 값
+let lcFire = new Map(), lcFireAll = [], lcPick = null, lcFd = null, lcTabQ = '', lcView = 'active';   // lcPick: { id, kind } 기존 계산 연결 중 / lcFd: 화재보험 입력 중인 값
 const lcW = (n) => Number(n || 0).toLocaleString('ko-KR');
 const lcNum = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); return d ? Number(d) : 0; };
 const lcComma = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); return d ? Number(d).toLocaleString('ko-KR') : ''; };
@@ -81,13 +81,13 @@ function lcHtml(t, dropped){
       else {
         if (i.k === 'fire'){
           if (lcPick && lcPick.id === t.id && lcPick.kind === 'fire' && !i.calc){
-            const list = lcFireAll.filter(c => !c.loan_task_id);
+            const list = lcFireAll.filter(c => !c.loan_task_id && !c.archived_at);
             act = `<select id="lcSel" style="max-width:260px;min-height:34px;padding:4px 8px">${list.map(c => `<option value="${c.id}">${esc(c.debtor_name || '(이름 없음)')} (${esc(String(c.updated_at).slice(0, 10))})</option>`).join('') || '<option value="">연결할 수 있는 판단이 없어요</option>'}</select>` + B('link:fire', '연결', 'primary') + B('pickx', '취소');
           } else act = B('fire', i.calc ? '📝 판단 수정·인쇄' : '📝 판단 입력', 'primary') + (i.calc ? B(`unlink:fire:${i.calc.id}`, '연결 해제') : B('pick:fire', '기존 판단 연결'));
         }
         else if (i.calc) act = B(`open:${i.k}:${i.calc.id}`, '계산 열기') + (calcOk(i.k) ? B(`unlink:${i.k}:${i.calc.id}`, '연결 해제') : '');
         else if (lcPick && lcPick.id === t.id && lcPick.kind === i.k){
-          const list = (i.k === 'rti' ? rtiCalcs : depCalcs).filter(c => !c.loan_task_id);
+          const list = (i.k === 'rti' ? rtiCalcs : depCalcs).filter(c => !c.loan_task_id && !c.archived_at);
           act = `<select id="lcSel" style="max-width:260px;min-height:34px;padding:4px 8px">${list.map(c => `<option value="${c.id}">${esc(c.title)} (${esc(String(c.updated_at).slice(0, 10))})</option>`).join('') || '<option value="">연결할 수 있는 계산이 없어요</option>'}</select>` + B(`link:${i.k}`, '연결', 'primary') + B('pickx', '취소');
         } else act = calcOk(i.k) ? B(`new:${i.k}`, '＋ 새로 계산', 'primary') + B(`pick:${i.k}`, '기존 계산 연결') : '<span class="muted">감정평가 권한자가 계산해요</span>';
         act += B(`mode:${i.k}:ask`, '판단 취소');
@@ -134,15 +134,18 @@ async function lcAct(t, full){
 // ---------- 담보심사 > 화재보험 가입여부 탭 (RTI·임차보증금 차감과 같은 방식: 목록 + 입력, 대출 건 연결은 선택) ----------
 function renderFireTab(){
   const el = $('fire'); if (!el) return;
-  const rows = lcFireAll.filter(r => !lcTabQ || [r.debtor_name, r.collateral_type].some(v => String(v || '').toLowerCase().includes(lcTabQ))), can = lcFireCanTab();
+  const nB = lcFireAll.filter(r => r.archived_at).length, can = lcFireCanTab();
+  const rows = lcFireAll.filter(r => (lcView === 'archive' ? !!r.archived_at : !r.archived_at) && (!lcTabQ || [r.debtor_name, r.collateral_type].some(v => String(v || '').toLowerCase().includes(lcTabQ))));
+  if (lcView === 'archive') rows.sort((a, b) => String(b.archived_at).localeCompare(String(a.archived_at)));
   const stat = (r) => r.target === 'Y' ? ((r.insurer && r.ins_start && r.ins_end && r.min_amount != null) ? ['done', '가입 완료'] : ['todo', '가입 대상 · 가입 정보 입력 전']) : ['na', r.target === 'EX' ? '생략 가능 (면제)' : '생략 가능 (5천만원 이하)'];
-  el.innerHTML = `<div class="list-panel"><div class="toolbar"><input id="lfQ" class="search" type="search" placeholder="🔍 채무자 검색" value="${esc(lcTabQ)}" />
+  el.innerHTML = `<div class="list-panel"><div class="toolbar"><div class="seg" id="lfViewSeg"><button data-v="active" class="${lcView === 'active' ? 'on' : ''}">진행중 ${lcFireAll.length - nB}</button><button data-v="archive" class="${lcView === 'archive' ? 'on' : ''}">📦 보관함 ${nB}</button></div><input id="lfQ" class="search" type="search" placeholder="🔍 채무자 검색" value="${esc(lcTabQ)}" />
       ${can ? '<button class="btn small primary" data-lt="new">＋ 새 화재보험 판단</button>' : '<span class="pill ro">👀 보기 전용</span>'}</div>
     <div class="lfthead"><span>채무자 · 담보물</span><span style="text-align:right">대출금액</span><span style="text-align:right">요보험가입금액</span><span>판정</span><span>연결 대출 건</span></div>
     <div>${rows.map(r => { const [cls, txt] = stat(r), ln = r.loan_task_id && typeof byId === 'function' ? byId(r.loan_task_id) : null;
       return `<div class="lftrow" data-fid="${r.id}"><div><div class="nm">${esc(r.debtor_name || '(이름 없음)')}</div><div class="sub">${esc(r.collateral_type || '')}</div></div>
         <div class="mo">${lcW(r.loan_amount)}원</div><div class="mo">${lcW(r.required_amount)}원</div><div><span class="lcc ${cls}">${txt}</span></div>
-        <div class="sub2">${ln ? '🔗 ' + esc(ln.title) : '<span class="muted">연결 안 함</span>'}<br><span class="muted">${esc(nameOf(r.created_by))} · ${esc(String(r.updated_at).slice(0, 10))}</span></div></div>`; }).join('') || `<div class="blk-empty">${lcFireAll.length ? '조건에 맞는 판단이 없어요.' : '아직 화재보험 판단이 없어요. 「＋ 새 화재보험 판단」으로 입력하거나, 대출 건의 「취급 점검」에서 입력할 수 있어요.'}</div>`}</div></div>`;
+        <div class="sub2">${ln ? '🔗 ' + esc(ln.title) : '<span class="muted">연결 안 함</span>'}<br><span class="muted">${esc(nameOf(r.created_by))} · ${esc(String(r.updated_at).slice(0, 10))}</span></div></div>`; }).join('') || `<div class="blk-empty">${lcView === 'archive' ? '보관함이 비어 있어요. 처리가 끝난 판단은 열어서 📦 보관함으로 옮길 수 있어요.' : lcFireAll.length ? '조건에 맞는 판단이 없어요.' : '아직 화재보험 판단이 없어요. 「＋ 새 화재보험 판단」으로 입력하거나, 대출 건의 「취급 점검」에서 입력할 수 있어요.'}</div>`}</div></div>`;
+  $('lfViewSeg').onclick = (e) => { const b = e.target.closest('[data-v]'); if (b){ lcView = b.dataset.v; renderFireTab(); } };
   $('lfQ').oninput = (e) => { lcTabQ = e.target.value.trim().toLowerCase(); const pos = e.target.selectionStart; renderFireTab(); const q = $('lfQ'); q.focus(); q.setSelectionRange(pos, pos); };
 }
 (function(){ const el = $('fire'); if (!el) return;
@@ -160,7 +163,7 @@ function lcOpenFire(t, row){   // t = 대출 건(대출 상세에서 열 때, �
     d.innerHTML = `<div class="ov" id="lcFireOv"><div class="panel" style="max-width:700px" id="lcFirePanel"></div></div>`; document.body.appendChild(d);
     $('lcFireOv').addEventListener('click', (e) => { if (e.target === $('lcFireOv')) lcCloseFire(); });
     $('lcFirePanel').addEventListener('input', (e) => { const x = e.target; if (x.classList.contains('lfn')){ x.value = lcComma(x.value); } lcFireLive(); });
-    $('lcFirePanel').addEventListener('click', (e) => { const b = e.target.closest('[data-lf]'); if (!b) return; if (b.dataset.lf === 'close') lcCloseFire(); else if (b.dataset.lf === 'save') lcSaveFire(b); else if (b.dataset.lf === 'print') lcPrintFire(); else if (b.dataset.lf === 'del') lcDeleteFire(b); });
+    $('lcFirePanel').addEventListener('click', (e) => { const b = e.target.closest('[data-lf]'); if (!b) return; if (b.dataset.lf === 'close') lcCloseFire(); else if (b.dataset.lf === 'save') lcSaveFire(b); else if (b.dataset.lf === 'print') lcPrintFire(); else if (b.dataset.lf === 'del') lcDeleteFire(b); else if (b.dataset.lf === 'arch') lcArchiveFire(b); });
   }
   lcFd._fixed = !!t; lcFd._can = can;
   const f = lcFd, dis = can ? '' : 'disabled', N = (id, v, ph = '') => `<input class="lfn" id="${id}" inputmode="numeric" value="${v == null || v === 0 && id !== 'lfA' && id !== 'lfB' && id !== 'lfC' ? '' : lcComma(v)}" placeholder="${ph}" ${dis} />`;
@@ -177,10 +180,17 @@ function lcOpenFire(t, row){   // t = 대출 건(대출 상세에서 열 때, �
       <div class="lfg"><div><label>보험시작일자</label><input type="date" id="lfS" value="${esc(f.ins_start || '')}" ${dis} /></div><div><label>보험종료일자</label><input type="date" id="lfE" value="${esc(f.ins_end || '')}" ${dis} /></div><div></div></div>
       <div class="lfg"><div><label>확정일자 부여번호</label><input id="lfNo" maxlength="100" value="${esc(f.confirm_no || '')}" ${dis} /></div><div><label>확정일자 부여일</label><input type="date" id="lfDate" value="${esc(f.confirm_date || '')}" ${dis} /></div><div></div></div></div>
     <label>메모 <span class="muted" style="font-weight:400">(선택)</span></label><input id="lfMemo" maxlength="500" value="${esc(f.memo || '')}" ${dis} />
-    <div class="acts" style="margin-top:16px">${can ? '<button class="btn primary" data-lf="save" style="min-height:44px;padding:8px 26px">저장</button>' : ''}<button class="btn" data-lf="print" style="min-height:44px">🖨 계산내역 인쇄</button><button class="btn" data-lf="close" style="min-height:44px">닫기</button>${can && f.id ? '<span style="flex:1"></span><button class="btn danger small" data-lf="del">삭제</button>' : ''}</div>`;
+    <div class="acts" style="margin-top:16px">${can ? '<button class="btn primary" data-lf="save" style="min-height:44px;padding:8px 26px">저장</button>' : ''}<button class="btn" data-lf="print" style="min-height:44px">🖨 계산내역 인쇄</button><button class="btn" data-lf="close" style="min-height:44px">닫기</button>${can && f.id ? `<span style="flex:1"></span><button class="btn small" data-lf="arch">${f.archived_at ? '↩ 진행중으로' : '📦 보관함으로'}</button><button class="btn danger small" data-lf="del">삭제</button>` : ''}</div>`;
   $('lcFireOv').style.display = 'block'; document.body.style.overflow = 'hidden'; lcFireLive();
 }
 function lcCloseFire(){ $('lcFireOv').style.display = 'none'; document.body.style.overflow = ''; const t = typeof openId !== 'undefined' && openId ? byId(openId) : null; if (t && $('detailOv').style.display === 'block') renderDetail(t); if (typeof apTab !== 'undefined' && apTab === 'fire' && typeof divn !== 'undefined' && divn === 'appraisal') renderFireTab(); }
+async function lcArchiveFire(btn){   // 처리가 끝난 판단을 보관함으로 / 진행중으로 되돌림
+  if (!lcFd || !lcFd.id || !lcFd._can) return; const was = !!lcFd.archived_at;
+  if (!was && !confirm(`"${lcFd.debtor_name}" 판단을 보관함으로 옮길까요?\n진행중 목록에서는 빠지고, 보관함에서 언제든 찾아볼 수 있어요.`)) return;
+  btn.disabled = true; const { error } = await sb.from('fire_judgments').update(was ? { archived_at: null, archived_by: null } : { archived_at: new Date().toISOString(), archived_by: me }).eq('id', lcFd.id); btn.disabled = false;
+  if (error) return alert(error.message);
+  toast(was ? '↩ 진행중으로 꺼냈어요' : '📦 보관함으로 옮겼어요'); if (!was) lcView = 'active'; await loadLc(); lcCloseFire();
+}
 async function lcDeleteFire(btn){
   if (!lcFd || !lcFd.id || !confirm('이 화재보험 판단을 삭제할까요?')) return;
   btn.disabled = true; const { error } = await sb.from('fire_judgments').delete().eq('id', lcFd.id); btn.disabled = false;

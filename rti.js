@@ -2,7 +2,7 @@
 // 조회는 팀원 전체, 저장·수정은 감정평가 권한자(canWrite('appraisal')), 기준값(기준금리·Stress·판정 기준) 수정은 관리자.
 // 전역(sb, $, esc, me, meRow, nameOf, kstToday, toast, canWrite, isAdmin)과 appraisal.js 의 apPreview / apSettings / AP_FONT 를 함께 쓴다.
 
-let rtiCalcs = [], rtiSet = null, rtiMode = 'list', rtiDraft = null, rtiQ = '', rtiKind = 'all';
+let rtiCalcs = [], rtiSet = null, rtiMode = 'list', rtiDraft = null, rtiQ = '', rtiKind = 'all', rtiView = 'active';
 const RTI_DEF = { base_rate: 2.93, base_month: '2026년 3월', ref_loan_rate: 4.79, ref_loan_month: '2024년 12월', stress_existing: 1, stress_new: 1.7, est_ratio: 70, small_limit: 100000000, th_non_house: 1.5, th_non_house_ok: 1.2, th_house: 1.25, th_house_ok: 1.0 };
 const rtiS = () => ({ ...RTI_DEF, ...(rtiSet || {}) });
 const rtiCan = () => typeof canWrite === 'function' && canWrite('appraisal');
@@ -109,9 +109,12 @@ function renderRti(){
   const el = $('rti'); if (!el) return;
   if (rtiMode === 'edit' && rtiDraft) return;   // 편집 중에는 다시 그리지 않음
   rtiMode = 'list';
-  const rows = rtiCalcs.filter(r => (rtiKind === 'all' || r.kind === rtiKind) && (!rtiQ || String(r.title).toLowerCase().includes(rtiQ)));
+  const nB = rtiCalcs.filter(r => r.archived_at).length;
+  const rows = rtiCalcs.filter(r => (rtiView === 'archive' ? !!r.archived_at : !r.archived_at) && (rtiKind === 'all' || r.kind === rtiKind) && (!rtiQ || String(r.title).toLowerCase().includes(rtiQ)));
+  if (rtiView === 'archive') rows.sort((a, b) => String(b.archived_at).localeCompare(String(a.archived_at)));
   const stale = rtiStaleMsg();
   el.innerHTML = `${stale ? `<div class="rtiwarn">${esc(stale)}</div>` : ''}<div class="list-panel"><div class="toolbar">
+      <div class="seg" id="rtiViewSeg"><button data-v="active" class="${rtiView === 'active' ? 'on' : ''}">진행중 ${rtiCalcs.length - nB}</button><button data-v="archive" class="${rtiView === 'archive' ? 'on' : ''}">📦 보관함 ${nB}</button></div>
       <div class="seg" id="rtiKindSeg"><button data-k="all" class="${rtiKind === 'all' ? 'on' : ''}">전체</button><button data-k="비주택" class="${rtiKind === '비주택' ? 'on' : ''}">비주택</button><button data-k="주택" class="${rtiKind === '주택' ? 'on' : ''}">주택</button></div>
       <input id="rtiQ" class="search" type="search" placeholder="🔍 고객명 검색" value="${esc(rtiQ)}" />
       ${isAdmin() ? '<button class="btn small" data-r="set">⚙ 기준값</button>' : ''}${rtiCan() ? '<button class="btn small primary" data-r="new">＋ 새 RTI 계산</button>' : '<span class="pill ro">👀 보기 전용</span>'}
@@ -119,7 +122,8 @@ function renderRti(){
     <div class="rtihead"><span>고객명</span><span style="text-align:right">연간 임대소득</span><span style="text-align:right">연간 이자비용</span><span style="text-align:center">RTI</span><span>판정</span><span>작성</span></div>
     <div>${rows.map(r => `<div class="rtirow" data-rid="${r.id}"><div><div class="nm">${esc(r.title)}</div><div class="sub">${esc(r.kind)} 임대업</div></div>
       <div class="mo">${rtiW(r.income)}원</div><div class="mo">${rtiW(r.interest)}원</div><div class="rt">${r.rti === null ? '-' : Number(r.rti).toFixed(2)}</div>
-      <div><span class="rtiv ${esc((r.data && r.data.vcls) || 'n')}">${esc(r.verdict || '-')}</span></div><div style="font-size:12.5px;color:var(--muted)">${esc(nameOf(r.created_by))}<br>${esc(String(r.updated_at).slice(0, 10))}</div></div>`).join('') || `<div class="blk-empty">${rtiCalcs.length ? '조건에 맞는 계산이 없어요.' : '저장된 RTI 계산이 없어요. “＋ 새 RTI 계산”으로 시작해요.'}</div>`}</div></div>`;
+      <div><span class="rtiv ${esc((r.data && r.data.vcls) || 'n')}">${esc(r.verdict || '-')}</span></div><div style="font-size:12.5px;color:var(--muted)">${esc(nameOf(r.created_by))}<br>${esc(String(r.updated_at).slice(0, 10))}</div></div>`).join('') || `<div class="blk-empty">${rtiView === 'archive' ? '보관함이 비어 있어요. 처리가 끝난 계산은 열어서 📦 보관함으로 옮길 수 있어요.' : rtiCalcs.length ? '조건에 맞는 계산이 없어요.' : '저장된 RTI 계산이 없어요. “＋ 새 RTI 계산”으로 시작해요.'}</div>`}</div></div>`;
+  $('rtiViewSeg').onclick = (e) => { const b = e.target.closest('[data-v]'); if (b){ rtiView = b.dataset.v; renderRti(); } };
   $('rtiKindSeg').onclick = (e) => { const b = e.target.closest('[data-k]'); if (b){ rtiKind = b.dataset.k; renderRti(); } };
   $('rtiQ').oninput = (e) => { rtiQ = e.target.value.trim().toLowerCase(); const pos = e.target.selectionStart; renderRti(); const q = $('rtiQ'); q.focus(); q.setSelectionRange(pos, pos); };
 }
@@ -127,7 +131,7 @@ function rtiNew(){ if (!rtiCan()) return; rtiDraft = { id: null, title: '', kind
 function rtiOpen(id){
   const r = rtiCalcs.find(x => x.id === id); if (!r) return;
   const d = { ...rtiNewData(), ...(r.data || {}) }; d.existing = (d.existing || []).map(x => ({ ...x })); d.news = (d.news || []).map(x => ({ ...x }));
-  rtiDraft = { id: r.id, title: r.title, kind: r.kind, memo: r.memo || '', d, loan: r.loan_task_id || null }; rtiMode = 'edit'; renderRtiEditor();
+  rtiDraft = { id: r.id, title: r.title, kind: r.kind, memo: r.memo || '', d, loan: r.loan_task_id || null, arch: r.archived_at || null }; rtiMode = 'edit'; renderRtiEditor();
 }
 $('rti').addEventListener('click', async (e) => {
   const a = e.target.closest('[data-r]');
@@ -139,6 +143,7 @@ $('rti').addEventListener('click', async (e) => {
     if (k === 'save') return rtiSave(a);
     if (k === 'print') return rtiPrint();
     if (k === 'del') return rtiDelete();
+    if (k === 'arch') return rtiArchive();
     if (k === 'addex'){ rtiRead(); rtiDraft.d.existing.push({ p: 0, r: 0 }); return renderRtiEditor(); }
     if (k === 'addnew'){ rtiRead(); rtiDraft.d.news.push({ p: 0, r: 0 }); return renderRtiEditor(); }
     if (k === 'rmex'){ rtiRead(); rtiDraft.d.existing.splice(+a.dataset.i, 1); return renderRtiEditor(); }
@@ -164,7 +169,7 @@ function renderRtiEditor(){
       <button class="btn small" data-r="back">← 목록</button>
       <input id="rtiTitle" placeholder="고객명" maxlength="100" value="${esc(D.title)}" style="flex:1;min-width:150px;font-weight:700" ${can ? '' : 'disabled'} />
       <div class="seg" id="rtiKindEd"><button data-k="비주택" class="${D.kind === '비주택' ? 'on' : ''}">비주택 임대업</button><button data-k="주택" class="${D.kind === '주택' ? 'on' : ''}">주택 임대업</button></div>
-      <button class="btn small" data-r="print">🖨 인쇄</button>${can ? '<button class="btn small primary" data-r="save">💾 저장</button>' : ''}${can && D.id ? '<button class="btn small danger" data-r="del">삭제</button>' : ''}</div></div>
+      <button class="btn small" data-r="print">🖨 인쇄</button>${can ? '<button class="btn small primary" data-r="save">💾 저장</button>' : ''}${can && D.id ? `<button class="btn small" data-r="arch">${D.arch ? '↩ 진행중으로' : '📦 보관함으로'}</button>` : ''}${can && D.id ? '<button class="btn small danger" data-r="del">삭제</button>' : ''}</div></div>
     ${rtiStaleMsg() ? `<div class="rtiwarn">${esc(rtiStaleMsg())}</div>` : ''}
     <div class="rtied"><div style="display:flex;flex-direction:column;gap:12px;min-width:0">
       <div class="rtibox"><div class="rtisum"><div class="inc"><div class="k">연간 임대소득</div><div class="v" id="rtoInc"></div></div><div class="int"><div class="k">연간 이자비용</div><div class="v" id="rtoInt"></div></div><div><div class="k">RTI</div><div class="v" id="rtoRti"></div></div><div><div class="k">판정</div><div class="v" style="font-size:15px"><span class="rtiv" id="rtoV"></span></div></div></div>
@@ -238,6 +243,14 @@ async function rtiSave(btn){
   btn.disabled = false; if (r.error) return alert(r.error.message);
   if (!D.id && r.data) D.id = r.data.id;
   toast('💾 저장했어요'); await loadRti(); renderRtiEditor();
+}
+async function rtiArchive(){   // 처리가 끝난 계산을 보관함으로 / 진행중으로 되돌림
+  const D = rtiDraft; if (!D || !D.id || !rtiCan()) return;
+  if (!D.arch && !confirm(`"${D.title}" 계산을 보관함으로 옮길까요?\n진행중 목록에서는 빠지고, 보관함에서 언제든 찾아볼 수 있어요.`)) return;
+  const { error } = await sb.from('rti_calcs').update(D.arch ? { archived_at: null, archived_by: null } : { archived_at: new Date().toISOString(), archived_by: me }).eq('id', D.id);
+  if (error) return alert(error.message);
+  toast(D.arch ? '↩ 진행중으로 꺼냈어요' : '📦 보관함으로 옮겼어요');
+  rtiDraft = null; rtiMode = 'list'; if (!D.arch) rtiView = 'active'; await loadRti(); renderRti();
 }
 async function rtiDelete(){
   const D = rtiDraft; if (!D || !D.id) return;
