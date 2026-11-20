@@ -215,23 +215,33 @@ async function lcSaveFire(btn){
   if (t && t.chk_fire !== 'need'){ const r = await sb.from('work_tasks').update({ chk_fire: 'need', chk_fire_reason: null }).eq('id', t.id); if (!r.error) await loadTasks(); }   // 판단을 입력하면 '필요'로 기록
   toast('🔥 화재보험 판단을 저장했어요'); await loadLc(); lcCloseFire();
 }
-function lcPrintFire(){   // 담보물 화재보험 가입여부 계산내역 양식 (A4 세로)
-  const f = lcFireRead(), c = lcFireCalc(f), d = kstToday(), [y, m, dd] = d.split('-');
-  const font = typeof AP_FONT !== 'undefined' ? AP_FONT : "'Malgun Gothic',sans-serif", link = typeof AP_FONT_LINK !== 'undefined' ? AP_FONT_LINK : '', org = (typeof apSettings !== 'undefined' && apSettings['본점'] && apSettings['본점'].org_name) || '춘천시산림조합';
-  const w = (n) => n ? lcW(n) : '-', ex = { house: '전용주택', officetel: '아파트 단지 내 주거용 오피스텔' }[f.exempt] || '';
-  const css = `@page{size:A4;margin:14mm 15mm}*{box-sizing:border-box}body{font-family:${font};color:#111;margin:0;font-size:12px}.org{font-size:14px;font-weight:700;letter-spacing:4px;color:#444}h1{text-align:center;font-size:24px;margin:14px 0 4px;text-decoration:underline;letter-spacing:2px}.u{text-align:right;font-size:11px;margin:6px 0}
-  table{width:100%;table-layout:fixed;border-collapse:collapse;margin-bottom:12px}th,td{border:1px solid #777;padding:7px 4px;text-align:center;font-size:11.5px;word-break:keep-all;overflow-wrap:anywhere}td.r{padding-right:6px}th{background:#c6e0b4;font-weight:700}.y th{background:#ffe699}td.r{text-align:right}.big td{height:38px}.tg{font-size:15px;font-weight:800}.note{font-size:11px;margin:4px 0 12px}.sg{text-align:right;margin-top:24px;font-size:13px;line-height:2}`;
-  const html = `<html><head><meta charset="utf-8">${link}<style>${css}</style></head><body><div class="org">${esc(org)}</div><h1>담보물 화재보험 가입여부 계산내역</h1><div class="u">(단위 : 원)</div>
-  <table class="big"><tr><th style="width:25%">채무자</th><th style="width:30%">대출금액</th><th>담보물종류</th></tr><tr><td>${esc(f.debtor_name)}</td><td class="r">${w(f.loan_amount)}</td><td>${esc(f.collateral_type || '')}</td></tr></table>
-  <table class="big"><tr><th>순대출액<br>(A)</th><th>선순위설정액<br>(B)</th><th>토지감정평가액<br>(C)</th><th>요보험가입금액<br>(D=A+B−C)</th><th>가입대상판별<br>(자동계산)</th></tr>
-    <tr><td class="r">${w(f.net_amount)}</td><td class="r">${w(f.senior_amount)}</td><td class="r">${w(f.land_amount)}</td><td class="r">${w(c.D)}</td><td class="tg">${c.target === 'Y' ? 'Y' : 'N'}</td></tr></table>
-  <div class="note">* 요보험가입금액이 5천만원 이하이거나 전용주택·아파트 단지 내 주거용 오피스텔은 가입 생략 가능${ex ? ` (이 건: ${esc(ex)})` : ''}</div>
-  <div class="note"><b>* 화재보험 가입시 작성</b></div>
-  <table class="y big"><tr><th>요보험가입금액<br>(최소금액)</th><th>질권설정액</th><th>보험시작일자<br>보험종료일자</th><th>보험회사</th><th>확정일자 부여번호<br>부여일</th></tr>
-    <tr><td class="r">${w(c.target === 'Y' ? (f.min_amount != null ? f.min_amount : c.D) : 0)}</td><td class="r">${w(f.pledge_amount)}</td><td>${esc(f.ins_start || '')}<br>${esc(f.ins_end || '')}</td><td>${esc(f.insurer || '')}</td><td>${esc(f.confirm_no || '')}<br>${esc(f.confirm_date || '')}</td></tr></table>
-  <div class="note">* 대출금액은 신규취급 합산금액</div>
-  <div class="sg">${+y}년 ${+m}월 ${+dd}일<br>확인자 : ${esc(f.checker || nameOf(me))} (인)</div></body></html>`;
-  if (typeof apPreview === 'function') apPreview(html, '담보물 화재보험 가입여부 계산내역', `화재보험판단_${f.debtor_name || ''}`);
+function lcPrintFire(){   // 담보물 화재보험 가입여부 판단 출력 (임차보증금 차감계산 출력과 같은 스타일, A4 세로)
+  const f = lcFireRead(), c = lcFireCalc(f), today = kstToday(), need = c.target === 'Y';
+  const org = (typeof apSettings !== 'undefined' && apSettings['본점'] && apSettings['본점'].org_name) || '춘천시산림조합';
+  const font = typeof AP_FONT !== 'undefined' ? AP_FONT : "'Apple SD Gothic Neo','Malgun Gothic',sans-serif", link = typeof AP_FONT_LINK !== 'undefined' ? AP_FONT_LINK : '';
+  const css = `@page{size:A4;margin:14mm 15mm}*{box-sizing:border-box}body{font-family:${font};color:#111;margin:0;padding:0 1px;font-size:12px;line-height:1.5}
+  .org{font-size:14px;font-weight:700;letter-spacing:6px;color:#444}.title{margin-top:12px;border-top:5px solid #111;border-bottom:1px solid #111;padding:12px 0 9px;text-align:center}.title h1{font-size:22px;margin:0;letter-spacing:2px}.title .sub{margin-top:6px;color:#555;font-size:12px}
+  h2{font-size:13.5px;margin:14px 0 5px;padding-left:9px;border-left:5px solid #111}table.t{width:calc(100% - 1px);border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:5px 8px;vertical-align:middle}table.t th{background:#eee}
+  .r{text-align:right}.c{text-align:center}.big td{font-size:14px;font-weight:800;background:#f3f3f3}tr{page-break-inside:avoid}.why{border:1px solid #444;padding:8px 10px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:11.5px}.note{font-size:11px;color:#555;margin-top:6px}.sg{text-align:right;margin-top:26px;font-size:13px;line-height:2}`;
+  const w = (n) => lcW(n), tr = (k, v, cls = '') => `<tr class="${cls}"><td>${k}</td><td class="r">${v}</td></tr>`;
+  const ex = { house: '전용주택', officetel: '아파트 단지 내 주거용 오피스텔' }[f.exempt] || '';
+  const raw = (f.net_amount || 0) + (f.senior_amount || 0) - (f.land_amount || 0);
+  const why = [`요보험가입금액(D) = 순대출액(A) + 선순위설정액(B) − 토지감정평가액(C)`,
+    `   = ${w(f.net_amount)} + ${w(f.senior_amount)} − ${w(f.land_amount)} = ${raw < 0 ? '−' + w(-raw) : w(raw)}${raw < 0 ? ' → 음수는 0으로 처리' : ''}`,
+    `   → 요보험가입금액 ${w(c.D)}원`,
+    ex ? `면제 담보물: ${ex} → 가입 생략 가능` : c.D > LC_FIRE_MIN ? `요보험가입금액 ${w(c.D)}원 > 5천만원 → 가입 대상` : `요보험가입금액 ${w(c.D)}원 ≤ 5천만원 → 가입 생략 가능`].join('\n');
+  const ins = need ? `<h2>화재보험 가입 사항</h2><table class="t"><tr><th style="width:26%">요보험가입금액 (최소금액)</th><td class="r">${f.min_amount != null ? w(f.min_amount) : w(c.D)}원</td></tr><tr><th>질권설정액</th><td class="r">${f.pledge_amount ? w(f.pledge_amount) + '원' : '-'}</td></tr>
+    <tr><th>보험기간</th><td>${f.ins_start || f.ins_end ? `${esc(f.ins_start || '')} ~ ${esc(f.ins_end || '')}` : '-'}</td></tr><tr><th>보험회사</th><td>${esc(f.insurer || '-')}</td></tr><tr><th>확정일자 부여번호 · 부여일</th><td>${esc(f.confirm_no || '-')}${f.confirm_date ? ` · ${esc(f.confirm_date)}` : ''}</td></tr></table>` : '';
+  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>화재보험 가입여부 판단</title>${link}<style>${css}</style></head><body>
+  <div class="org">${esc(org)}</div><div class="title"><h1>담보물 화재보험 가입여부 판단 (${esc(f.debtor_name || '')})</h1><div class="sub">${need ? '가입 대상' : '가입 생략 가능'} · 작성일 ${esc(today)} · 작성자 ${esc(nameOf(me))}</div></div>
+  <h2>기본 사항</h2><table class="t"><tr><th style="width:26%">채무자</th><td>${esc(f.debtor_name || '')}</td></tr><tr><th>대출금액 (신규취급 합산금액)</th><td>${w(f.loan_amount)}원</td></tr><tr><th>담보물 종류</th><td>${esc(f.collateral_type || '')}${ex ? ` · 면제 담보물(${esc(ex)})` : ''}</td></tr></table>
+  <h2>요보험가입금액 산정</h2><table class="t">${tr('순대출액 (A)', w(f.net_amount) + '원')}${tr('선순위설정액 (B)', w(f.senior_amount) + '원')}${tr('토지감정평가액 (C)', w(f.land_amount) + '원')}${tr('요보험가입금액 (D = A + B − C)', w(c.D) + '원', 'big')}${tr('가입대상 판별', need ? '가입 대상 (Y)' : ex ? '생략 가능 (면제 담보물)' : '생략 가능 (N · 5천만원 이하)', 'big')}</table>
+  ${ins}
+  <h2>판단 근거</h2><div class="why">${esc(why)}</div>
+  <div class="note">요보험가입금액이 5천만원 이하이거나 전용주택·아파트 단지 내 주거용 오피스텔은 화재보험 가입을 생략할 수 있음 · 대출금액은 신규취급 합산금액 · 화재보험은 대출 취급 전에 판단</div>
+  ${f.memo ? `<h2>메모</h2><div class="note" style="white-space:pre-wrap;font-size:12px;color:#111">${esc(f.memo)}</div>` : ''}
+  <div class="sg">확인자 : ${esc(f.checker || nameOf(me))} (인)</div></body></html>`;
+  if (typeof apPreview === 'function') apPreview(html, '화재보험 가입여부 판단', `화재보험판단_${f.debtor_name || ''}`);
 }
 
 (function(){
