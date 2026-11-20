@@ -35,7 +35,7 @@ function lrSummary(){   // 본점+지점(통합 포함) 합산, 진행상태별 
 }
 function lrHtml(){
   const extra = lrData.some(r => lrStages[r.stage] && r.scope !== '본점' && r.scope !== '지점');
-  return lrTable(['본점', '지점']) + (extra ? '<p style="margin:10px 0 4px;font-size:13px">※ 통합·기타 구분</p>' + lrTable(['통합']) : '') + lrSummary();
+  return lrTable(['본점', '지점']) + (extra ? '<p style="margin:10px 0 4px;font-size:13px">※ 통합·기타 구분</p>' + lrTable(['통합']) : '');   // 복사 대상: 본점·지점 표만 (합산표는 화면 참고용)
 }
 function lrPlain(){   // 표를 못 붙이는 곳(메모장 등)용 탭 구분 텍스트
   const out = [];
@@ -44,8 +44,6 @@ function lrPlain(){   // 표를 못 붙이는 곳(메모장 등)용 탭 구분 �
     if (k === '통합' && !rows.length) return;
     out.push(`[${k}]`, ...rows.map(r => [r.name, r.stage, r.amount == null ? '-' : lrN(r.amount) + '백만원', lrColl(r.coll)].join('\t')), `${k}(${rows.length}건)\t${lrN(rows.reduce((s, r) => s + (Number(r.amount) || 0), 0))}백만원`, '');
   });
-  const v = lrVisible(), sm = (a) => lrN(a.reduce((s, r) => s + (Number(r.amount) || 0), 0)) + '백만원';
-  out.push('[전체 합계 (본점+지점)]', ...['실행', '진행', '협의'].filter(k => lrStages[k]).map(k => { const a = v.filter(r => r.stage === k); return `${k}\t${a.length}건\t${sm(a)}`; }), `합계\t${v.length}건\t${sm(v)}`);
   return out.join('\n');
 }
 function lrRender(){
@@ -53,6 +51,7 @@ function lrRender(){
   $('lrBody').innerHTML = `<div class="lrbar">
       ${['실행', '진행', '협의'].map(s => `<label><input type="checkbox" data-lrs="${s}" ${lrStages[s] ? 'checked' : ''} /> ${s} ${cnt(s)}건</label>`).join('')}</div>
     <div class="lrwrap" id="lrTbl">${lrHtml()}</div>
+    <div class="lrsum"><div class="lrsumh">참고용 · 복사에 포함되지 않아요</div>${lrSummary()}</div>
     <div class="lrnote">※ 협의 = 1단계 · 진행 = 2~4단계 · 실행 = 5단계 진행 중 · 완료된 건과 미진행 처리된 건은 제외 · 금액은 백만원 단위(미입력은 합계에서 제외)</div>`;
   document.querySelectorAll('[data-lrs]').forEach(c => { c.onchange = () => { lrStages[c.dataset.lrs] = c.checked; lrRender(); }; });
 }
@@ -61,11 +60,11 @@ function openLoanReport(loans){
   if (!$('lrOv')){
     const st = document.createElement('style'); st.textContent = `
     .lrbar{ display:flex; gap:6px 16px; flex-wrap:wrap; margin:12px 0; font-size:13.5px; font-weight:600; } .lrbar label{ display:flex; align-items:center; gap:7px; margin:0; font-size:14px; color:var(--ink); white-space:nowrap; cursor:pointer; min-height:34px; } .lrbar input{ width:18px; height:18px; min-height:0; padding:0; flex:none; -webkit-appearance:auto; appearance:auto; }
-    .lrwrap{ overflow-x:auto; padding:2px; border:1px dashed #d9d2c2; border-radius:10px; background:#fff; } .lrnote{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.5; }`;
+    .lrwrap{ overflow-x:auto; padding:2px; border:1px dashed #d9d2c2; border-radius:10px; background:#fff; } .lrsum{ margin-top:14px; } .lrsumh{ font-size:12.5px; font-weight:700; color:var(--muted); } .lrnote{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.5; }`;
     document.head.appendChild(st);
     const d = document.createElement('div');
     d.innerHTML = `<div class="ov" id="lrOv"><div class="panel" style="max-width:1100px"><div class="ph"><h2>📋 대출 현황표</h2><button class="x" id="lrX">✕</button></div>
-      <div class="pfsub" style="font-size:13px">현재 대출 집계를 본점·지점으로 나눈 표예요. “표 복사” 후 한글·워드·엑셀·메일에 붙여넣으세요.</div>
+      <div class="pfsub" style="font-size:13px">현재 대출 집계를 본점·지점으로 나눈 표예요. “표 복사” 후 한글·워드·엑셀·메일에 붙여넣으세요. (아래 합산표는 참고용이라 복사되지 않아요)</div>
       <div id="lrBody"></div><div class="acts" style="margin-top:14px"><button class="btn primary" id="lrCopy" style="min-height:44px;padding:8px 26px">📋 표 복사</button><button class="btn" id="lrClose" style="min-height:44px">닫기</button></div></div></div>`;
     document.body.appendChild(d);
     const close = () => { $('lrOv').style.display = 'none'; document.body.style.overflow = ''; };
