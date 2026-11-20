@@ -703,6 +703,7 @@
     <div id="appraisal"></div>
     <div id="rti"></div>
     <div id="dep"></div>
+    <div id="fire"></div>
     <div id="event"></div>
     <div id="liq"></div>
     <div id="debt"><div class="seg" id="dbTabs"><button data-t="debt">📞 <span class="svlf">연체채권관리</span><span class="svls">연체채권</span></button><button data-t="survey">🏭 <span class="svlf">정책자금실태조사</span><span class="svls">실태조사</span></button><button data-t="fund" id="dbTabFund" style="display:none">💰 <span class="svlf">자금운영관리</span><span class="svls">자금</span></button></div><div id="debtMain"></div><div id="survey"></div><div id="fund"></div></div>
@@ -1086,7 +1087,7 @@
     $('app').dataset.div = divn;
     const nm = (nameOf(me) || '').trim() || '담당자';
     $('helloT').innerHTML = liq ? '유동성 상황판이에요 💧<br><span>분기말 비율을 미리 보고 만기를 나눠요</span>' : ev ? '이벤트 일정이에요 🎉<br><span>검진·연차·반차를 겹치지 않게 골라요</span>' : home ? `안녕하세요, ${esc(nm)}님 👋<br><span>오늘의 조합 현황이에요</span>` : debt ? '사후관리 현황이에요 🛠<br><span>오늘 챙길 조치부터 확인해요</span>' : appr ? '새 의뢰 전에,<br><span>기존 기록부터 찾아볼까요? 🔍</span>' : personal ? '나만 보는 업무예요 🔒<br><span>오늘 할 일부터 확인해요</span>' : `안녕하세요, ${esc(nm)}님 👋<br><span>오늘 챙겨야 할 업무예요</span>`;
-    $('home').style.display = home ? 'flex' : 'none'; $('shared').style.display = personal || appr || debt || home || ev || liq ? 'none' : 'flex'; $('event').style.display = ev ? 'flex' : 'none'; $('liq').style.display = liq ? 'flex' : 'none'; $('debt').style.display = debt ? 'flex' : 'none'; $('debtBtn').style.display = ''; $('personal').style.display = personal ? 'flex' : 'none'; $('appraisal').style.display = appr ? 'flex' : 'none'; $('rti').style.display = appr && typeof apTab !== 'undefined' && apTab === 'rti' ? 'flex' : 'none'; $('dep').style.display = appr && typeof apTab !== 'undefined' && apTab === 'dep' ? 'flex' : 'none';
+    $('home').style.display = home ? 'flex' : 'none'; $('shared').style.display = personal || appr || debt || home || ev || liq ? 'none' : 'flex'; $('event').style.display = ev ? 'flex' : 'none'; $('liq').style.display = liq ? 'flex' : 'none'; $('debt').style.display = debt ? 'flex' : 'none'; $('debtBtn').style.display = ''; $('personal').style.display = personal ? 'flex' : 'none'; $('appraisal').style.display = appr ? 'flex' : 'none'; $('rti').style.display = appr && typeof apTab !== 'undefined' && apTab === 'rti' ? 'flex' : 'none'; $('dep').style.display = appr && typeof apTab !== 'undefined' && apTab === 'dep' ? 'flex' : 'none'; $('fire').style.display = appr && typeof apTab !== 'undefined' && apTab === 'fire' ? 'flex' : 'none';
     document.querySelectorAll('#divBtns button').forEach(b => b.classList.toggle('on', b.dataset.div === divn));
     const pToday = kstToday(), pDue = ptasks.filter(t => !t.done_at && t.due_date && t.due_date <= pToday).length;
     $('nPersonal').textContent = pDue || ''; $('nPersonal').style.display = pDue ? '' : 'none';
@@ -1096,7 +1097,7 @@
     const fundTab = debt && typeof dbTab !== 'undefined' && dbTab === 'fund';
     const w = !home && !ev && !liq && !fundTab && (personal || canWrite(divn));   // debt 도 canWrite('debt'), 현황판에는 새 업무 버튼 없음
     $('newBtn').style.display = w ? '' : 'none';
-    { const full = debt ? (typeof dbTab !== 'undefined' && dbTab === 'survey' ? '＋ 조사 대상 등록' : '＋ 연체채권 등록') : personal ? '＋ 개인 할 일' : appr ? (typeof apTab !== 'undefined' && apTab === 'rti' ? '＋ 새 RTI 계산' : typeof apTab !== 'undefined' && apTab === 'dep' ? '＋ 새 차감계산' : '＋ 새 감정평가 의뢰') : '＋ 새 업무',
+    { const full = debt ? (typeof dbTab !== 'undefined' && dbTab === 'survey' ? '＋ 조사 대상 등록' : '＋ 연체채권 등록') : personal ? '＋ 개인 할 일' : appr ? (typeof apTab !== 'undefined' && apTab === 'rti' ? '＋ 새 RTI 계산' : typeof apTab !== 'undefined' && apTab === 'dep' ? '＋ 새 차감계산' : typeof apTab !== 'undefined' && apTab === 'fire' ? '＋ 새 화재보험 판단' : '＋ 새 감정평가 의뢰') : '＋ 새 업무',
         short = { '＋ 조사 대상 등록': '＋ 조사 등록', '＋ 연체채권 등록': '＋ 채권 등록', '＋ 개인 할 일': '＋ 할 일', '＋ 새 RTI 계산': '＋ 새 계산', '＋ 새 차감계산': '＋ 새 계산', '＋ 새 감정평가 의뢰': '＋ 새 의뢰' }[full] || full;
       $('newBtn').innerHTML = `<span class="bf">${esc(full)}</span><span class="bs">${esc(short)}</span>`; $('newBtn').title = full.replace('＋ ', ''); }
     $('roPill').style.display = w || home || ev || liq || fundTab ? 'none' : '';
@@ -1790,7 +1791,7 @@
   function closeForm(){ $('formOv').style.display = 'none'; editId = null; document.body.style.overflow = $('detailOv').style.display === 'block' && !dockOn() ? 'hidden' : ''; }
   $('fClose').onclick = closeForm; $('fCancel').onclick = closeForm;
   $('formOv').addEventListener('click', (e) => { if (e.target === $('formOv')) closeForm(); });
-  $('newBtn').onclick = () => divn === 'personal' ? openPf(null) : divn === 'debt' ? (dbTab === 'survey' ? svOpenForm(null) : dbOpenForm(null)) : divn === 'appraisal' ? (apTab === 'rti' ? rtiNew() : apTab === 'dep' ? depNew() : apOpenForm(null)) : openForm('new', null);
+  $('newBtn').onclick = () => divn === 'personal' ? openPf(null) : divn === 'debt' ? (dbTab === 'survey' ? svOpenForm(null) : dbOpenForm(null)) : divn === 'appraisal' ? (apTab === 'rti' ? rtiNew() : apTab === 'dep' ? depNew() : apTab === 'fire' ? lcNewFire() : apOpenForm(null)) : openForm('new', null);
 
   $('fSave').onclick = async () => {
     const title = $('fTitle').value.trim();
@@ -2218,7 +2219,7 @@
 <script src="perf.js?v=33"></script>
 <script src="orig.js?v=2"></script>
 <script src="loanreport.js?v=14"></script>
-<script src="loancheck.js?v=3"></script>
+<script src="loancheck.js?v=4"></script>
 <script src="cover.js?v=1"></script>
 <script src="liquidity.js?v=6"></script>
 </body>

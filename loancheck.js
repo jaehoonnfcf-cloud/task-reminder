@@ -9,7 +9,7 @@ const LC_FIRE_MIN = 50000000;                  // 요보험가입금액이 이 �
 const LC_KIND = { rti: { name: 'RTI', mode: 'chk_rti', why: 'chk_rti_reason', ask: '임대사업자 대출이면 RTI 계산이 필요해요', tab: 'rti' },
   dep: { name: '임차보증금 차감', mode: 'chk_dep', why: 'chk_dep_reason', ask: '임차인이 있는 담보물이면 임차보증금 차감계산이 필요해요', tab: 'dep' },
   fire: { name: '화재보험', mode: 'chk_fire', why: 'chk_fire_reason', ask: '건물이 담보물에 포함되면 화재보험 가입여부 판단이 필요해요' } };
-let lcFire = new Map(), lcPick = null, lcFd = null;   // lcPick: { id, kind } 기존 계산 연결 중 / lcFd: 화재보험 입력 중인 값
+let lcFire = new Map(), lcFireAll = [], lcPick = null, lcFd = null, lcTabQ = '';   // lcPick: { id, kind } 기존 계산 연결 중 / lcFd: 화재보험 입력 중인 값
 const lcW = (n) => Number(n || 0).toLocaleString('ko-KR');
 const lcNum = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); return d ? Number(d) : 0; };
 const lcComma = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); return d ? Number(d).toLocaleString('ko-KR') : ''; };
@@ -17,10 +17,12 @@ const lcComma = (s) => { const d = String(s ?? '').replace(/[^0-9]/g, ''); retur
 async function loadLc(){
   const r = await sb.from('fire_judgments').select('*');
   if (r.error){ console.warn('화재보험 판단 불러오기 실패', r.error.message); return; }
-  lcFire = new Map((r.data || []).map(x => [x.loan_task_id, x])); lcRefresh();
+  lcFireAll = (r.data || []).slice().sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+  lcFire = new Map(lcFireAll.filter(x => x.loan_task_id).map(x => [x.loan_task_id, x])); lcRefresh();
 }
-function lcRefresh(){   // 열려 있는 대출 상세와 목록을 다시 그린다
-  try { if (typeof render === 'function') render(); const t = typeof openId !== 'undefined' && openId ? byId(openId) : null; if (t && t.task_type === 'loan' && $('detailOv').style.display === 'block' && !($('lcFireOv') && $('lcFireOv').style.display === 'block')) renderDetail(t); } catch (e) { console.warn(e); }
+function lcRefresh(){   // 열려 있는 대출 상세·목록·담보심사 화재보험 탭을 다시 그린다
+  try { if (typeof apTab !== 'undefined' && apTab === 'fire' && typeof divn !== 'undefined' && divn === 'appraisal' && !($('lcFireOv') && $('lcFireOv').style.display === 'block')) renderFireTab();
+     if (typeof render === 'function') render(); const t = typeof openId !== 'undefined' && openId ? byId(openId) : null; if (t && t.task_type === 'loan' && $('detailOv').style.display === 'block' && !($('lcFireOv') && $('lcFireOv').style.display === 'block')) renderDetail(t); } catch (e) { console.warn(e); }
 }
 
 // ---------- 상태 계산 ----------
@@ -77,7 +79,12 @@ function lcHtml(t, dropped){
       if (i.state === 'ask') act = B(`mode:${i.k}:need`, '필요', 'primary') + B(`mode:${i.k}:none`, '해당 없음');
       else if (i.state === 'na') act = B(`mode:${i.k}:ask`, '다시 판단');
       else {
-        if (i.k === 'fire') act = B('fire', i.calc ? '📝 판단 수정·인쇄' : '📝 판단 입력', 'primary');
+        if (i.k === 'fire'){
+          if (lcPick && lcPick.id === t.id && lcPick.kind === 'fire' && !i.calc){
+            const list = lcFireAll.filter(c => !c.loan_task_id);
+            act = `<select id="lcSel" style="max-width:260px;min-height:34px;padding:4px 8px">${list.map(c => `<option value="${c.id}">${esc(c.debtor_name || '(이름 없음)')} (${esc(String(c.updated_at).slice(0, 10))})</option>`).join('') || '<option value="">연결할 수 있는 판단이 없어요</option>'}</select>` + B('link:fire', '연결', 'primary') + B('pickx', '취소');
+          } else act = B('fire', i.calc ? '📝 판단 수정·인쇄' : '📝 판단 입력', 'primary') + (i.calc ? B(`unlink:fire:${i.calc.id}`, '연결 해제') : B('pick:fire', '기존 판단 연결'));
+        }
         else if (i.calc) act = B(`open:${i.k}:${i.calc.id}`, '계산 열기') + (calcOk(i.k) ? B(`unlink:${i.k}:${i.calc.id}`, '연결 해제') : '');
         else if (lcPick && lcPick.id === t.id && lcPick.kind === i.k){
           const list = (i.k === 'rti' ? rtiCalcs : depCalcs).filter(c => !c.loan_task_id);
@@ -107,9 +114,10 @@ async function lcAct(t, full){
   if (op === 'pick'){ lcPick = { id: t.id, kind: k }; return renderDetail(t); }
   if (op === 'link' || op === 'unlink'){
     const id = op === 'link' ? +($('lcSel') || {}).value : +arg; if (!id) return;
-    const { error } = await sb.from(k === 'rti' ? 'rti_calcs' : 'deposit_calcs').update({ loan_task_id: op === 'link' ? t.id : null }).eq('id', id);
+    const { error } = await sb.from(k === 'rti' ? 'rti_calcs' : k === 'fire' ? 'fire_judgments' : 'deposit_calcs').update({ loan_task_id: op === 'link' ? t.id : null }).eq('id', id);
     if (error) return alert(error.message);
-    lcPick = null; toast(op === 'link' ? '🔗 계산을 이 대출 건에 연결했어요' : '연결을 해제했어요');
+    lcPick = null; toast(op === 'link' ? '🔗 이 대출 건에 연결했어요' : '연결을 해제했어요');
+    if (k === 'fire') return loadLc();
     if (k === 'rti' && typeof loadRti === 'function') await loadRti(); if (k === 'dep' && typeof loadDep === 'function') await loadDep(); return;
   }
   if (op === 'open' || op === 'new') return goAppraisal(() => {   // 감정평가 화면의 해당 탭에서 열기
@@ -123,20 +131,42 @@ async function lcAct(t, full){
   if (op === 'fire') return lcOpenFire(t);
 }
 
+// ---------- 담보심사 > 화재보험 가입여부 탭 (RTI·임차보증금 차감과 같은 방식: 목록 + 입력, 대출 건 연결은 선택) ----------
+function renderFireTab(){
+  const el = $('fire'); if (!el) return;
+  const rows = lcFireAll.filter(r => !lcTabQ || [r.debtor_name, r.collateral_type].some(v => String(v || '').toLowerCase().includes(lcTabQ))), can = lcFireCanTab();
+  const stat = (r) => r.target === 'Y' ? ((r.insurer && r.ins_start && r.ins_end && r.min_amount != null) ? ['done', '가입 완료'] : ['todo', '가입 대상 · 가입 정보 입력 전']) : ['na', r.target === 'EX' ? '생략 가능 (면제)' : '생략 가능 (5천만원 이하)'];
+  el.innerHTML = `<div class="list-panel"><div class="toolbar"><input id="lfQ" class="search" type="search" placeholder="🔍 채무자 검색" value="${esc(lcTabQ)}" />
+      ${can ? '<button class="btn small primary" data-lt="new">＋ 새 화재보험 판단</button>' : '<span class="pill ro">👀 보기 전용</span>'}</div>
+    <div class="lfthead"><span>채무자 · 담보물</span><span style="text-align:right">대출금액</span><span style="text-align:right">요보험가입금액</span><span>판정</span><span>연결 대출 건</span></div>
+    <div>${rows.map(r => { const [cls, txt] = stat(r), ln = r.loan_task_id && typeof byId === 'function' ? byId(r.loan_task_id) : null;
+      return `<div class="lftrow" data-fid="${r.id}"><div><div class="nm">${esc(r.debtor_name || '(이름 없음)')}</div><div class="sub">${esc(r.collateral_type || '')}</div></div>
+        <div class="mo">${lcW(r.loan_amount)}원</div><div class="mo">${lcW(r.required_amount)}원</div><div><span class="lcc ${cls}">${txt}</span></div>
+        <div class="sub2">${ln ? '🔗 ' + esc(ln.title) : '<span class="muted">연결 안 함</span>'}<br><span class="muted">${esc(nameOf(r.created_by))} · ${esc(String(r.updated_at).slice(0, 10))}</span></div></div>`; }).join('') || `<div class="blk-empty">${lcFireAll.length ? '조건에 맞는 판단이 없어요.' : '아직 화재보험 판단이 없어요. 「＋ 새 화재보험 판단」으로 입력하거나, 대출 건의 「취급 점검」에서 입력할 수 있어요.'}</div>`}</div></div>`;
+  $('lfQ').oninput = (e) => { lcTabQ = e.target.value.trim().toLowerCase(); const pos = e.target.selectionStart; renderFireTab(); const q = $('lfQ'); q.focus(); q.setSelectionRange(pos, pos); };
+}
+(function(){ const el = $('fire'); if (!el) return;
+  el.addEventListener('click', (e) => { if (e.target.closest('[data-lt="new"]')) return lcNewFire(); const row = e.target.closest('[data-fid]'); if (row){ const r = lcFireAll.find(x => x.id === +row.dataset.fid); if (r) lcOpenFire(null, r); } });
+})();
+
 // ---------- 화재보험 가입여부 판단 (수기 입력) ----------
-function lcOpenFire(t){
-  const old = lcFire.get(t.id), won = t.loan_amount != null ? Number(t.loan_amount) * 1e6 : 0, can = canAct(t) && !isDropped(t);
-  lcFd = old ? { ...old } : { loan_task_id: t.id, debtor_name: t.title || '', loan_amount: won, collateral_type: t.collateral || '', net_amount: won, senior_amount: 0, land_amount: 0, exempt: null, min_amount: null, pledge_amount: null, ins_start: '', ins_end: '', insurer: '', confirm_no: '', confirm_date: '', memo: '' };
+const lcFireCanTab = () => typeof canWrite === 'function' && (canWrite('appraisal') || canWrite('credit'));
+const lcNewFire = () => { if (!lcFireCanTab()) return alert('화재보험 판단을 입력할 권한이 없어요.'); lcOpenFire(null, null); };
+function lcOpenFire(t, row){   // t = 대출 건(대출 상세에서 열 때, 연결 고정) / row = 담보심사 탭에서 연 기존 판단 / 둘 다 없으면 새 판단
+  const old = row || (t ? lcFire.get(t.id) : null), won = t && t.loan_amount != null ? Number(t.loan_amount) * 1e6 : 0, can = t ? canAct(t) && !isDropped(t) : lcFireCanTab();
+  lcFd = old ? { ...old } : { loan_task_id: t ? t.id : null, debtor_name: t ? t.title || '' : '', loan_amount: won, collateral_type: t ? t.collateral || '' : '', net_amount: won, senior_amount: 0, land_amount: 0, exempt: null, min_amount: null, pledge_amount: null, ins_start: '', ins_end: '', insurer: '', confirm_no: '', confirm_date: '', memo: '' };
   if (!$('lcFireOv')){
     const d = document.createElement('div');
     d.innerHTML = `<div class="ov" id="lcFireOv"><div class="panel" style="max-width:700px" id="lcFirePanel"></div></div>`; document.body.appendChild(d);
     $('lcFireOv').addEventListener('click', (e) => { if (e.target === $('lcFireOv')) lcCloseFire(); });
     $('lcFirePanel').addEventListener('input', (e) => { const x = e.target; if (x.classList.contains('lfn')){ x.value = lcComma(x.value); } lcFireLive(); });
-    $('lcFirePanel').addEventListener('click', (e) => { const b = e.target.closest('[data-lf]'); if (!b) return; if (b.dataset.lf === 'close') lcCloseFire(); else if (b.dataset.lf === 'save') lcSaveFire(b); else if (b.dataset.lf === 'print') lcPrintFire(); });
+    $('lcFirePanel').addEventListener('click', (e) => { const b = e.target.closest('[data-lf]'); if (!b) return; if (b.dataset.lf === 'close') lcCloseFire(); else if (b.dataset.lf === 'save') lcSaveFire(b); else if (b.dataset.lf === 'print') lcPrintFire(); else if (b.dataset.lf === 'del') lcDeleteFire(b); });
   }
+  lcFd._fixed = !!t; lcFd._can = can;
   const f = lcFd, dis = can ? '' : 'disabled', N = (id, v, ph = '') => `<input class="lfn" id="${id}" inputmode="numeric" value="${v == null || v === 0 && id !== 'lfA' && id !== 'lfB' && id !== 'lfC' ? '' : lcComma(v)}" placeholder="${ph}" ${dis} />`;
   $('lcFirePanel').innerHTML = `<div class="ph"><h2>🔥 담보물 화재보험 가입여부 판단</h2><button class="x" data-lf="close">✕</button></div>
     <div class="pfsub">단위: 원 · 수기 입력. 요보험가입금액 = 순대출액(A) + 선순위설정액(B) − 토지감정평가액(C)</div>
+    ${t ? '' : `<label>연결할 대출 건 (대출취급) <span class="muted" style="font-weight:400">· 선택</span></label><select id="lfLink" ${dis}><option value="">연결 안 함</option>${(typeof tasks !== 'undefined' ? tasks : []).filter(x => x.task_type === 'loan' && !isDropped(x) && curIdx(x) < stepsOf(x).length && (!lcFire.has(x.id) || x.id === f.loan_task_id)).map(x => `<option value="${x.id}" ${x.id === f.loan_task_id ? 'selected' : ''}>${esc(x.title)}${x.scope ? ' · ' + esc(x.scope) : ''}</option>`).join('')}</select>`}
     <div class="lfg"><div><label>채무자</label><input id="lfDebtor" maxlength="100" value="${esc(f.debtor_name)}" ${dis} /></div><div><label>대출금액 (신규취급 합산금액)</label>${N('lfLoan', f.loan_amount)}</div><div><label>담보물 종류</label><input id="lfColl" maxlength="100" value="${esc(f.collateral_type || '')}" placeholder="예: 토지, 건물" ${dis} /></div></div>
     <div class="lfg"><div><label>순대출액 (A)</label>${N('lfA', f.net_amount)}</div><div><label>선순위설정액 (B)</label>${N('lfB', f.senior_amount)}</div><div><label>토지감정평가액 (C)</label>${N('lfC', f.land_amount)}</div></div>
     <label>생략 가능 담보물 <span class="muted" style="font-weight:400">(해당하면 선택)</span></label>
@@ -147,10 +177,16 @@ function lcOpenFire(t){
       <div class="lfg"><div><label>보험시작일자</label><input type="date" id="lfS" value="${esc(f.ins_start || '')}" ${dis} /></div><div><label>보험종료일자</label><input type="date" id="lfE" value="${esc(f.ins_end || '')}" ${dis} /></div><div></div></div>
       <div class="lfg"><div><label>확정일자 부여번호</label><input id="lfNo" maxlength="100" value="${esc(f.confirm_no || '')}" ${dis} /></div><div><label>확정일자 부여일</label><input type="date" id="lfDate" value="${esc(f.confirm_date || '')}" ${dis} /></div><div></div></div></div>
     <label>메모 <span class="muted" style="font-weight:400">(선택)</span></label><input id="lfMemo" maxlength="500" value="${esc(f.memo || '')}" ${dis} />
-    <div class="acts" style="margin-top:16px">${can ? '<button class="btn primary" data-lf="save" style="min-height:44px;padding:8px 26px">저장</button>' : ''}<button class="btn" data-lf="print" style="min-height:44px">🖨 계산내역 인쇄</button><button class="btn" data-lf="close" style="min-height:44px">닫기</button></div>`;
+    <div class="acts" style="margin-top:16px">${can ? '<button class="btn primary" data-lf="save" style="min-height:44px;padding:8px 26px">저장</button>' : ''}<button class="btn" data-lf="print" style="min-height:44px">🖨 계산내역 인쇄</button><button class="btn" data-lf="close" style="min-height:44px">닫기</button>${can && f.id ? '<span style="flex:1"></span><button class="btn danger small" data-lf="del">삭제</button>' : ''}</div>`;
   $('lcFireOv').style.display = 'block'; document.body.style.overflow = 'hidden'; lcFireLive();
 }
-function lcCloseFire(){ $('lcFireOv').style.display = 'none'; document.body.style.overflow = ''; const t = byId(openId); if (t && $('detailOv').style.display === 'block') renderDetail(t); }
+function lcCloseFire(){ $('lcFireOv').style.display = 'none'; document.body.style.overflow = ''; const t = typeof openId !== 'undefined' && openId ? byId(openId) : null; if (t && $('detailOv').style.display === 'block') renderDetail(t); if (typeof apTab !== 'undefined' && apTab === 'fire' && typeof divn !== 'undefined' && divn === 'appraisal') renderFireTab(); }
+async function lcDeleteFire(btn){
+  if (!lcFd || !lcFd.id || !confirm('이 화재보험 판단을 삭제할까요?')) return;
+  btn.disabled = true; const { error } = await sb.from('fire_judgments').delete().eq('id', lcFd.id); btn.disabled = false;
+  if (error) return alert(error.message);
+  toast('삭제했어요'); await loadLc(); lcCloseFire();
+}
 function lcFireRead(){   // 화면 입력값 → lcFd
   const f = lcFd, g = (id) => $(id) ? $(id).value : '';
   Object.assign(f, { debtor_name: g('lfDebtor').trim(), loan_amount: lcNum(g('lfLoan')), collateral_type: g('lfColl').trim(), net_amount: lcNum(g('lfA')), senior_amount: lcNum(g('lfB')), land_amount: lcNum(g('lfC')),
@@ -165,17 +201,18 @@ function lcFireLive(){
   if (c.target === 'Y' && !f.min_amount && $('lfMin') && !$('lfMin').value && document.activeElement !== $('lfMin')) $('lfMin').placeholder = lcW(c.D);
 }
 async function lcSaveFire(btn){
-  const t = byId(openId); if (!t || !canAct(t)) return;
-  const f = lcFireRead(), c = lcFireCalc(f);
-  const row = { loan_task_id: t.id, debtor_name: f.debtor_name, loan_amount: f.loan_amount, collateral_type: f.collateral_type || null, net_amount: f.net_amount, senior_amount: f.senior_amount, land_amount: f.land_amount, exempt: f.exempt || null,
+  if (!lcFd || !lcFd._can) return;
+  const f = lcFireRead(), c = lcFireCalc(f), loanId = f._fixed ? f.loan_task_id : ($('lfLink') && $('lfLink').value ? +$('lfLink').value : null), t = loanId ? byId(loanId) : null;
+  if (!f.debtor_name) return alert('채무자를 입력해주세요.');
+  const row = { loan_task_id: loanId, debtor_name: f.debtor_name, loan_amount: f.loan_amount, collateral_type: f.collateral_type || null, net_amount: f.net_amount, senior_amount: f.senior_amount, land_amount: f.land_amount, exempt: f.exempt || null,
     required_amount: c.D, target: c.target, min_amount: c.target === 'Y' ? (f.min_amount != null ? f.min_amount : c.D) : null, pledge_amount: c.target === 'Y' ? f.pledge_amount : null,
     ins_start: c.target === 'Y' && f.ins_start ? f.ins_start : null, ins_end: c.target === 'Y' && f.ins_end ? f.ins_end : null, insurer: c.target === 'Y' ? f.insurer || null : null,
     confirm_no: c.target === 'Y' ? f.confirm_no || null : null, confirm_date: c.target === 'Y' && f.confirm_date ? f.confirm_date : null, checker: nameOf(me), memo: f.memo || null, updated_at: new Date().toISOString() };
   if (row.ins_start && row.ins_end && row.ins_end < row.ins_start) return alert('보험종료일자가 시작일자보다 빠릅니다.');
   btn.disabled = true;
-  const { error } = await sb.from('fire_judgments').upsert(row, { onConflict: 'loan_task_id' });
-  btn.disabled = false; if (error) return alert(error.message);
-  if (t.chk_fire !== 'need'){ const r = await sb.from('work_tasks').update({ chk_fire: 'need', chk_fire_reason: null }).eq('id', t.id); if (!r.error) await loadTasks(); }   // 판단을 입력하면 '필요'로 기록
+  const { error } = f.id ? await sb.from('fire_judgments').update(row).eq('id', f.id) : await sb.from('fire_judgments').insert(row);
+  btn.disabled = false; if (error) return alert(error.code === '23505' ? '이 대출 건에는 이미 화재보험 판단이 있어요. 기존 판단을 열어 수정하거나 연결을 해제해주세요.' : error.message);
+  if (t && t.chk_fire !== 'need'){ const r = await sb.from('work_tasks').update({ chk_fire: 'need', chk_fire_reason: null }).eq('id', t.id); if (!r.error) await loadTasks(); }   // 판단을 입력하면 '필요'로 기록
   toast('🔥 화재보험 판단을 저장했어요'); await loadLc(); lcCloseFire();
 }
 function lcPrintFire(){   // 담보물 화재보험 가입여부 계산내역 양식 (A4 세로)
@@ -208,6 +245,12 @@ function lcPrintFire(){   // 담보물 화재보험 가입여부 계산내역 �
   #lcFireOv .lfg{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; } #lcFireOv .lfg input{ text-align:left; } #lcFireOv .lfn{ text-align:right !important; } #lcFireOv .lfh{ margin:16px 0 4px; font-size:13.5px; font-weight:800; color:#7a5b00; }
   #lcFireOv .lfres{ margin-top:14px; padding:12px 14px; border-radius:14px; display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; font-size:13.5px; background:#eef6ee; } #lcFireOv .lfres.Y{ background:#fdeee9; } #lcFireOv .lfres b{ font-size:18px; font-weight:800; } #lcFireOv .lfv{ font-weight:800; margin-left:auto; }
   #lcFireOv .checks input{ width:20px; height:20px; min-height:0; -webkit-appearance:auto; appearance:auto; }
+  .lfthead,.lftrow{ display:grid; grid-template-columns:minmax(150px,1.3fr) 130px 150px 190px minmax(150px,1fr); gap:10px; align-items:center; padding:0 22px; }
+  .lfthead{ font-size:12px; font-weight:700; color:var(--muted); padding-top:10px; padding-bottom:8px; }
+  .lftrow{ padding-top:14px; padding-bottom:14px; background:#fff; border-radius:22px; box-shadow:var(--sh); margin-bottom:12px; cursor:pointer; font-size:13.5px; } .lftrow:hover{ box-shadow:var(--sh-hover); }
+  .lftrow .nm{ font-size:16.5px; font-weight:700; letter-spacing:-.02em; word-break:break-all; } .lftrow .sub,.lftrow .sub2{ font-size:12px; color:var(--muted); margin-top:2px; } .lftrow .sub2{ color:#44546f; } .lftrow .mo{ font-weight:700; text-align:right; }
+  #fire{ flex-direction:column; }
+  @media (max-width:760px){ .lfthead{ display:none; } .lftrow{ grid-template-columns:1fr auto; gap:6px 10px; padding:14px 16px; border-radius:20px; } .lftrow > :nth-child(1){ grid-column:1 / 3; } }
   @media (max-width:600px){ #lcFireOv .lfg{ grid-template-columns:1fr; } }`;
   document.head.appendChild(st);
 })();
