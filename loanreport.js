@@ -28,7 +28,7 @@ function lrMatrix(){
 function lrWeek(){
   if (!lrWeekly) return '';
   const d = (n, p) => n === p ? '<span class="eq">지난주와 같음</span>' : `<span class="${n > p ? 'up' : 'dn'}">${n > p ? '▲' : '▼'} ${Math.abs(n - p)}건</span> <span class="pv">지난주 ${p}건</span>`;
-  return `<div class="lrh">이번 주 변동 <small>${lrWeekly.range} (월~일)</small></div><div class="lrwk">${lrWeekly.items.map(x => `<div class="lrw"><div class="t">${x.l}</div><div class="v"><b>${x.n}</b>건${x.n ? `<small>${lrN(x.amt)}백만원</small>` : ''}</div><div class="d">${d(x.n, x.prev.n)}</div></div>`).join('')}</div>`;
+  return `<div class="lrh">이번 주 변동 <small>${lrWeekly.range} (월~금 영업일)</small></div><div class="lrwk">${lrWeekly.items.map(x => `<div class="lrw"><div class="t">${x.l}</div><div class="v"><b>${x.n}</b>건${x.n ? `<small>${lrN(x.amt)}백만원</small>` : ''}</div><div class="d">${d(x.n, x.prev.n)}</div></div>`).join('')}</div>`;
 }
 function lrTable(scopes){
   const groups = scopes.map(k => ({ k, rows: lrVisible().filter(r => lrInScope(r, k)).sort((a, b) => LR_ORDER[a.stage] - LR_ORDER[b.stage]) })), n = Math.max(1, ...groups.map(g => g.rows.length)), f = 2 / groups.length;
