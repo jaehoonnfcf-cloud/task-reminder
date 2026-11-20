@@ -59,12 +59,13 @@ function lrRender(){
     + (extra ? `<div class="lrx">통합·기타 구분</div><div class="lrwrap">${lrTable(['통합'])}</div>` : '')
     + `<div class="lrnote">협의 = 1단계 · 진행 = 2~4단계 · 실행 = 5단계 진행 중 · 완료된 건과 미진행 처리된 건은 제외 · 금액은 백만원 단위${noAmt ? ` · <b>금액 미입력 ${noAmt}건</b>은 금액 합계에서 빠져 있어요` : ''}</div></div>`;
 }
-// A4 가로 한 장 인쇄: 폭을 고정해 배치를 확정하고, 높이가 한 장을 넘으면 배율(zoom)을 줄여 맞춘다
+// A4 세로 한 장 인쇄: 폭을 고정해 배치를 확정하고, 높이가 한 장을 넘으면 배율(zoom)을 줄여 맞춘다
 function lrPrint(){
   const rep = $('lrRep'); if (!rep) return;
-  const pg = document.createElement('style'); pg.id = 'lrPg'; pg.textContent = '@page{ size:A4 landscape; margin:8mm; }'; document.head.appendChild(pg);
+  // 용지: A4 세로, 위 여백 16mm · 좌우·아래 10mm
+  const pg = document.createElement('style'); pg.id = 'lrPg'; pg.textContent = '@page{ size:A4 portrait; margin:16mm 10mm 10mm; }'; document.head.appendChild(pg);
   rep.classList.add('lrfixed'); rep.style.zoom = ''; lrFit();
-  const z = Math.max(.45, Math.min(1, 700 / rep.offsetHeight)); rep.style.zoom = z;   // 인쇄 가능 높이 ≈ 194mm(약 733px)에 여유를 둔 값
+  const z = Math.max(.4, Math.min(1, 700 / 900, 990 / rep.offsetHeight)); rep.style.zoom = z;   // 인쇄 가능 영역 ≈ 190×271mm(약 718×1024px)에 여유를 둔 값: 폭 900px 배치를 폭·높이 모두 맞게 축소
   document.body.classList.add('lr-printing');
   const done = () => { document.body.classList.remove('lr-printing'); rep.classList.remove('lrfixed'); rep.style.zoom = ''; const x = $('lrPg'); if (x) x.remove(); lrFit(); window.removeEventListener('afterprint', done); };
   window.addEventListener('afterprint', done); window.print();
@@ -96,7 +97,7 @@ function openLoanReport(loans, weekly){
     .lrw .t{ font-size:12.5px; font-weight:700; color:#5a6172; } .lrw .v{ margin-top:4px; font-size:13px; font-weight:600; } .lrw .v b{ font-size:24px; font-weight:800; letter-spacing:-.02em; } .lrw .v small{ margin-left:8px; font-size:12.5px; color:#6b7385; }
     .lrw .d{ margin-top:2px; font-size:12px; } .lrw .up{ color:#d4380d; font-weight:800; } .lrw .dn{ color:#1d6fd6; font-weight:800; } .lrw .pv,.lrw .eq{ color:#8a90a0; }
     .lrhead{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:2px 2px 10px; border-bottom:2px solid #172b4d; } .lrhead h3{ margin:0; font-size:21px; font-weight:800; letter-spacing:-.03em; } .lrhead span{ font-size:13px; color:#5a6172; font-weight:600; }
-    #lrRep.lrfixed{ width:1050px; } #lrRep.lrfixed .lrt{ min-width:0; } #lrRep.lrfixed .lrwrap,#lrRep.lrfixed .lrsum{ overflow:visible; } #lrRep .lrwrap,#lrRep .lrw{ break-inside:avoid; }
+    #lrRep.lrfixed{ width:900px; } #lrRep.lrfixed .lrt{ min-width:0; } #lrRep.lrfixed .lrwrap,#lrRep.lrfixed .lrsum{ overflow:visible; } #lrRep .lrwrap,#lrRep .lrw{ break-inside:avoid; }
     @media print{
       body.lr-printing{ background:#fff !important; } body.lr-printing > *:not(#lrOv-wrap){ display:none !important; }
       body.lr-printing #lrOv{ display:block !important; position:static !important; background:none !important; padding:0 !important; overflow:visible !important; }
@@ -111,7 +112,7 @@ function openLoanReport(loans, weekly){
     const d = document.createElement('div');
     d.id = 'lrOv-wrap'; d.innerHTML = `<div class="ov" id="lrOv"><div class="panel"><div class="ph"><h2>📋 대출 현황표</h2><button class="x" id="lrX">✕</button></div>
       <div class="pfsub">현재 진행 중인 대출을 본점·지점으로 나눈 표예요. 합계 → 본점·지점 현황 → 이번 주 변동 → 진행 건 명세 순서예요.</div>
-      <div id="lrBody"></div><div class="acts" style="margin-top:14px"><button class="btn primary" id="lrPrint" style="min-height:44px;padding:8px 26px">🖨 보고서 인쇄 (A4 한 장)</button><button class="btn" id="lrClose" style="min-height:44px;padding:8px 26px">닫기</button></div></div></div>`;
+      <div id="lrBody"></div><div class="acts" style="margin-top:14px"><button class="btn primary" id="lrPrint" style="min-height:44px;padding:8px 26px">🖨 보고서 인쇄 (A4 세로 한 장)</button><button class="btn" id="lrClose" style="min-height:44px;padding:8px 26px">닫기</button></div></div></div>`;
     document.body.appendChild(d);
     const close = () => { $('lrOv').style.display = 'none'; document.body.style.overflow = ''; };
     $('lrPrint').onclick = lrPrint; $('lrX').onclick = $('lrClose').onclick = close; $('lrOv').addEventListener('click', (e) => { if (e.target === $('lrOv')) close(); });
