@@ -10,26 +10,27 @@ const lrN = (n) => Number(n || 0).toLocaleString('ko-KR');
 
 // 붙여넣기 후에도 모양이 남도록 모든 스타일을 inline 으로 쓴다
 function lrTable(scopes){
-  const TD = 'border:1px solid #000;padding:3px 6px;font-size:14px;', HD = 'border:1px solid #000;padding:5px 6px;font-size:15px;font-weight:700;background:#f3efe6;text-align:center;';
+  const TD = 'border:1px solid #000;padding:4px 6px;font-size:14px;vertical-align:middle;', HD = 'border:1px solid #000;padding:5px 6px;font-size:15px;font-weight:700;background:#f3efe6;text-align:center;vertical-align:middle;';
   const pick = (k) => lrData.filter(r => lrStages[r.stage] && (k === '통합' ? r.scope !== '본점' && r.scope !== '지점' : r.scope === k)).sort((a, b) => LR_ORDER[a.stage] - LR_ORDER[b.stage]);
-  const groups = scopes.map(k => ({ k, rows: pick(k) })), n = Math.max(1, ...groups.map(g => g.rows.length));
-  const head = groups.map(g => `<td style="${HD}">${g.k} 채무자</td><td style="${HD}">진행</td><td style="${HD}">금액</td><td style="${HD}">담보물</td>`).join('');
+  const groups = scopes.map(k => ({ k, rows: pick(k) })), n = Math.max(1, ...groups.map(g => g.rows.length)), f = 2 / groups.length, W = (v) => `width:${(v * f).toFixed(1)}%;`;   // 열 너비 고정(표가 내용에 따라 흔들리지 않게). 한 구역만 있으면 2배
+  const BADGE = 'display:inline-block;white-space:nowrap;font-size:12px;font-weight:700;padding:1px 7px;';
+  const head = groups.map(g => `<td style="${HD}${W(21)}">${g.k} 채무자</td><td style="${HD}${W(6)}">진행</td><td style="${HD}${W(9)}">금액</td><td style="${HD}${W(14)}">담보물</td>`).join('');
   let body = '';
   for (let i = 0; i < n; i++){
     body += '<tr>' + groups.map(g => {
       const r = g.rows[i]; if (!r) return `<td style="${TD}background:#f3efe6">&nbsp;</td><td style="${TD}text-align:center">&nbsp;</td><td style="${TD}">&nbsp;</td><td style="${TD}">&nbsp;</td>`;
       const c = LR_STAGE[r.stage];
-      return `<td style="${TD}white-space:nowrap">${esc(r.name)}</td><td style="${TD}text-align:center"><span style="background:${c.bg};color:${c.fg};font-size:12px;font-weight:700;padding:1px 5px">${r.stage}</span></td><td style="${TD}text-align:right;white-space:nowrap">${r.amount == null ? '-' : lrN(r.amount) + '백만원'}</td><td style="${TD}">${esc(lrColl(r.coll))}</td>`;
+      return `<td style="${TD}word-break:keep-all">${esc(r.name)}</td><td style="${TD}text-align:center"><span style="${BADGE}background:${c.bg};color:${c.fg}">${r.stage}</span></td><td style="${TD}text-align:right;white-space:nowrap">${r.amount == null ? '-' : lrN(r.amount) + '백만원'}</td><td style="${TD}word-break:keep-all">${esc(lrColl(r.coll))}</td>`;
     }).join('') + '</tr>';
   }
   const foot = groups.map(g => `<td colspan="2" style="${HD}background:#fff">${g.k}(${g.rows.length}건)</td><td colspan="2" style="${HD}background:#fff;text-align:left">${lrN(g.rows.reduce((s, r) => s + (Number(r.amount) || 0), 0))}백만원</td>`).join('');
-  return `<table style="border-collapse:collapse;border:1px solid #000;font-family:'맑은 고딕','Malgun Gothic',sans-serif;color:#000"><tr>${head}</tr>${body}<tr>${foot}</tr></table>`;
+  return `<table style="border-collapse:collapse;border:1px solid #000;table-layout:fixed;width:100%;min-width:940px;font-family:'맑은 고딕','Malgun Gothic',sans-serif;color:#000"><tr>${head}</tr>${body}<tr>${foot}</tr></table>`;
 }
 const lrVisible = () => lrData.filter(r => lrStages[r.stage]);
 function lrSummary(){   // 본점+지점(통합 포함) 합산, 진행상태별 건수·금액
   const TD = 'border:1px solid #000;padding:3px 10px;font-size:14px;', HD = 'border:1px solid #000;padding:5px 10px;font-size:15px;font-weight:700;background:#f3efe6;text-align:center;';
   const v = lrVisible(), sum = (a) => a.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-  const rows = ['실행', '진행', '협의'].filter(k => lrStages[k]).map(k => { const a = v.filter(r => r.stage === k), c = LR_STAGE[k]; return `<tr><td style="${TD}text-align:center"><span style="background:${c.bg};color:${c.fg};font-size:12px;font-weight:700;padding:1px 5px">${k}</span></td><td style="${TD}text-align:right">${a.length}건</td><td style="${TD}text-align:right">${lrN(sum(a))}백만원</td></tr>`; }).join('');
+  const rows = ['실행', '진행', '협의'].filter(k => lrStages[k]).map(k => { const a = v.filter(r => r.stage === k), c = LR_STAGE[k]; return `<tr><td style="${TD}text-align:center"><span style="display:inline-block;white-space:nowrap;background:${c.bg};color:${c.fg};font-size:12px;font-weight:700;padding:1px 7px">${k}</span></td><td style="${TD}text-align:right">${a.length}건</td><td style="${TD}text-align:right">${lrN(sum(a))}백만원</td></tr>`; }).join('');
   return `<table style="border-collapse:collapse;border:1px solid #000;font-family:'맑은 고딕','Malgun Gothic',sans-serif;color:#000;margin-top:12px"><tr><td colspan="3" style="${HD}">전체 합계 (본점+지점)</td></tr><tr><td style="${HD}">진행</td><td style="${HD}">건수</td><td style="${HD}">금액</td></tr>${rows}<tr><td style="${HD}background:#fff">합계</td><td style="${HD}background:#fff;text-align:right">${v.length}건</td><td style="${HD}background:#fff;text-align:right">${lrN(sum(v))}백만원</td></tr></table>`;
 }
 function lrHtml(){
