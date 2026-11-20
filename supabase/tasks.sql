@@ -947,3 +947,10 @@ create policy fj_upd on public.fire_judgments for update to authenticated using 
 create policy fj_del on public.fire_judgments for delete to authenticated using (has_div('credit') or is_admin());
 grant select, insert, update, delete on public.fire_judgments to authenticated;
 alter publication supabase_realtime add table public.fire_judgments;
+
+-- 담보심사 > 화재보험 가입여부 탭: 대출 건 연결은 선택(loan_task_id null 허용), 담보심사 권한자(has_appraisal)도 입력·수정·삭제
+alter table public.fire_judgments alter column loan_task_id drop not null;
+drop policy if exists fj_ins on public.fire_judgments; drop policy if exists fj_upd on public.fire_judgments; drop policy if exists fj_del on public.fire_judgments;
+create policy fj_ins on public.fire_judgments for insert to authenticated with check ((has_div('credit') or has_appraisal() or is_admin()) and created_by = auth.email());
+create policy fj_upd on public.fire_judgments for update to authenticated using (has_div('credit') or has_appraisal() or is_admin()) with check (has_div('credit') or has_appraisal() or is_admin());
+create policy fj_del on public.fire_judgments for delete to authenticated using (has_div('credit') or has_appraisal() or is_admin());

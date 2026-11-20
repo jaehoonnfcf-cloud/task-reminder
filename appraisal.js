@@ -13,7 +13,7 @@ const AP_JIMOK = ['대', '전', '답', '임야', '잡종지', '공장용지', '�
 const AP_JIMOK_ABBR = { '대': '대', '전': '전', '답': '답', '임': '임야', '잡': '잡종지', '공': '공장용지', '도': '도로', '구': '구거', '천': '하천', '과': '과수원', '목': '목장용지', '학': '학교용지', '차': '주차장', '주': '주유소용지', '창': '창고용지', '체': '체육용지', '종': '종교용지', '철': '철도용지', '제': '제방', '수': '수도용지', '원': '공원', '묘': '묘지' };
 
 let apCases = [], apFirms = [], apSettings = {}, apOpenId = null, apFormId = null, apTimer = null;
-let apTab = (() => { try { const t = localStorage.getItem('apTab'); return t === 'rti' || t === 'dep' ? t : 'ap'; } catch (e) { return 'ap'; } })();
+let apTab = (() => { try { const t = localStorage.getItem('apTab'); return t === 'rti' || t === 'dep' || t === 'fire' ? t : 'ap'; } catch (e) { return 'ap'; } })();
 let apMainView = (() => { try { return localStorage.getItem('apMain') || 'map'; } catch (e) { return 'map'; } })();
 let apQ = '', apMine = false, apScope = 'all', apType = 'all', apView = 'active';
 
@@ -204,7 +204,7 @@ function renderAppraisal(){
   const el = $('appraisal');
   if (!el.dataset.ready){
     el.dataset.ready = '1';
-    el.innerHTML = `<div class="seg" id="apTabs" style="align-self:flex-start"><button data-t="ap">🏛 감정평가</button><button data-t="rti">🧮 임대사업자 RTI 계산</button><button data-t="dep">🏠 임차보증금 차감계산</button></div>
+    el.innerHTML = `<div class="seg" id="apTabs" style="align-self:flex-start"><button data-t="ap">🏛 감정평가</button><button data-t="rti">🧮 임대사업자 RTI 계산</button><button data-t="dep">🏠 임차보증금 차감계산</button><button data-t="fire">🔥 화재보험 가입여부</button></div>
     <div id="apSum"></div>
     <div class="seg" id="apMain" style="align-self:flex-start;background:#fff;box-shadow:var(--sh)"><button data-m="map">🗺 지도 (기록 찾기)</button><button data-m="list">📋 목록</button></div>
     <div id="apMapWrap" class="list-panel" style="display:none">
@@ -230,7 +230,7 @@ function renderAppraisal(){
       </div>
       <div class="aphead"><span>채무자</span><span>물건</span><span>평가기관 (✓ 가격 입력 완료)</span><span>금액</span><span>의뢰일</span></div>
       <div id="apList"></div></div>`;
-    $('apTabs').onclick = (e) => { const b = e.target.closest('[data-t]'); if (!b || b.dataset.t === apTab) return; apTab = b.dataset.t; try { localStorage.setItem('apTab', apTab); } catch (x) {} apSetMain(apMainView, true); if (apTab === 'rti') renderRti(); if (apTab === 'dep' && typeof renderDep === 'function') renderDep(); if (typeof applyDivUI === 'function') applyDivUI(); };
+    $('apTabs').onclick = (e) => { const b = e.target.closest('[data-t]'); if (!b || b.dataset.t === apTab) return; apTab = b.dataset.t; try { localStorage.setItem('apTab', apTab); } catch (x) {} apSetMain(apMainView, true); if (apTab === 'rti') renderRti(); if (apTab === 'dep' && typeof renderDep === 'function') renderDep(); if (apTab === 'fire' && typeof renderFireTab === 'function') renderFireTab(); if (typeof applyDivUI === 'function') applyDivUI(); };
     $('apMain').onclick = (e) => { const b = e.target.closest('[data-m]'); if (b) apSetMain(b.dataset.m); };
     apMapWire();
     $('apView').onclick = (e) => { const b = e.target.closest('[data-v]'); if (!b) return; apView = b.dataset.v; renderAppraisal(); };
@@ -244,6 +244,7 @@ function renderAppraisal(){
   { const sm = $('apSum'); if (sm) sm.innerHTML = apTab === 'ap' ? apSummaryHtml() : ''; }
   if (apTab === 'rti' && typeof renderRti === 'function') renderRti();
   if (apTab === 'dep' && typeof renderDep === 'function') renderDep();
+  if (apTab === 'fire' && typeof renderFireTab === 'function') renderFireTab();
   const nb = apCases.filter(c => c.archived_at).length;
   $('apNA').textContent = apCases.length - nb; $('apNB').textContent = nb;
   document.querySelectorAll('#apView button').forEach(b => b.classList.toggle('on', b.dataset.v === apView));
@@ -1085,15 +1086,16 @@ function apSetMain(v, quiet){
   document.querySelectorAll('#apMain button').forEach(b => b.classList.toggle('on', b.dataset.m === apMainView));
   $('apMapWrap').style.display = apMainView === 'map' ? 'block' : 'none';
   $('apListWrap').style.display = apMainView === 'list' ? 'block' : 'none';
-  if (apMainView === 'map' && apTab !== 'rti' && apTab !== 'dep') apMapEnsure();
+  if (apMainView === 'map' && apTab !== 'rti' && apTab !== 'dep' && apTab !== 'fire') apMapEnsure();
   apApplyTab();
 }
 function apApplyTab(){   // 상단 탭: 감정평가(지도·목록) / 임대사업자 RTI 계산
   document.querySelectorAll('#apTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === apTab));
-  const rti = apTab === 'rti', dep = apTab === 'dep', other = rti || dep;
+  const rti = apTab === 'rti', dep = apTab === 'dep', fire = apTab === 'fire', other = rti || dep || fire;
   $('apMain').style.display = other ? 'none' : ''; if (other){ $('apMapWrap').style.display = 'none'; $('apListWrap').style.display = 'none'; }
   if ($('rti')) $('rti').style.display = rti && divn === 'appraisal' ? 'flex' : 'none';
   if ($('dep')) $('dep').style.display = dep && divn === 'appraisal' ? 'flex' : 'none';
+  if ($('fire')) $('fire').style.display = fire && divn === 'appraisal' ? 'flex' : 'none';
 }
 async function apMapEnsure(){
   try { await apLoadLeaflet(); } catch (e) { $('apMapPanel').innerHTML = `<div class="apdup">${esc(e.message)} — 목록 화면을 이용해주세요.</div>`; return; }
