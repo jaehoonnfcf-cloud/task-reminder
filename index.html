@@ -1341,7 +1341,7 @@
   let closedAll = false;
   function rowHtml(t, doneMode){
     const today = kstToday(), g = dueGrp(t, today), loan = t.task_type === 'loan', steps = stepsOf(t), asg = t.work_task_assignees;
-    const sub = [t.task_type === 'loan' && apmLine(t) && `감정 ${apmLine(t)}`, typeof lcSub === 'function' && lcSub(t), t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
+    const sub = [t.task_type === 'loan' && apmLine(t) && `감정 ${apmLine(t)}`, t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
     let prog, act = '';
     if (loan && isDropped(t)){
       const ds = steps.find(s => s.seq === t.dropped_step);
@@ -1365,7 +1365,7 @@
     const avs = `<div class="avs">${asg.map(a => avHtml(a.email, loan ? '' : a.done_at ? 'done' : a.confirmed_at ? 'ack' : '')).join('')}</div>`;
     return `<div class="trow ${g === 'done' || g === 'drop' ? 'done' : ''}${openId === t.id ? ' sel' : ''}" data-id="${t.id}">
       <div class="c-type"><span class="tp ${loan ? 'loan' : ''}">${loan ? '대출' : '일반'}</span>${t.scope ? `<span class="chip sc-${esc(t.scope)}">${esc(t.scope)}</span>` : ''}</div>
-      <div class="c-title"><div class="tt">${esc(loan ? loanLine(t) : t.title)}${(t.work_task_comments || []).length ? ` <span class="cmtc">💬 ${t.work_task_comments.length}</span>` : ''}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}</div>
+      <div class="c-title"><div class="tt">${esc(loan ? loanLine(t) : t.title)}${(t.work_task_comments || []).length ? ` <span class="cmtc">💬 ${t.work_task_comments.length}</span>` : ''}</div>${sub ? `<div class="ts">${esc(sub)}</div>` : ''}${loan && typeof lcChips === 'function' ? lcChips(t) : ''}</div>
       <div class="c-prog prog">${prog}</div><div class="c-who">${avs}</div><div class="c-due">${due}</div><div class="c-act">${act}</div></div>`;
   }
 
@@ -2215,7 +2215,7 @@
 <script src="perf.js?v=33"></script>
 <script src="orig.js?v=2"></script>
 <script src="loanreport.js?v=14"></script>
-<script src="loancheck.js?v=1"></script>
+<script src="loancheck.js?v=2"></script>
 <script src="cover.js?v=1"></script>
 <script src="liquidity.js?v=6"></script>
 </body>
