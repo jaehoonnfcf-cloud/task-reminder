@@ -52,7 +52,7 @@ function lrRender(){
   $('lrBody').innerHTML = `<div class="lrbar">
       ${['실행', '진행', '협의'].map(s => `<label><input type="checkbox" data-lrs="${s}" ${lrStages[s] ? 'checked' : ''} /> ${s} ${cnt(s)}건</label>`).join('')}</div>
     <div class="lrwrap" id="lrTbl">${lrHtml()}</div>
-    <div class="lrnote">※ 협의 = 1단계 · 진행 = 2~4단계 · 실행 = 5단계(올해 실행 완료 포함) · 미진행 처리된 건은 제외 · 금액은 백만원 단위(미입력은 합계에서 제외)</div>`;
+    <div class="lrnote">※ 협의 = 1단계 · 진행 = 2~4단계 · 실행 = 5단계 진행 중 · 완료된 건과 미진행 처리된 건은 제외 · 금액은 백만원 단위(미입력은 합계에서 제외)</div>`;
   document.querySelectorAll('[data-lrs]').forEach(c => { c.onchange = () => { lrStages[c.dataset.lrs] = c.checked; lrRender(); }; });
 }
 function openLoanReport(loans){
