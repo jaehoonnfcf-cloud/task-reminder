@@ -959,3 +959,14 @@ create policy fj_del on public.fire_judgments for delete to authenticated using 
 alter table public.rti_calcs add column if not exists archived_at timestamptz, add column if not exists archived_by text;
 alter table public.deposit_calcs add column if not exists archived_at timestamptz, add column if not exists archived_by text;
 alter table public.fire_judgments add column if not exists archived_at timestamptz, add column if not exists archived_by text;
+
+-- 대출취급 등록: 심사구분 · 담보구분 · 담보지역 (담보요약 collateral 은 이 값으로 앱이 자동 생성). 필수 점검(RTI·임차보증금 계산·화재보험 판단)은 이 값으로 정해짐.
+--  · 심사구분 review_type: 가계대출 / 사업자대출 / 정책자금 (사업자대출이면 biz_type: 임대사업자 / 임대 外 사업자)
+--  · 담보구분 coll_kind: 부동산 / 신용 / 보증서, coll_detail: 부동산(임야·농지·아파트·주택·근린상가·근린상가주택·기타) 또는 보증서(농신보·지역신보), coll_area: 담보지역(ㅇㅇ동·ㅇㅇ리)
+alter table public.work_tasks
+  add column if not exists review_type text check (review_type in ('가계대출','사업자대출','정책자금')),
+  add column if not exists biz_type text check (biz_type in ('임대사업자','임대 外 사업자')),
+  add column if not exists coll_kind text check (coll_kind in ('부동산','신용','보증서')),
+  add column if not exists coll_detail text check (coll_detail in ('임야','농지','아파트','주택','근린상가','근린상가주택','기타','농신보','지역신보')),
+  add column if not exists coll_area text check (coll_area is null or char_length(coll_area) <= 50);
+grant update (review_type, biz_type, coll_kind, coll_detail, coll_area) on public.work_tasks to authenticated;
