@@ -954,3 +954,8 @@ drop policy if exists fj_ins on public.fire_judgments; drop policy if exists fj_
 create policy fj_ins on public.fire_judgments for insert to authenticated with check ((has_div('credit') or has_appraisal() or is_admin()) and created_by = auth.email());
 create policy fj_upd on public.fire_judgments for update to authenticated using (has_div('credit') or has_appraisal() or is_admin()) with check (has_div('credit') or has_appraisal() or is_admin());
 create policy fj_del on public.fire_judgments for delete to authenticated using (has_div('credit') or has_appraisal() or is_admin());
+
+-- RTI 계산 / 임차보증금 차감계산 / 화재보험 가입여부 판단 보관함: archived_at 이 있으면 보관함 (진행중 목록에서 제외, 대출 건 연결·점검 결과는 그대로 유지)
+alter table public.rti_calcs add column if not exists archived_at timestamptz, add column if not exists archived_by text;
+alter table public.deposit_calcs add column if not exists archived_at timestamptz, add column if not exists archived_by text;
+alter table public.fire_judgments add column if not exists archived_at timestamptz, add column if not exists archived_by text;

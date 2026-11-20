@@ -1,7 +1,7 @@
 // 감정평가 > 임차보증금 차감계산 (대출가능금액 산정)
 // 규정: 대출가능금액 = 총감정평가액(토지 포함) × 담보인정비율 − 선순위 설정금액 − 임차보증금 − 소액임차보증금 − 기타 우선채권
 // 의존: index.html 의 $, esc, sb, me, meRow, isAdmin, nameOf, toast, kstToday, canWrite / appraisal.js 의 apPreview, AP_FONT
-let depCalcs = [], depMode = 'list', depDraft = null, depQ = '';
+let depCalcs = [], depMode = 'list', depDraft = null, depQ = '', depView = 'active';
 // 소액임차보증금(최우선변제 보증금 중 일정액) 지역별 기본값. 담보물권 취득 시점에 따라 달라지고 법령이 바뀔 수 있어 계산마다 직접 고칠 수 있다.
 //  · 주택: 주택임대차보호법 시행령 제10조(2023.2.21. 개정 기준)  · 상가: 상가건물 임대차보호법 시행령 제7조 — 현행 수치는 법령 원문으로 꼭 확인할 것
 const DEP_REGIONS = [
@@ -130,20 +130,23 @@ function renderDep(){
   const el = $('dep'); if (!el) return;
   if (depMode === 'edit' && depDraft) return;
   depMode = 'list';
-  const rows = depCalcs.filter(r => !depQ || String(r.title).toLowerCase().includes(depQ));
-  el.innerHTML = `<div class="list-panel"><div class="toolbar"><input id="depQ" class="search" type="search" placeholder="🔍 고객·물건명 검색" value="${esc(depQ)}" />
+  const nB = depCalcs.filter(r => r.archived_at).length;
+  const rows = depCalcs.filter(r => (depView === 'archive' ? !!r.archived_at : !r.archived_at) && (!depQ || String(r.title).toLowerCase().includes(depQ)));
+  if (depView === 'archive') rows.sort((a, b) => String(b.archived_at).localeCompare(String(a.archived_at)));
+  el.innerHTML = `<div class="list-panel"><div class="toolbar"><div class="seg" id="depViewSeg"><button data-v="active" class="${depView === 'active' ? 'on' : ''}">진행중 ${depCalcs.length - nB}</button><button data-v="archive" class="${depView === 'archive' ? 'on' : ''}">📦 보관함 ${nB}</button></div><input id="depQ" class="search" type="search" placeholder="🔍 고객·물건명 검색" value="${esc(depQ)}" />
       ${depCan() ? '<button class="btn small primary" data-p="new">＋ 새 차감계산</button>' : '<span class="pill ro">👀 보기 전용</span>'}</div>
     <div class="dphead"><span>고객 · 물건</span><span style="text-align:right">총감정평가액</span><span style="text-align:right">임차보증금 차감</span><span style="text-align:right">대출가능금액</span><span>작성</span></div>
     <div>${rows.map(r => `<div class="dprow" data-pid="${r.id}"><div><div class="nm">${esc(r.title)}</div><div class="sub">${esc(DEP_MODES[(r.data && r.data.mode) || 'res'])}</div></div>
       <div class="mo">${depW(r.appraisal)}원</div><div class="mo">${depW(r.deduct)}원</div><div class="ln">${depW(r.loanable)}원</div>
-      <div style="font-size:12.5px;color:var(--muted)">${esc(nameOf(r.created_by))}<br>${esc(String(r.updated_at).slice(0, 10))}</div></div>`).join('') || `<div class="blk-empty">${depCalcs.length ? '조건에 맞는 계산이 없어요.' : '저장된 계산이 없어요. “＋ 새 차감계산”으로 시작해요.'}</div>`}</div></div>`;
+      <div style="font-size:12.5px;color:var(--muted)">${esc(nameOf(r.created_by))}<br>${esc(String(r.updated_at).slice(0, 10))}</div></div>`).join('') || `<div class="blk-empty">${depView === 'archive' ? '보관함이 비어 있어요. 처리가 끝난 계산은 열어서 📦 보관함으로 옮길 수 있어요.' : depCalcs.length ? '조건에 맞는 계산이 없어요.' : '저장된 계산이 없어요. “＋ 새 차감계산”으로 시작해요.'}</div>`}</div></div>`;
+  $('depViewSeg').onclick = (e) => { const b = e.target.closest('[data-v]'); if (b){ depView = b.dataset.v; renderDep(); } };
   $('depQ').oninput = (e) => { depQ = e.target.value.trim().toLowerCase(); const pos = e.target.selectionStart; renderDep(); const q = $('depQ'); q.focus(); q.setSelectionRange(pos, pos); };
 }
 function depNew(){ if (!depCan()) return; depDraft = { id: null, title: '', memo: '', d: depNewData('res') }; depMode = 'edit'; renderDepEditor(); }
 function depOpen(id){
   const r = depCalcs.find(x => x.id === id); if (!r) return;
   const d = { ...depNewData((r.data && r.data.mode) || 'res'), ...(r.data || {}) }; d.parts = ((r.data && r.data.parts) || depNewData().parts).map(p => ({ ...depNewPart(p.kind), ...p }));
-  depDraft = { id: r.id, title: r.title, memo: r.memo || '', d, loan: r.loan_task_id || null }; depMode = 'edit'; renderDepEditor();
+  depDraft = { id: r.id, title: r.title, memo: r.memo || '', d, loan: r.loan_task_id || null, arch: r.archived_at || null }; depMode = 'edit'; renderDepEditor();
 }
 $('dep').addEventListener('click', async (e) => {
   const a = e.target.closest('[data-p]');
@@ -154,6 +157,7 @@ $('dep').addEventListener('click', async (e) => {
     if (k === 'save') return depSave(a);
     if (k === 'print') return depPrint();
     if (k === 'del') return depDelete();
+    if (k === 'arch') return depArchive();
     if (k === 'mode'){ if (!depCan()) return; depRead(); depDraft.d.mode = a.dataset.m; return renderDepEditor(); }
     if (k === 'addpart'){ depRead(); depDraft.d.parts.push(depNewPart('주거')); return renderDepEditor(); }
     if (k === 'rmpart'){ depRead(); depDraft.d.parts.splice(+a.dataset.i, 1); return renderDepEditor(); }
@@ -228,7 +232,7 @@ function renderDepEditor(){
   el.innerHTML = `<div class="dpbox" style="padding:14px 18px"><div class="dbline" style="gap:10px">
       <button class="btn small" data-p="back">← 목록</button>
       <input id="depTitle" placeholder="고객·물건명" maxlength="100" value="${esc(D.title)}" style="flex:1;min-width:150px;font-weight:700" ${dis} />
-      <button class="btn small" data-p="print">🖨 인쇄</button>${can ? '<button class="btn small primary" data-p="save">💾 저장</button>' : ''}${can && D.id ? '<button class="btn small danger" data-p="del">삭제</button>' : ''}</div></div>
+      <button class="btn small" data-p="print">🖨 인쇄</button>${can ? '<button class="btn small primary" data-p="save">💾 저장</button>' : ''}${can && D.id ? `<button class="btn small" data-p="arch">${D.arch ? '↩ 진행중으로' : '📦 보관함으로'}</button>` : ''}${can && D.id ? '<button class="btn small danger" data-p="del">삭제</button>' : ''}</div></div>
     ${modeSeg}
     <div class="dped ${mode === 'mix' ? 'mix' : ''}"><div style="display:flex;flex-direction:column;gap:12px;min-width:0">${body}
       <div class="dpbox"><label style="margin-top:0">메모</label><textarea id="depMemo" rows="2" maxlength="500" ${dis}>${esc(D.memo)}</textarea></div></div>
@@ -296,6 +300,14 @@ async function depSave(btn){
   btn.disabled = false; if (r.error) return alert(r.error.message);
   if (!D.id && r.data) D.id = r.data.id;
   toast('💾 저장했어요'); await loadDep(); renderDepEditor();
+}
+async function depArchive(){   // 처리가 끝난 계산을 보관함으로 / 진행중으로 되돌림
+  const D = depDraft; if (!D || !D.id || !depCan()) return;
+  if (!D.arch && !confirm(`"${D.title}" 계산을 보관함으로 옮길까요?\n진행중 목록에서는 빠지고, 보관함에서 언제든 찾아볼 수 있어요.`)) return;
+  const { error } = await sb.from('deposit_calcs').update(D.arch ? { archived_at: null, archived_by: null } : { archived_at: new Date().toISOString(), archived_by: me }).eq('id', D.id);
+  if (error) return alert(error.message);
+  toast(D.arch ? '↩ 진행중으로 꺼냈어요' : '📦 보관함으로 옮겼어요');
+  depDraft = null; depMode = 'list'; if (!D.arch) depView = 'active'; await loadDep(); renderDep();
 }
 async function depDelete(){
   const D = depDraft; if (!D || !D.id) return;
