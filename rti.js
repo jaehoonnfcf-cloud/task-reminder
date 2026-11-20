@@ -99,6 +99,7 @@ async function loadRti(){
   if (!s.error && s.data) rtiSet = s.data;
   if (c.error){ console.warn('RTI 불러오기 실패', c.error.message); return; }
   rtiCalcs = c.data || [];
+  if (typeof lcRefresh === 'function') lcRefresh();
   if (typeof divn !== 'undefined' && divn === 'appraisal' && typeof apTab !== 'undefined' && apTab === 'rti' && rtiMode === 'list') renderRti();
 }
 let rtiTimer = null; const scheduleRti = () => { clearTimeout(rtiTimer); rtiTimer = setTimeout(() => { if (me) loadRti(); }, 400); };
@@ -126,7 +127,7 @@ function rtiNew(){ if (!rtiCan()) return; rtiDraft = { id: null, title: '', kind
 function rtiOpen(id){
   const r = rtiCalcs.find(x => x.id === id); if (!r) return;
   const d = { ...rtiNewData(), ...(r.data || {}) }; d.existing = (d.existing || []).map(x => ({ ...x })); d.news = (d.news || []).map(x => ({ ...x }));
-  rtiDraft = { id: r.id, title: r.title, kind: r.kind, memo: r.memo || '', d }; rtiMode = 'edit'; renderRtiEditor();
+  rtiDraft = { id: r.id, title: r.title, kind: r.kind, memo: r.memo || '', d, loan: r.loan_task_id || null }; rtiMode = 'edit'; renderRtiEditor();
 }
 $('rti').addEventListener('click', async (e) => {
   const a = e.target.closest('[data-r]');
@@ -231,6 +232,7 @@ async function rtiSave(btn){
   rtiRead(); const D = rtiDraft; if (!rtiCan()) return;
   if (!D.title.trim()) return alert('고객명을 입력해주세요.');
   const c = rtiCompute(D.d, D.kind), row = { title: D.title.trim(), kind: D.kind, data: { ...D.d, vcls: c.vcls }, income: c.income, interest: c.interest, rti: c.rti, verdict: c.verdict, memo: D.memo.trim() || null, updated_at: new Date().toISOString() };
+  if (D.loan) row.loan_task_id = D.loan;   // 대출 건에서 시작했거나 이미 연결된 계산이면 연결 유지
   btn.disabled = true;
   const r = D.id ? await sb.from('rti_calcs').update(row).eq('id', D.id) : await sb.from('rti_calcs').insert(row).select('id').single();
   btn.disabled = false; if (r.error) return alert(r.error.message);

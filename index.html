@@ -948,7 +948,7 @@
     if (!started) setInterval(async () => { if (!document.hidden){ await loadAvatars(); renderWho(); render(); } }, 50 * 60 * 1000);   // 서명 URL 갱신
     if (!started) divn = hashDiv() || 'home';   // 열 때마다 현황판이 기본화면 (주소 끝 #credit 등으로 바로 열 수도 있음)
     started = true;
-    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadEvent === 'function') await loadEvent(); if (typeof loadRti === 'function') await loadRti(); if (typeof loadDep === 'function') await loadDep(); if (typeof loadDebt === 'function') await loadDebt(); if (typeof loadCal === 'function') await loadCal(); if (typeof loadPcal === 'function') await loadPcal(); if (typeof loadPerf === 'function') await loadPerf(); if (typeof loadLiq === 'function') loadLiq(); ensureSide(); startRealtime();
+    await loadTelegram(); await loadTasks(); await loadPersonal(); await loadAppraisal(); if (typeof loadEvent === 'function') await loadEvent(); if (typeof loadRti === 'function') await loadRti(); if (typeof loadDep === 'function') await loadDep(); if (typeof loadLc === 'function') await loadLc(); if (typeof loadDebt === 'function') await loadDebt(); if (typeof loadCal === 'function') await loadCal(); if (typeof loadPcal === 'function') await loadPcal(); if (typeof loadPerf === 'function') await loadPerf(); if (typeof loadLiq === 'function') loadLiq(); ensureSide(); startRealtime();
   }
 
   async function reloadMembers(){
@@ -1269,7 +1269,7 @@
     const rb = $('loanRptBtn'); if (rb) rb.onclick = () => {   // 현황표: 현재 진행 중인 협의·진행·실행 건을 본점/지점 표로
       const stg = (t) => { const ci = curIdx(t), n = stepsOf(t).length; return ci === 0 ? '협의' : ci < n - 1 ? '진행' : '실행'; };
       // 현재까지 진행사항: "감정평가 진행 중 · 대출신청 완료 11/18"
-      const progOf = (t) => { const st = stepsOf(t), ci = curIdx(t), prev = ci > 0 ? st[ci - 1] : null; return `${st[ci].name} 진행 중` + (prev && prev.done_at ? ` · ${prev.name} 완료 ${fmtMD(kstDay(prev.done_at))}` : ''); };
+      const progOf = (t) => { const st = stepsOf(t), ci = curIdx(t), prev = ci > 0 ? st[ci - 1] : null; return `${st[ci].name} 진행 중` + (prev && prev.done_at ? ` · ${prev.name} 완료 ${fmtMD(kstDay(prev.done_at))}` : '') + (typeof lcPending === 'function' && lcPending(t).length ? ` · 미점검 ${lcPending(t).map(i => i.name).join('·')}` : ''); };
       // 이번 주(영업일 월~금, KST) 변동: 신규 접수 · 협의→진행(1단계 완료) · 진행→실행(4단계 완료) · 실행 완료(5단계 완료). 지난주와 비교
       const addD = (iso, n) => new Date(Date.parse(iso + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10), mon = smMonday(kstToday()), pmon = addD(mon, -7);
       const inW = (d, m) => !!d && d >= m && d <= addD(m, 4);
@@ -1341,7 +1341,7 @@
   let closedAll = false;
   function rowHtml(t, doneMode){
     const today = kstToday(), g = dueGrp(t, today), loan = t.task_type === 'loan', steps = stepsOf(t), asg = t.work_task_assignees;
-    const sub = [t.task_type === 'loan' && apmLine(t) && `감정 ${apmLine(t)}`, t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
+    const sub = [t.task_type === 'loan' && apmLine(t) && `감정 ${apmLine(t)}`, typeof lcSub === 'function' && lcSub(t), t.directed_by && `요청: ${t.directed_by}`, t.detail, isDropped(t) && t.drop_reason && `사유: ${t.drop_reason}`].filter(Boolean).join(' · ');
     let prog, act = '';
     if (loan && isDropped(t)){
       const ds = steps.find(s => s.seq === t.dropped_step);
@@ -1483,6 +1483,7 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'fund_days' }, () => { if (typeof loadFund === 'function' && typeof divn !== 'undefined' && divn === 'debt') loadFund(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'event_bookings' }, () => { if (typeof scheduleEvent === 'function') scheduleEvent(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_calcs' }, () => { if (typeof scheduleDep === 'function') scheduleDep(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'fire_judgments' }, () => { if (typeof loadLc === 'function') loadLc(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rti_calcs' }, () => { if (typeof scheduleRti === 'function') scheduleRti(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rti_settings' }, () => { if (typeof scheduleRti === 'function') scheduleRti(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'survey_cases' }, () => { if (typeof scheduleDebt === 'function') scheduleDebt(); })
@@ -1507,6 +1508,7 @@
   async function completeStep(tid, seq){
     const tk = byId(tid);
     if (seq === 3 && tk && tk.task_type === 'loan' && !tk.appraisal_mode && !confirm('감정 방식(외부감정 / 자체감정 / 기존감정서 습용 / 감정 불요)이 아직 기록되지 않았어요.\n그래도 감정평가 단계를 완료할까요?')) return false;
+    if (typeof lcGate === 'function' && !lcGate(tk, seq)) return false;   // 내부결재·대출실행 전 취급 점검 미완료 알림
     const { error } = await sb.from('work_task_steps').update({ done_at: new Date().toISOString() }).eq('task_id', tid).eq('seq', seq);
     if (error){ alert(error.message); return false; }
     await sb.functions.invoke('task-notify', { body: { event: 'step_done', task_id: tid, seq } });
@@ -1647,6 +1649,7 @@
         ${lastDone && canUndoStep(t, lastDone) ? `<button class="btn" data-d="undo:${lastDone.seq}">↩ ${esc(lastDone.name)} 되돌리기</button>` : ''}
         ${cur ? `<button class="btn danger" data-d="drop">⛔ 미진행 처리</button>` : ''}</div>` : ''}</div>`;
       body += apprHtml(t, dropped);
+      body += typeof lcHtml === 'function' ? lcHtml(t, dropped) : '';   // 취급 점검(RTI·임차보증금 차감·화재보험)
       body += `<div class="kv"><div class="k">담당자</div><div class="v asgs">${t.work_task_assignees.map(a => `<span class="asgc">${avHtml(a.email, '', 'margin:0')}${esc(nameOf(a.email))}</span>`).join('')}</div></div>`;
     } else {
       body += `<div class="kv"><div class="k">담당자별 진행</div>${t.work_task_assignees.map(a => { const st = asgStage(a), mineRow = a.email === me && canAct(t);
@@ -1702,6 +1705,7 @@
     if (kind === 'edit') return openForm('edit', t.id);
     if (kind === 'drop') return openDrop(t);
     if (kind === 'cover') return typeof loanCoverPrint === 'function' ? loanCoverPrint(t) : undefined;
+    if (kind === 'lc') return typeof lcAct === 'function' && lcAct(t, b.dataset.d);
     if (kind === 'apm'){ apDraft = { id: t.id, mode: arg }; return renderDetail(t); }
     if (kind === 'apr'){ if ($('apNote')) $('apNote').value = arg === '기타' ? '' : arg; if (arg === '기타' && $('apNote')) $('apNote').focus(); return; }
     if (kind === 'apsave'){ b.disabled = true; try { await saveApprMode(t); } finally { b.disabled = false; } return; }
@@ -2211,6 +2215,7 @@
 <script src="perf.js?v=33"></script>
 <script src="orig.js?v=2"></script>
 <script src="loanreport.js?v=14"></script>
+<script src="loancheck.js?v=1"></script>
 <script src="cover.js?v=1"></script>
 <script src="liquidity.js?v=6"></script>
 </body>

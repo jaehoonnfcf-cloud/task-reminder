@@ -903,3 +903,47 @@ drop policy if exists lr_ins on public.liq_reports; drop policy if exists lr_upd
 create policy lr_ins on public.liq_reports for insert to authenticated with check (has_perf() and uploaded_by = auth.email());
 create policy lr_upd on public.liq_reports for update to authenticated using (has_perf()) with check (has_perf());
 create policy lr_del on public.liq_reports for delete to authenticated using (has_perf());
+
+-- ===== 대출취급 점검(판단사항 연결): RTI · 임차보증금차감 · 담보물 화재보험 가입여부 =====
+-- 1) 대출 건(work_tasks)별 필요 여부: null=아직 판단 안 함 / 'need'=필요 / 'none'=해당 없음(+사유). 수정은 대출 업무 권한자(기존 update 정책 + 컬럼 grant).
+alter table public.work_tasks
+  add column if not exists chk_rti text check (chk_rti in ('need','none')),
+  add column if not exists chk_rti_reason text check (chk_rti_reason is null or char_length(chk_rti_reason) <= 100),
+  add column if not exists chk_dep text check (chk_dep in ('need','none')),
+  add column if not exists chk_dep_reason text check (chk_dep_reason is null or char_length(chk_dep_reason) <= 100),
+  add column if not exists chk_fire text check (chk_fire in ('need','none')),
+  add column if not exists chk_fire_reason text check (chk_fire_reason is null or char_length(chk_fire_reason) <= 100);
+grant update (chk_rti, chk_rti_reason, chk_dep, chk_dep_reason, chk_fire, chk_fire_reason) on public.work_tasks to authenticated;
+-- 2) RTI 계산 / 임차보증금 차감계산 ↔ 대출 건 연결 (감정평가 appraisal_cases.loan_task_id 와 같은 방식)
+alter table public.rti_calcs add column if not exists loan_task_id bigint references public.work_tasks(id) on delete set null;
+alter table public.deposit_calcs add column if not exists loan_task_id bigint references public.work_tasks(id) on delete set null;
+create index if not exists rti_calcs_loan_idx on public.rti_calcs (loan_task_id);
+create index if not exists deposit_calcs_loan_idx on public.deposit_calcs (loan_task_id);
+-- 3) 담보물 화재보험 가입여부 판단(수기 입력, 대출 건당 1건): 요보험가입금액 D = 순대출액 A + 선순위설정액 B − 토지감정평가액 C
+--    판정: 면제(전용주택·아파트 단지 내 주거용 오피스텔) 또는 D ≤ 5천만원이면 가입 생략 가능, 그 밖에는 가입 대상. 금액 단위는 원.
+create table if not exists public.fire_judgments (
+  id bigint generated always as identity primary key,
+  loan_task_id bigint not null unique references public.work_tasks(id) on delete cascade,
+  debtor_name text not null default '' check (char_length(debtor_name) <= 100),
+  loan_amount bigint not null default 0 check (loan_amount >= 0),          -- 신규취급 합산금액
+  collateral_type text check (collateral_type is null or char_length(collateral_type) <= 100),
+  net_amount bigint not null default 0 check (net_amount >= 0),             -- A 순대출액
+  senior_amount bigint not null default 0 check (senior_amount >= 0),       -- B 선순위설정액
+  land_amount bigint not null default 0 check (land_amount >= 0),           -- C 토지감정평가액
+  exempt text check (exempt is null or exempt in ('house','officetel')),    -- house=전용주택 / officetel=아파트 단지 내 주거용 오피스텔
+  required_amount bigint not null default 0 check (required_amount >= 0),   -- D (화면에서 계산해 저장)
+  target text not null default 'N' check (target in ('Y','N','EX')),         -- Y 가입 대상 / N 5천만원 이하(생략 가능) / EX 면제(생략 가능)
+  min_amount bigint check (min_amount is null or min_amount >= 0),          -- 요보험가입금액(최소금액)
+  pledge_amount bigint check (pledge_amount is null or pledge_amount >= 0),
+  ins_start date, ins_end date, insurer text check (insurer is null or char_length(insurer) <= 100),
+  confirm_no text check (confirm_no is null or char_length(confirm_no) <= 100), confirm_date date,
+  checker text, memo text check (memo is null or char_length(memo) <= 500),
+  created_by text not null default auth.email(), created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+alter table public.fire_judgments enable row level security;
+create policy fj_sel on public.fire_judgments for select to authenticated using (is_member());
+create policy fj_ins on public.fire_judgments for insert to authenticated with check ((has_div('credit') or is_admin()) and created_by = auth.email());
+create policy fj_upd on public.fire_judgments for update to authenticated using (has_div('credit') or is_admin()) with check (has_div('credit') or is_admin());
+create policy fj_del on public.fire_judgments for delete to authenticated using (has_div('credit') or is_admin());
+grant select, insert, update, delete on public.fire_judgments to authenticated;
+alter publication supabase_realtime add table public.fire_judgments;
