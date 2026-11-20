@@ -25,6 +25,36 @@ function lcRefresh(){   // 열려 있는 대출 상세·목록·담보심사 화
      if (typeof render === 'function') render(); const t = typeof openId !== 'undefined' && openId ? byId(openId) : null; if (t && t.task_type === 'loan' && $('detailOv').style.display === 'block' && !($('lcFireOv') && $('lcFireOv').style.display === 'block')) renderDetail(t); } catch (e) { console.warn(e); }
 }
 
+// ---------- 필수 점검 규칙 (대출 등록의 심사구분·담보구분 기준) ----------
+//  · RTI 산정: 사업자대출 + 임대사업자  · 임차보증금 계산: 부동산 담보의 아파트·주택·근린상가·근린상가주택  · 화재보험 가입여부 판단: 부동산 담보의 근린상가·근린상가주택
+//  심사구분·담보구분이 없는 기존 대출 건은 null(= 예전처럼 담당자가 필요 여부를 직접 판단)
+function lcReqOf(o){
+  if (!o || !o.review_type || !o.coll_kind) return null;
+  const re = o.coll_kind === '부동산', d = o.coll_detail;
+  return { rti: o.review_type === '사업자대출' && o.biz_type === '임대사업자', dep: re && ['아파트', '주택', '근린상가', '근린상가주택'].includes(d), fire: re && ['근린상가', '근린상가주택'].includes(d) };
+}
+const LC_NOREQ = { rti: 'RTI 산정은 사업자대출 중 임대사업자만 필수예요', dep: '임차보증금 계산은 부동산 담보의 아파트·주택·근린상가·근린상가주택만 필수예요', fire: '화재보험 판단은 부동산 담보의 근린상가·근린상가주택만 필수예요' };
+
+// ---------- 프리뷰 대상 대출: 사업자대출 + 대출금액 3억원(300백만원) 이상. 구분: 프리뷰 / 의견서 / 사후검토 / 해당없음 ----------
+const LC_PV = ['프리뷰', '의견서', '사후검토', '해당없음'];
+const lcPvTarget = (t) => t.task_type === 'loan' && t.review_type === '사업자대출' && Number(t.loan_amount) >= 300;
+function lcPvChip(t){   // 목록용 작은 표시
+  if (!lcPvTarget(t) || isDropped(t)) return '';
+  const v = t.preview_type;
+  return `<span class="lcpv ${v ? (v === '해당없음' ? 'na' : 'on') : 'todo'}" title="사업자대출 3억원 이상 = 프리뷰 대상 대출">${v === '해당없음' ? '프리뷰 해당없음' : '프리뷰대상' + (v ? ' · ' + v : ' ?')}</span>`;
+}
+function lcPvHtml(t, dropped){   // 상세용: 대상 표시 + 구분 선택
+  if (!lcPvTarget(t)) return '';
+  const can = canAct(t) && !dropped, v = t.preview_type;
+  return `<div class="kv"><div class="k">프리뷰 대상 <span class="lcpv ${v ? (v === '해당없음' ? 'na' : 'on') : 'todo'}" style="vertical-align:1px">${v || '구분 미지정'}</span></div><div class="v"><div class="lcsub">사업자대출 3억원 이상이라 프리뷰 대상 대출이에요</div>
+    <div class="apmseg">${LC_PV.map(x => `<button type="button" class="${v === x ? 'on' : ''}" data-d="pv:${x}" ${can ? '' : 'disabled'}>${x}</button>`).join('')}</div></div></div>`;
+}
+async function lcPvSet(t, v){
+  if (!canAct(t) || t.preview_type === v) return;
+  const { error } = await sb.from('work_tasks').update({ preview_type: v }).eq('id', t.id); if (error) return alert(error.message);
+  toast(`프리뷰 구분: ${v}`); await loadTasks();
+}
+
 // ---------- 상태 계산 ----------
 function lcFireCalc(f){
   const D = Math.max(0, (f.net_amount || 0) + (f.senior_amount || 0) - (f.land_amount || 0)), target = f.exempt ? 'EX' : D > LC_FIRE_MIN ? 'Y' : 'N';
@@ -32,8 +62,10 @@ function lcFireCalc(f){
 }
 const lcFireText = { Y: '가입 대상', N: '생략 가능 (5천만원 이하)', EX: '생략 가능 (면제)' };
 function lcItem(t, k){
-  const K = LC_KIND[k], mode = t[K.mode] || null, why = t[K.why] || '', it = { k, name: K.name, mode, why, state: 'ask', text: K.ask, calc: null };
-  if (mode === 'none'){ it.state = 'na'; it.text = `해당 없음${why ? ' · ' + why : ''}`; return it; }
+  const K = LC_KIND[k], reqs = lcReqOf(t), mode0 = t[K.mode] || null, why = t[K.why] || '';
+  // 심사·담보 구분이 있으면 필수 여부가 자동으로 정해짐 (필수 → 필요 고정 / 필수 아님 → 해당 없음, 담당자가 필요하다고 바꾸면 필요)
+  const mode = reqs ? (reqs[k] ? 'need' : mode0 === 'need' ? 'need' : 'none') : mode0, it = { k, name: K.name, mode, why, state: 'ask', text: K.ask, calc: null, req: !!(reqs && reqs[k]), derived: !!reqs };
+  if (mode === 'none'){ it.state = 'na'; it.text = reqs ? LC_NOREQ[k] : `해당 없음${why ? ' · ' + why : ''}`; return it; }
   if (!mode) return it;
   if (k === 'fire'){
     const f = lcFire.get(t.id); it.calc = f || null;
@@ -77,7 +109,7 @@ function lcHtml(t, dropped){
     let act = '';
     if (can){
       if (i.state === 'ask') act = B(`mode:${i.k}:need`, '필요', 'primary') + B(`mode:${i.k}:none`, '해당 없음');
-      else if (i.state === 'na') act = B(`mode:${i.k}:ask`, '다시 판단');
+      else if (i.state === 'na') act = i.derived ? B(`mode:${i.k}:need`, '필요로 변경') : B(`mode:${i.k}:ask`, '다시 판단');
       else {
         if (i.k === 'fire'){
           if (lcPick && lcPick.id === t.id && lcPick.kind === 'fire' && !i.calc){
@@ -90,14 +122,14 @@ function lcHtml(t, dropped){
           const list = (i.k === 'rti' ? rtiCalcs : depCalcs).filter(c => !c.loan_task_id && !c.archived_at);
           act = `<select id="lcSel" style="max-width:260px;min-height:34px;padding:4px 8px">${list.map(c => `<option value="${c.id}">${esc(c.title)} (${esc(String(c.updated_at).slice(0, 10))})</option>`).join('') || '<option value="">연결할 수 있는 계산이 없어요</option>'}</select>` + B(`link:${i.k}`, '연결', 'primary') + B('pickx', '취소');
         } else act = calcOk(i.k) ? B(`new:${i.k}`, '＋ 새로 계산', 'primary') + B(`pick:${i.k}`, '기존 계산 연결') : '<span class="muted">감정평가 권한자가 계산해요</span>';
-        act += B(`mode:${i.k}:ask`, '판단 취소');
+        if (!i.req) act += B(`mode:${i.k}:ask`, i.derived ? '필요 취소' : '판단 취소');   // 필수 항목은 취소할 수 없음
       }
     } else if (i.state === 'done' && i.calc && i.k !== 'fire') act = B(`open:${i.k}:${i.calc.id}`, '계산 열기');
     else if (i.k === 'fire' && i.calc) act = B('fire', '판단 보기');
     const st = { ask: '판단 전', na: '해당 없음', todo: '필요 · 미완료', done: '완료' }[i.state];
-    return `<div class="lcr ${i.state}${i.warn ? ' warn' : ''}"><div class="lch"><b>${i.name}</b><span class="lcst">${st}</span></div><div class="lct">${esc(i.text)}</div>${act ? `<div class="lca">${act}</div>` : ''}</div>`;
+    return `<div class="lcr ${i.state}${i.warn ? ' warn' : ''}"><div class="lch"><b>${i.name}</b>${i.req ? '<span class="lcreqt">필수</span>' : ''}<span class="lcst">${st}</span></div><div class="lct">${esc(i.text)}</div>${act ? `<div class="lca">${act}</div>` : ''}</div>`;
   }).join('');
-  return `<div class="kv"><div class="k">취급 점검 <span class="muted" style="font-weight:600">${done}/3</span></div><div class="v lcv"><div class="lcsub">내부결재·대출실행 전에 RTI, 임차보증금 차감, 화재보험 가입여부를 판단해 연결해주세요</div>${rows}</div></div>`;
+  return `<div class="kv"><div class="k">취급 점검 <span class="muted" style="font-weight:600">${done}/3</span></div><div class="v lcv"><div class="lcsub">${t.review_type ? '대출 등록의 심사구분·담보구분에 따라 필수 점검이 정해져요. 내부결재·대출실행 전에 필수 항목을 완료해주세요' : '내부결재·대출실행 전에 RTI, 임차보증금 차감, 화재보험 가입여부를 판단해 연결해주세요'}</div>${rows}</div></div>`;
 }
 
 // ---------- 클릭 처리 ----------
@@ -257,11 +289,12 @@ function lcPrintFire(){   // 담보물 화재보험 가입여부 판단 출력 (
 (function(){
   const st = document.createElement('style'); st.textContent = `
   .lcv{ display:flex; flex-direction:column; gap:8px; } .lcsub{ font-size:12.5px; color:var(--muted); margin-bottom:2px; }
+  .lcpv{ display:inline-block; font-size:11px; font-weight:800; padding:1px 8px; margin-left:6px; border-radius:99px; vertical-align:1px; white-space:nowrap; letter-spacing:0; background:#eef0f5; color:#7a8294; } .lcpv.todo{ background:#fde8b8; color:#8a5a00; } .lcpv.on{ background:#172b4d; color:#fff; } .lcpv.na{ background:#eef0f5; color:#a4aab8; }
   .lcm{ display:flex; gap:3px; flex:none; } .lcc{ font-size:11px; font-weight:800; padding:1px 6px; border-radius:99px; background:#eef0f5; color:#7a8294; white-space:nowrap; letter-spacing:0; }
   .lcc.done{ background:#d9f0de; color:#1d6b32; } .lcc.todo{ background:#fbd5cc; color:#a33a24; } .lcc.ask{ background:#fde8b8; color:#8a5a00; } .lcc.na{ background:#eef0f5; color:#a4aab8; } .lcc.warn{ box-shadow:inset 0 0 0 1.5px #e8a04a; }
   .lcr{ border:1px solid #e3e6ee; border-radius:12px; padding:10px 12px; background:#fff; } .lcr.ask{ border-color:#f2d48a; background:#fffaf0; } .lcr.todo{ border-color:#f0b8aa; background:#fff6f3; } .lcr.done{ border-color:#bfe3c7; background:#f5fbf6; } .lcr.na{ background:#f6f6f8; } .lcr.warn{ border-color:#e8a04a; }
   .lch{ display:flex; align-items:center; gap:8px; font-size:14px; } .lcst{ font-size:11.5px; font-weight:800; padding:1px 8px; border-radius:999px; background:#eef0f5; color:#5a6172; } .lcr.ask .lcst{ background:#fde8b8; color:#8a5a00; } .lcr.todo .lcst{ background:#fbd5cc; color:#a33a24; } .lcr.done .lcst{ background:#cdeed4; color:#1d6b32; }
-  .lct{ margin-top:4px; font-size:13px; color:#44546f; word-break:keep-all; } .lcr.warn .lct{ color:#b45f06; font-weight:700; } .lca{ margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .lcreqt{ font-size:11px; font-weight:800; padding:1px 7px; border-radius:99px; background:#172b4d; color:#fff; } .lct{ margin-top:4px; font-size:13px; color:#44546f; word-break:keep-all; } .lcr.warn .lct{ color:#b45f06; font-weight:700; } .lca{ margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
   #lcFireOv .lfg{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; } #lcFireOv .lfg input{ text-align:left; } #lcFireOv .lfn{ text-align:right !important; } #lcFireOv .lfh{ margin:16px 0 4px; font-size:13.5px; font-weight:800; color:#7a5b00; }
   #lcFireOv .lfres{ margin-top:14px; padding:12px 14px; border-radius:14px; display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; font-size:13.5px; background:#eef6ee; } #lcFireOv .lfres.Y{ background:#fdeee9; } #lcFireOv .lfres b{ font-size:18px; font-weight:800; } #lcFireOv .lfv{ font-weight:800; margin-left:auto; }
   #lcFireOv .checks input{ width:20px; height:20px; min-height:0; -webkit-appearance:auto; appearance:auto; }
