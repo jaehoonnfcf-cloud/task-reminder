@@ -37,16 +37,17 @@ function lrTable(scopes){
   let body = '';
   for (let i = 0; i < n; i++) body += '<tr>' + groups.map(g => {
     const r = g.rows[i]; if (!r) return '<td class="e"></td><td></td><td></td><td></td>';
-    return `<td class="nm" title="${esc(r.name)}">${esc(r.name)}</td><td class="c">${lrBadge(r.stage)}</td><td class="r">${r.amount == null ? '<i>-</i>' : lrN(r.amount)}</td><td class="cl" title="${esc(lrColl(r.coll))}">${esc(lrColl(r.coll))}</td>`;
+    return `<td class="nm" title="${esc(r.name + (r.prog ? ' — ' + r.prog : ''))}"><div class="n1">${esc(r.name)}</div>${r.prog ? `<div class="n2">${esc(r.prog)}</div>` : ''}</td><td class="c">${lrBadge(r.stage)}</td><td class="r">${r.amount == null ? '<i>-</i>' : lrN(r.amount)}</td><td class="cl" title="${esc(lrColl(r.coll))}">${esc(lrColl(r.coll))}</td>`;
   }).join('') + '</tr>';
   const foot = groups.map(g => `<td colspan="2" class="ft">${g.k}<small>${g.rows.length}건</small></td><td colspan="2" class="ft r">${lrN(lrSum(g.rows))}<small>백만원</small></td>`).join('');
   return `<table class="lrt"><thead><tr>${head}</tr></thead><tbody>${body}</tbody><tfoot><tr>${foot}</tr></tfoot></table>`;
 }
 // 이름·담보물이 칸보다 길면 글자 크기를 줄여 한 줄에 맞춘다(최소 10px, 그래도 넘치면 … 처리) → 모든 행의 높이가 같아진다
 function lrFit(){
-  document.querySelectorAll('#lrRep td.nm, #lrRep td.cl').forEach(td => {
+  document.querySelectorAll('#lrRep .n1, #lrRep .n2, #lrRep td.cl').forEach(td => {
+    const min = td.classList.contains('n2') ? 9 : 10;
     td.style.fontSize = ''; let fs = parseFloat(getComputedStyle(td).fontSize);
-    while (td.scrollWidth > td.clientWidth + 1 && fs > 10){ fs -= .5; td.style.fontSize = fs + 'px'; }
+    while (td.scrollWidth > td.clientWidth + 1 && fs > min){ fs -= .5; td.style.fontSize = fs + 'px'; }
   });
 }
 function lrRender(){
@@ -63,7 +64,7 @@ function lrPrint(){
   const rep = $('lrRep'); if (!rep) return;
   const pg = document.createElement('style'); pg.id = 'lrPg'; pg.textContent = '@page{ size:A4 landscape; margin:8mm; }'; document.head.appendChild(pg);
   rep.classList.add('lrfixed'); rep.style.zoom = ''; lrFit();
-  const z = Math.max(.5, Math.min(1, 700 / rep.offsetHeight)); rep.style.zoom = z;   // 인쇄 가능 높이 ≈ 194mm(약 733px)에 여유를 둔 값
+  const z = Math.max(.45, Math.min(1, 700 / rep.offsetHeight)); rep.style.zoom = z;   // 인쇄 가능 높이 ≈ 194mm(약 733px)에 여유를 둔 값
   document.body.classList.add('lr-printing');
   const done = () => { document.body.classList.remove('lr-printing'); rep.classList.remove('lrfixed'); rep.style.zoom = ''; const x = $('lrPg'); if (x) x.remove(); lrFit(); window.removeEventListener('afterprint', done); };
   window.addEventListener('afterprint', done); window.print();
@@ -81,10 +82,10 @@ function openLoanReport(loans, weekly){
     .lrwrap{ overflow-x:auto; border:1px solid #e3e6ee; border-radius:14px; background:#fff; }
     .lrt{ width:100%; min-width:940px; table-layout:fixed; border-collapse:collapse; font-size:14px; font-variant-numeric:tabular-nums; }
     .lrt th{ background:#f3efe6; color:#44546f; font-size:13px; font-weight:800; padding:10px 8px; border-bottom:1px solid #e3e6ee; text-align:center; }
-    .lrt td{ padding:0 10px; height:38px; border-top:1px solid #eef0f5; vertical-align:middle; line-height:1.3; }
+    .lrt td{ padding:0 10px; height:46px; border-top:1px solid #eef0f5; vertical-align:middle; line-height:1.3; }
     .lrt th+th,.lrt td+td{ border-left:1px solid #f0f2f6; } .lrt tbody tr:first-child td{ border-top:0; }
     .lrt th:nth-child(5),.lrt td:nth-child(5){ border-left:2px solid #d9d2c2; }
-    .lrt td.nm,.lrt td.cl{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .lrt td.nm{ font-weight:700; font-size:14px; } .lrt td.c{ text-align:center; } .lrt td.r{ text-align:right; white-space:nowrap; font-weight:700; } .lrt td.r i{ font-style:normal; color:#b4bac6; font-weight:500; }
+    .lrt td.cl,.lrt .n1,.lrt .n2{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .lrt td.nm{ max-width:0; } .lrt .n1{ font-weight:700; font-size:14px; line-height:1.35; } .lrt .n2{ font-size:11px; color:#7a8294; font-weight:500; line-height:1.3; margin-top:1px; } .lrt td.c{ text-align:center; } .lrt td.r{ text-align:right; white-space:nowrap; font-weight:700; } .lrt td.r i{ font-style:normal; color:#b4bac6; font-weight:500; }
     .lrt small{ font-size:11.5px; font-weight:500; color:#8a90a0; margin-left:2px; } .lrt td.cl{ color:#5a6172; font-size:13px; } .lrt td.e{ background:#faf8f3; }
     .lrt tfoot td{ background:#f3efe6; border-top:1px solid #d9d2c2; font-size:15px; font-weight:800; padding:11px 12px; } .lrt tfoot td.ft{ text-align:center; } .lrt tfoot td.ft small{ margin-left:6px; font-size:12.5px; } .lrt tfoot td.r{ text-align:left; }
     .lrh{ margin:20px 2px 8px; font-size:14.5px; font-weight:800; } .lrh small{ font-size:12px; font-weight:500; color:#8a90a0; margin-left:6px; }

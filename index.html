@@ -1268,6 +1268,8 @@
       + card('t5', '실행', '5단계', G.x, `대기 ${G.x.length - xd.length} · 올해 완료 ${xd.length}`) + card('tt', '합계', '미진행 제외', all) + `</div>`;
     const rb = $('loanRptBtn'); if (rb) rb.onclick = () => {   // 현황표: 현재 진행 중인 협의·진행·실행 건을 본점/지점 표로
       const stg = (t) => { const ci = curIdx(t), n = stepsOf(t).length; return ci === 0 ? '협의' : ci < n - 1 ? '진행' : '실행'; };
+      // 현재까지 진행사항: "3/5단계 감정평가 진행 중 · 대출신청 완료 11/18"
+      const progOf = (t) => { const st = stepsOf(t), ci = curIdx(t), prev = ci > 0 ? st[ci - 1] : null; return `${ci + 1}/${st.length}단계 ${st[ci].name} 진행 중` + (prev && prev.done_at ? ` · ${prev.name} 완료 ${fmtMD(kstDay(prev.done_at))}` : ''); };
       // 이번 주(월~일, KST) 변동: 신규 접수 · 협의→진행(1단계 완료) · 진행→실행(4단계 완료) · 실행 완료(5단계 완료). 지난주와 비교
       const addD = (iso, n) => new Date(Date.parse(iso + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10), mon = smMonday(kstToday()), pmon = addD(mon, -7);
       const inW = (d, m) => !!d && d >= m && d <= addD(m, 6);
@@ -1276,7 +1278,7 @@
       const cnt = (f, m) => { const a = loans.filter(t => inW(f(t), m)); return { n: a.length, amt: a.reduce((q, t) => q + (Number(t.loan_amount) || 0), 0) }; };
       const weekly = { today: kstToday(), range: `${fmtMD(mon)}~${fmtMD(addD(mon, 6))}`, items: MET.map(([l, f]) => ({ l, ...cnt(f, mon), prev: cnt(f, pmon) })) };
       // 완료(5단계까지 끝난) 건은 제외하고 현재 진행 중인 건만 명세에 표시
-      openLoanReport(loans.filter(t => curIdx(t) < stepsOf(t).length).sort((a, b) => a.id - b.id).map(t => ({ name: t.title, scope: t.scope, stage: stg(t), amount: t.loan_amount, coll: t.collateral })), weekly);
+      openLoanReport(loans.filter(t => curIdx(t) < stepsOf(t).length).sort((a, b) => a.id - b.id).map(t => ({ name: t.title, scope: t.scope, stage: stg(t), amount: t.loan_amount, coll: t.collateral, prog: progOf(t) })), weekly);
     };
   }
   // ---------- 화면별 요약 위젯 (대시보드형 공용 부품) ----------
@@ -2208,7 +2210,7 @@
 <script src="event.js?v=4"></script>
 <script src="perf.js?v=33"></script>
 <script src="orig.js?v=2"></script>
-<script src="loanreport.js?v=9"></script>
+<script src="loanreport.js?v=10"></script>
 <script src="cover.js?v=1"></script>
 <script src="liquidity.js?v=6"></script>
 </body>
