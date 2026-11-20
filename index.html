@@ -1264,12 +1264,19 @@
     };
     const all = G.c.concat(G.p, G.x);
     el.style.display = '';
-    el.innerHTML = `<div class="smx-t" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>대출 금액 현황</span><button type="button" class="btn small" id="loanRptBtn" style="margin-left:auto">📋 현황표 (복사용)</button></div><div class="smx-cards">` + card('t1', '협의', '1단계', G.c) + card('t3', '진행', '2~4단계', G.p)
+    el.innerHTML = `<div class="smx-t" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>대출 금액 현황</span><button type="button" class="btn small" id="loanRptBtn" style="margin-left:auto">📋 현황표</button></div><div class="smx-cards">` + card('t1', '협의', '1단계', G.c) + card('t3', '진행', '2~4단계', G.p)
       + card('t5', '실행', '5단계', G.x, `대기 ${G.x.length - xd.length} · 올해 완료 ${xd.length}`) + card('tt', '합계', '미진행 제외', all) + `</div>`;
     const rb = $('loanRptBtn'); if (rb) rb.onclick = () => {   // 현황표: 현재 진행 중인 협의·진행·실행 건을 본점/지점 표로
       const stg = (t) => { const ci = curIdx(t), n = stepsOf(t).length; return ci === 0 ? '협의' : ci < n - 1 ? '진행' : '실행'; };
-      // 완료(5단계까지 끝난) 건은 제외하고 현재 진행 중인 건만
-      openLoanReport(loans.filter(t => curIdx(t) < stepsOf(t).length).sort((a, b) => a.id - b.id).map(t => ({ name: t.title, scope: t.scope, stage: stg(t), amount: t.loan_amount, coll: t.collateral })));
+      // 이번 주(월~일, KST) 변동: 신규 접수 · 협의→진행(1단계 완료) · 진행→실행(4단계 완료) · 실행 완료(5단계 완료). 지난주와 비교
+      const addD = (iso, n) => new Date(Date.parse(iso + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10), mon = smMonday(kstToday()), pmon = addD(mon, -7);
+      const inW = (d, m) => !!d && d >= m && d <= addD(m, 6);
+      const doneD = (t, seq) => { const st = stepsOf(t), x = seq < 0 ? st[st.length - 1] : st.find(q => q.seq === seq); return x && x.done_at ? kstDay(x.done_at) : ''; };
+      const MET = [['신규 접수', (t) => t.created_at ? kstDay(t.created_at) : ''], ['협의 → 진행', (t) => doneD(t, 1)], ['진행 → 실행', (t) => doneD(t, 4)], ['실행 완료', (t) => doneD(t, -1)]];
+      const cnt = (f, m) => { const a = loans.filter(t => inW(f(t), m)); return { n: a.length, amt: a.reduce((q, t) => q + (Number(t.loan_amount) || 0), 0) }; };
+      const weekly = { range: `${fmtMD(mon)}~${fmtMD(addD(mon, 6))}`, items: MET.map(([l, f]) => ({ l, ...cnt(f, mon), prev: cnt(f, pmon) })) };
+      // 완료(5단계까지 끝난) 건은 제외하고 현재 진행 중인 건만 명세에 표시
+      openLoanReport(loans.filter(t => curIdx(t) < stepsOf(t).length).sort((a, b) => a.id - b.id).map(t => ({ name: t.title, scope: t.scope, stage: stg(t), amount: t.loan_amount, coll: t.collateral })), weekly);
     };
   }
   // ---------- 화면별 요약 위젯 (대시보드형 공용 부품) ----------
@@ -2201,7 +2208,7 @@
 <script src="event.js?v=4"></script>
 <script src="perf.js?v=33"></script>
 <script src="orig.js?v=2"></script>
-<script src="loanreport.js?v=6"></script>
+<script src="loanreport.js?v=8"></script>
 <script src="cover.js?v=1"></script>
 <script src="liquidity.js?v=6"></script>
 </body>
