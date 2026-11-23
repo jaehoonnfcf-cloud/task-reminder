@@ -1023,3 +1023,31 @@ create trigger team_members_priv_guard_t before update on public.team_members
 -- 확인용 (읽기 전용): 비관리자 계정으로 아래가 0행 업데이트/에러여야 함
 --   update public.team_members set perm_debt = true where email = auth.email();
 -- select policyname, cmd, qual, with_check from pg_policies where tablename = 'team_members';
+
+
+-- ===== [보안] 개인업무 테이블 소유자 전용 RLS 명시 (감사 2번, IDOR) =====
+-- 문제: personal_tasks / personal_recurring 의 RLS 정책이 저장소에 SQL 로 없고 주석만 있어, 실제 적용 여부를 코드로 확인할 수 없었음.
+-- 조치: 본인(owner_email = auth.email()) 행만 조회·등록·수정·삭제. 관리자도 예외 없음. owner_email 은 화면이 보내지 않으므로 기본값 auth.email() 사용.
+-- 서버 정기 작업(task-notify)·gen_personal_occurrences 는 service_role/security definer 이므로 RLS 의 영향을 받지 않음. 여러 번 실행해도 안전.
+alter table public.personal_tasks     alter column owner_email set default auth.email();
+alter table public.personal_recurring alter column owner_email set default auth.email();
+alter table public.personal_tasks     enable row level security;
+alter table public.personal_recurring enable row level security;
+do $$
+declare p record;
+begin
+  for p in select policyname, tablename from pg_policies
+           where schemaname = 'public' and tablename in ('personal_tasks', 'personal_recurring') loop
+    execute format('drop policy %I on public.%I', p.policyname, p.tablename);
+  end loop;
+end $$;
+create policy pt_sel on public.personal_tasks for select to authenticated using (owner_email = auth.email());
+create policy pt_ins on public.personal_tasks for insert to authenticated with check (owner_email = auth.email() and public.is_member());
+create policy pt_upd on public.personal_tasks for update to authenticated using (owner_email = auth.email()) with check (owner_email = auth.email());
+create policy pt_del on public.personal_tasks for delete to authenticated using (owner_email = auth.email());
+create policy pr_sel on public.personal_recurring for select to authenticated using (owner_email = auth.email());
+create policy pr_ins on public.personal_recurring for insert to authenticated with check (owner_email = auth.email() and public.is_member());
+create policy pr_upd on public.personal_recurring for update to authenticated using (owner_email = auth.email()) with check (owner_email = auth.email());
+create policy pr_del on public.personal_recurring for delete to authenticated using (owner_email = auth.email());
+revoke all on public.personal_tasks, public.personal_recurring from anon;
+-- 확인용: select policyname, cmd, qual from pg_policies where tablename in ('personal_tasks','personal_recurring');
