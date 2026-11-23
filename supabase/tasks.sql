@@ -978,3 +978,48 @@ grant update (preview_type) on public.work_tasks to authenticated;
 -- 부동산 종류에 '대지', '잡종지' 추가 (기타 앞): coll_detail 허용 값 확장
 alter table public.work_tasks drop constraint if exists work_tasks_coll_detail_check;
 alter table public.work_tasks add constraint work_tasks_coll_detail_check check (coll_detail in ('임야','농지','아파트','주택','근린상가','근린상가주택','대지','잡종지','기타','농신보','지역신보'));
+
+
+-- ===== [보안] team_members 권한 상승 방지 (감사 8번) =====
+-- 문제: perm_*/is_admin 컬럼을 authenticated 에 UPDATE 로 열어 두었으나, 이를 "관리자만"으로 막는 정책이 저장소에 없었음.
+-- 조치: (1) 쓰기 정책을 관리자 전용으로 재정의 (2) 클라이언트의 insert/delete 권한 회수 (3) 정책이 느슨해져도 막는 트리거(이중 방어)
+-- 본인 이름·사진 변경은 update_my_profile() (security definer) 로만 한다. 멤버 등록·삭제는 admin-users(service_role) 경유.
+-- 적용: SQL Editor 에서 실행 (여러 번 실행해도 안전).
+do $$
+declare p record;
+begin
+  for p in select policyname from pg_policies
+           where schemaname = 'public' and tablename = 'team_members' and cmd <> 'SELECT' loop
+    execute format('drop policy %I on public.team_members', p.policyname);
+  end loop;
+end $$;
+
+create policy tm_update_admin on public.team_members for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+revoke insert, delete on public.team_members from authenticated, anon;
+
+create or replace function public.team_members_priv_guard() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  -- service_role(admin-users) 와 DB 관리 권한(SQL 편집기)은 통과, 로그인 사용자는 관리자만 권한 컬럼 변경 가능
+  if coalesce(auth.role(), '') = 'authenticated' and not public.is_admin() then
+    if new.email is distinct from old.email
+       or new.is_admin is distinct from old.is_admin
+       or new.perm_credit is distinct from old.perm_credit
+       or new.perm_deposit is distinct from old.perm_deposit
+       or new.perm_appraisal is distinct from old.perm_appraisal
+       or new.perm_debt is distinct from old.perm_debt
+       or new.perm_perf is distinct from old.perm_perf then
+      raise exception '권한 항목은 관리자만 변경할 수 있어요';
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists team_members_priv_guard_t on public.team_members;
+create trigger team_members_priv_guard_t before update on public.team_members
+  for each row execute function public.team_members_priv_guard();
+
+-- 확인용 (읽기 전용): 비관리자 계정으로 아래가 0행 업데이트/에러여야 함
+--   update public.team_members set perm_debt = true where email = auth.email();
+-- select policyname, cmd, qual, with_check from pg_policies where tablename = 'team_members';
