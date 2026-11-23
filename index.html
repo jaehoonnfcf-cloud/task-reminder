@@ -1173,6 +1173,7 @@
 
     const groups = (arr) => GROUPS.map(([k, label]) => {
       const items = arr.filter(t => dueGrp(t, today) === k);
+      if (items.length && items.every(t => t.task_type === 'loan')) items.sort((a, b) => a.id - b.id);   // 대출진행: 오래된 건이 위, 최신 등록이 맨 아래
       return items.length ? `<div class="sec-h ${k}">${label}<span class="n">${items.length}</span></div>${items.map(t => rowHtml(t)).join('')}` : '';
     }).join('');
     const mineRows = shown.filter(isMine), otherRows = shown.filter(t => !isMine(t));
