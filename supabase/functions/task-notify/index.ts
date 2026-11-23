@@ -131,8 +131,10 @@ async function handle(req: Request): Promise<Response> {
     const msg = u.message;
     const m = msg?.text?.match(/^\/start\s+(\S+)/);
     if (m) {
-      const { data } = await db.from("telegram_links").update({ chat_id: msg.chat.id, link_code: null }).eq("link_code", m[1]).select("email");
-      await tg(msg.chat.id, data?.length ? "✅ 업무 알림이 연결되었습니다." : "연결 코드가 올바르지 않습니다. 페이지에서 다시 시도해주세요.");
+      // 연결 코드는 발급 후 10분 안에, 1회만 사용 가능 (link_code_at 은 DB 트리거가 기록 — tasks.sql 참고)
+      const since = new Date(Date.now() - 10 * 60e3).toISOString();
+      const { data } = await db.from("telegram_links").update({ chat_id: msg.chat.id, link_code: null }).eq("link_code", m[1]).gte("link_code_at", since).select("email");
+      await tg(msg.chat.id, data?.length ? "✅ 업무 알림이 연결되었습니다." : "연결 코드가 올바르지 않거나 10분이 지났어요. 페이지에서 '연결하기'를 다시 눌러주세요.");
     }
     return ok();
   }

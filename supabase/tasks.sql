@@ -1051,3 +1051,24 @@ create policy pr_upd on public.personal_recurring for update to authenticated us
 create policy pr_del on public.personal_recurring for delete to authenticated using (owner_email = auth.email());
 revoke all on public.personal_tasks, public.personal_recurring from anon;
 -- 확인용: select policyname, cmd, qual from pg_policies where tablename in ('personal_tasks','personal_recurring');
+
+
+-- ===== [보안] 텔레그램 연결 코드 10분 만료 (감사 9번) =====
+-- link_code_at: 코드가 발급(변경)된 시각. 클라이언트가 보낸 값은 무시하고 트리거가 항상 서버 시각으로 기록한다.
+-- 적용 순서: ① 이 SQL 실행 → ② task-notify Edge Function 재배포 (순서가 바뀌면 연결이 잠시 실패함)
+alter table public.telegram_links add column if not exists link_code_at timestamptz;
+create or replace function public.telegram_links_code_guard() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if new.link_code is null then
+    new.link_code_at := null;
+  elsif tg_op = 'INSERT' or new.link_code is distinct from old.link_code then
+    new.link_code_at := now();
+  else
+    new.link_code_at := old.link_code_at;   -- 코드가 그대로면 시각 연장 불가
+  end if;
+  return new;
+end $$;
+drop trigger if exists telegram_links_code_guard_t on public.telegram_links;
+create trigger telegram_links_code_guard_t before insert or update on public.telegram_links
+  for each row execute function public.telegram_links_code_guard();
