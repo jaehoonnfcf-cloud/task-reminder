@@ -693,6 +693,7 @@
         </div>
         <select id="scopeSel"><option value="all">본점·지점·통합</option><option value="본점">본점</option><option value="지점">지점</option><option value="통합">통합</option></select>
         <div class="seg" id="stSeg"><button data-st="open">진행중 <span id="nStOpen"></span></button><button data-st="closed">✅ 완료내역 <span id="nStClosed"></span></button></div>
+        <div class="seg" id="sortSeg" style="display:none"><button data-sort="old">과거순</button><button data-sort="new">최신등록순</button></div>
         <select id="status" style="display:none"><option value="open">미완료</option><option value="closed">완료내역</option><option value="done">완료</option><option value="drop">미진행</option><option value="all">전체 상태</option></select>
         <label class="chk"><input type="checkbox" id="mine" /> 내 업무만</label>
         <input id="q" class="search" type="search" placeholder="🔍 업무·고객명·요청자 검색" />
@@ -866,6 +867,8 @@
   const DIVS = { credit: '대출취급', deposit: '공통업무', appraisal: '담보심사' };
   let me = '', meRow = null, members = [], tasks = [], openId = null, formMode = 'new', editId = null;
   let divn = 'credit', foldOther = false;
+  let loanSort = 'old';   // 대출진행 목록 정렬: old=과거순(오래된 건이 위), new=최신등록순
+  try { loanSort = localStorage.getItem('loanSort') === 'new' ? 'new' : 'old'; } catch (e) {}
   let fType = 'all', fGrp = null, fScope = 'all';     // 구분 필터 / 타일로 고른 그룹
   let storedDiv = null;
   try { fType = localStorage.getItem('fType') || 'all'; storedDiv = localStorage.getItem('div'); } catch (e) {}
@@ -1148,6 +1151,8 @@
     $('nStOpen').textContent = open.length; $('nStClosed').textContent = nClosed;
     document.querySelectorAll('#stSeg button').forEach(b => b.classList.toggle('on', b.dataset.st === (status === 'closed' ? 'closed' : 'open')));
     const closedView = status === 'closed';
+    $('sortSeg').style.display = divn === 'credit' && !closedView ? '' : 'none';
+    document.querySelectorAll('#sortSeg button').forEach(b => b.classList.toggle('on', b.dataset.sort === loanSort));
     $('tiles').style.display = closedView ? 'none' : '';
     const thSpans = document.querySelectorAll('#shared .thead span'); if (thSpans[4]) thSpans[4].textContent = closedView ? '완료일' : divn === 'credit' ? '' : '기한';
     { const th = document.querySelector('#shared .thead'); if (th) th.classList.toggle('lcw', divn === 'credit' && !closedView); }
@@ -1173,6 +1178,7 @@
 
     const groups = (arr) => GROUPS.map(([k, label]) => {
       const items = arr.filter(t => dueGrp(t, today) === k);
+      if (items.length && items.every(t => t.task_type === 'loan')) items.sort((a, b) => loanSort === 'new' ? b.id - a.id : a.id - b.id);   // 대출진행: 과거순(기본) / 최신등록순
       return items.length ? `<div class="sec-h ${k}">${label}<span class="n">${items.length}</span></div>${items.map(t => rowHtml(t)).join('')}` : '';
     }).join('');
     const mineRows = shown.filter(isMine), otherRows = shown.filter(t => !isMine(t));
@@ -1550,6 +1556,7 @@
   $('scopeSel').onchange = () => { fScope = $('scopeSel').value; fGrp = null; render(); };
   $('typeSeg').onclick = (e) => { const b = e.target.closest('[data-type]'); if (!b) return; fType = b.dataset.type; fGrp = null; try { localStorage.setItem('fType', fType); } catch (x) {} render(); };
   $('status').onchange = () => { fGrp = null; render(); };
+  $('sortSeg').onclick = (e) => { const b = e.target.closest('[data-sort]'); if (!b) return; loanSort = b.dataset.sort; try { localStorage.setItem('loanSort', loanSort); } catch (x) {} render(); };
   $('stSeg').onclick = (e) => { const b = e.target.closest('[data-st]'); if (!b) return; $('status').value = b.dataset.st; fGrp = null; closedAll = false; render(); };
   $('list').addEventListener('click', (e) => { if (e.target.closest('#closedMore')){ closedAll = true; render(); } });
   $('mine').onchange = render;
