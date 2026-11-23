@@ -12,7 +12,9 @@
 <link rel="manifest" href="manifest.webmanifest" />
 <title>할일요정</title>
 <script>try { if (navigator.standalone === true) document.documentElement.classList.add('ios-sa'); } catch (e) {}</script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://map.vworld.kr https://api.vworld.kr; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://mknsdknryqqewewxmbpf.supabase.co wss://mknsdknryqqewewxmbpf.supabase.co https://api.vworld.kr https://router.project-osrm.org; frame-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+<!-- supabase-js 2.119.2 (npm, 로컬 사본: CDN 변조·버전 변경 위험 제거) -->
+<script src="vendor/supabase.js"></script>
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
 <style>
   :root{
@@ -790,7 +792,7 @@
   <div class="kv" style="margin-top:24px"><div class="k">감정평가 의뢰서 · 본점/지점 회신 연락처 (팩스 의뢰서에 인쇄됩니다)</div><div id="aContacts"></div></div>
   <div class="kv" style="margin-top:24px"><div class="k">＋ 담당자 등록</div>
     <div class="row"><input id="aName" placeholder="이름 (예: 홍길동)" maxlength="30" /><input id="aEmail" type="email" placeholder="로그인 이메일" /></div>
-    <div class="row" style="margin-top:8px"><input id="aPw" type="text" placeholder="초기 비밀번호 (8자 이상)" autocomplete="off" /></div>
+    <div class="row" style="margin-top:8px"><input id="aPw" type="text" placeholder="초기 비밀번호 (12자 이상)" autocomplete="off" /></div>
     <div class="checks" style="margin-top:10px">
       <label><input type="checkbox" id="aCredit" checked /> 대출취급</label>
       <label><input type="checkbox" id="aDeposit" /> 공통업무</label>
@@ -2229,7 +2231,7 @@
       if (!confirm(`${name}님의 사진을 삭제할까요?`)) return;
       await removeAvatar(email); renderAdmin();
     } else if (b.dataset.act === 'pw'){
-      const pw = prompt(`${name}님의 새 비밀번호를 입력하세요 (8자 이상)`);
+      const pw = prompt(`${name}님의 새 비밀번호를 입력하세요 (12자 이상)`);
       if (!pw) return;
       const r = await adminCall({ action: 'reset', email, password: pw });
       alert(r.error || `${name}님의 비밀번호를 바꿨어요.`);

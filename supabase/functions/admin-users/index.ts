@@ -44,12 +44,12 @@ Deno.serve(async (req) => {
       let user = await findUser(email);
       let created = false;
       if (!user) {
-        if (password.length < 8) return fail("새 계정은 비밀번호를 8자 이상 입력해야 합니다.");
+        if (password.length < 12) return fail("새 계정은 비밀번호를 12자 이상 입력해야 합니다.");
         const { data, error } = await db.auth.admin.createUser({ email, password, email_confirm: true });
         if (error) return fail("계정 생성 실패: " + error.message);
         user = data.user; created = true;
       } else if (password) {
-        if (password.length < 8) return fail("비밀번호는 8자 이상이어야 합니다.");
+        if (password.length < 12) return fail("비밀번호는 12자 이상이어야 합니다.");
         const { error } = await db.auth.admin.updateUserById(user.id, { password });
         if (error) return fail("비밀번호 설정 실패: " + error.message);
       }
@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     }
 
     if (b.action === "reset") {
-      if (password.length < 8) return fail("비밀번호는 8자 이상이어야 합니다.");
+      if (password.length < 12) return fail("비밀번호는 12자 이상이어야 합니다.");
       const user = await findUser(email);
       if (!user) return fail("해당 이메일의 계정이 없습니다.");
       const { error } = await db.auth.admin.updateUserById(user.id, { password });
