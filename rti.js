@@ -297,7 +297,7 @@ function rtiPrint(){
   .org{font-size:14px;font-weight:700;letter-spacing:6px;color:#444}.title{margin-top:12px;border-top:5px solid #111;border-bottom:1px solid #111;padding:12px 0 9px;text-align:center}.title h1{font-size:23px;margin:0;letter-spacing:2px}.title .sub{margin-top:6px;color:#555;font-size:12px}
   h2{font-size:13.5px;margin:14px 0 5px;padding-left:9px;border-left:5px solid #111}table.t{width:calc(100% - 1px);border-collapse:collapse}table.t th,table.t td{border:1px solid #444;padding:5px 8px;vertical-align:middle}table.t th{background:#eee;font-size:11.5px}
   .r{text-align:right}.c{text-align:center}.nw{white-space:nowrap}.big td{font-size:15px;font-weight:800}.est td{background:#fff8e6}tfoot td{font-weight:800;background:#f3f3f3}tr.cur td,tr.cur th{background:#fff3c4;font-weight:800}tr{page-break-inside:avoid}
-  .v{display:inline-block;border:1.5px solid #111;border-radius:99px;padding:3px 14px;font-weight:800}.foot{margin-top:10px;font-size:11px;color:#666}.ex{color:#5b2a86;font-weight:600;margin-top:8px}.note{font-size:11.5px;color:#444;margin-top:6px}`;
+  .v{display:inline-block;border:1.5px solid #111;border-radius:99px;padding:3px 14px;font-weight:800}.foot{margin-top:10px;font-size:11px;color:#666}.ex{color:#5b2a86;font-weight:600;margin-top:8px}.note{font-size:11.5px;color:#444;margin-top:6px}.sg{text-align:right;margin-top:26px;font-size:13px;line-height:2;page-break-inside:avoid}`;
   const loan = (arr, name) => arr.map((x, i) => `<tr><td>${name} ${i + 1}</td><td class="r">${rtiW(x.p)}</td><td class="r">${rtiPctTxt(x.r)}${x.refUsed ? ' <small>(참고)</small>' : ''}</td><td class="c">${x.fixed ? '고정' : '변동'}</td><td class="r">${rtiPctTxt(x.s)}</td><td class="r">${rtiW(x.i)}</td></tr>`).join('');
   const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>임대사업자 RTI 계산내역</title>${link}<style>${css}</style></head><body>
   <div class="org">${esc(org)}</div><div class="title"><h1>임대사업자 RTI 계산내역 (${esc(D.title || '')})</h1><div class="sub">작성일 ${esc(today)} · 작성자 ${esc(nameOf(me))}</div></div>
@@ -319,6 +319,7 @@ function rtiPrint(){
   <div class="note">※ 근린상가주택은 비주택임대업으로 계산 · RTI = 연간 임대소득 ÷ 연간 이자비용(해당 부동산임대업대출 + 해당 임대물건에 대한 기존대출)</div>
   <h2>산출근거</h2><div class="note">• 기준금리: 한국은행고시 예금은행 수신금리(신규취급액 기준) ${rtiPctTxt(d.baseRate)} (${esc(s.base_month)} 기준)<br>• 기존대출 참고금리: 예금은행 대출금리(잔액기준, 중소기업대출) ${rtiPctTxt(s.ref_loan_rate)} (${esc(s.ref_loan_month)} 기준)</div>
   <div class="ex">* RTI 산정 예외 조건: 1) 1억원 이하의 소액 대출 &nbsp; 2) 상속, 채권보전을 위한 경매참가 등 불가피하게 채무를 인수하게 되는 경우${d.forced ? ' (※ 이 건은 불가피한 채무 인수로 표시됨)' : ''}</div>
-  ${D.memo ? `<h2>메모</h2><div class="note" style="white-space:pre-wrap">${esc(D.memo)}</div>` : ''}</body></html>`;
+  ${D.memo ? `<h2>메모</h2><div class="note" style="white-space:pre-wrap">${esc(D.memo)}</div>` : ''}
+  <div class="sg">확인자 : ${esc(nameOf(me))} (인)</div></body></html>`;
   apPreview(html, '임대사업자 RTI 계산내역', `RTI계산_${D.title || ''}`);
 }
