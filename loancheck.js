@@ -282,7 +282,7 @@ function lcPrintFire(){   // 담보물 화재보험 가입여부 판단 출력 (
   <h2>판단 근거</h2><div class="why">${esc(why)}</div>
   <div class="note">요보험가입금액이 5천만원 이하이거나 전용주택·아파트 단지 내 주거용 오피스텔은 화재보험 가입을 생략할 수 있음 · 대출금액은 신규취급 합산금액 · 화재보험은 대출 취급 전에 판단</div>
   ${f.memo ? `<h2>메모</h2><div class="note" style="white-space:pre-wrap;font-size:12px;color:#111">${esc(f.memo)}</div>` : ''}
-  <div class="sg">확인자 : ${esc(f.checker || nameOf(me))} (인)</div></body></html>`;
+  <div class="sg">확인자 : ${esc(nameOf(me))} (인)</div></body></html>`;
   if (typeof apPreview === 'function') apPreview(html, '화재보험 가입여부 판단', `화재보험판단_${f.debtor_name || ''}`);
 }
 
